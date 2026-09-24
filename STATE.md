@@ -10,8 +10,8 @@
 ## Onde estamos
 
 - **Fase:** design geral concluído → decomposto em marcos.
-- **Marco atual:** **M1 — Mídia e legendas** — não iniciado (M0 concluído e integrado ao `master`).
-- **Próxima ação:** escrever o spec do M1.
+- **Marco atual:** **M1 — Mídia e legendas** — spec escrito, aguardando revisão.
+- **Próxima ação:** revisar o spec do M1; depois, plano de implementação.
 
 ## Progresso dos marcos
 
@@ -20,7 +20,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | Marco | Status | Spec | Plano | Observações |
 |---|---|---|---|---|
 | M0 — Fundação | ✅ | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | concluído |
-| M1 — Mídia e legendas | ⬜ | — | — | |
+| M1 — Mídia e legendas | 📝 | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | — | aguardando revisão |
 | M2 — Camada de IA e tradução básica | ⬜ | — | — | |
 | M3 — Memória da série | ⬜ | — | — | |
 | M4 — Tradução contextual | ⬜ | — | — | |
@@ -65,6 +65,8 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-24 | Runner por etapa e escopo `episode`/`series` já no M0; tipos de linha passam para o M1 | spec M0, D4/D5 |
 | 2026-09-24 | Spec do M0 aprovado. Desvios registrados no plano: `LLMRequest`/`LLMResponse`/`Usage` como dataclasses; `inventory` sem `mtime`; módulos `reset`, `status`, `log`, `cli/app`; manifest corrompido → mensagem clara e código 1 | detectados ao validar o plano em protótipo |
 | 2026-09-24 | M0 executado (modo direto): 101 testes, aceite nas duas séries de teste (14 e 65 episódios), interrupção real com SIGINT retomada corretamente | Ctrl+C durante a importação dos módulos (antes de o comando começar) ainda mostra traceback — avaliado na revisão final |
+| 2026-09-24 | M1: abordagem A (parser próprio, cópia exata exceto texto); publicar só com tradução; remux substitui sem backup; PT-BR default, SDH removidas, demais sem default; base Full/Dialog > S&S, SDH nunca; `S01E01-02`; `series.toml` (faixa + estilos) | brainstorming do M1 |
+| 2026-09-24 | Medições: Charlotte `Dialog` ⊇ `S&S` (não há faixas divididas nos casos de teste); ~7 mil eventos → ~515 textos únicos; extração EN idêntica após remux | base do spec M1 |
 | 2026-09-24 | Casos de teste reais em `temporada-teste/` (fora do git): *Charlotte* (simples) e *High School D×D* (difícil); testes automatizados só com dados sintéticos | mídia e legendas reais não entram no repositório |
 
 ---
@@ -77,10 +79,6 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | Obter chave de API Gemini e/ou OpenAI (opcional) | antes de testar perfis `hibrido`/`nuvem` (M2) |
 | Política global padrão de honoríficos (manter / adaptar / remover) | spec do M4 |
 | Nível padrão de palavrão | spec do M4 |
-| Parser de nome de episódio: `guessit` (se suportar 3.14) ou próprio | spec do M1 |
-| Ler metadados de MKV **só por saída JSON** (`mkvmerge -J` / `ffprobe -of json`): a saída de texto do `mkvmerge` sai traduzida conforme o idioma do sistema ("ID da faixa", "Anexo") | spec do M1 (constatado em 2026-09-24) |
-| **Faixas divididas** (`Dialog` + `S&S` separadas, como no Caso 1): traduzir as duas e **mesclar num único `.pt-BR.ass`** (players carregam uma legenda externa por vez) ou gerar duas saídas? Mesclar exige resolver conflito de nomes de estilo e `PlayResX/Y` diferentes | spec do M1 |
-| **Seleção de faixas** — regras que funcionem nos dois casos: `Dialog`+`S&S` (usar ambas) vs `Full`+`S&S` (usar só `Full`); desempate entre dois `Full` de grupos diferentes (config por série? mais linhas? grupo preferido?) | spec do M1 |
 | **Casamento pasta/temporada → AniList** quando o `.nfo` só tem TVDB/TMDB: busca por título + ano + nº de eps, ou usar bases comunitárias de mapeamento (ex.: projetos Anime-Lists / Fribb, que ligam TVDB/TMDB ↔ AniDB/AniList/MAL) — avaliar | spec do M3 |
 | **Escopo da memória da série**: por pasta (show inteiro, todas as temporadas — glossário unificado) ou por temporada/entrada AniList? Metadados vêm por entrada AniList e precisam ser combinados | spec do M3 |
 | Modelos locais que **recusam conteúdo** (fan service) — critério na escolha dos modelos | spec do M2 |
@@ -99,7 +97,7 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 | Conteúdo | 13 eps (`Season 1/`) + 1 especial (`Specials/S00E02`), todos Bluray | uma temporada = uma entrada no AniList |
 | Estrutura | padrão Jellyfin/Sonarr, `tvshow.nfo`, `season.nfo`, `.nfo` por episódio | sinopses locais disponíveis além da Jikan |
 | Sobras de upgrade | `.nfo`/thumbs órfãos de versões HDTV antigas ao lado dos Bluray | varredura parte dos `.mkv`, ignora metadados órfãos |
-| Faixas de legenda | **`Dialog - ENG` + `S&S`** (diálogo e placas/músicas **divididos**) | é preciso usar as duas faixas |
+| Faixas de legenda | **`Dialog - ENG` + `S&S`** — medido: `Dialog` já contém a `S&S` | basta a `Dialog` |
 | Anexos | ~17 fontes por episódio | checagem de acentos e preservação no remux |
 | Áudio | inglês + japonês | — |
 
@@ -133,5 +131,5 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Escrever o spec do **M1 — Mídia e legendas** (pendências: seleção de faixas, faixas divididas, parser de episódio, leitura por JSON).
+1. Revisar o spec do M1 e escrever o plano.
 2. Avaliar, no M1, os menores adiados da revisão do M0 que tocarem o mesmo código (status, descoberta `.MKV`, mensagens do config em PT-BR).
