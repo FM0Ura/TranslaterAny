@@ -104,7 +104,7 @@ enabled = true                              # opcional, padrão true
 [stages.inventory.options]                  # opções próprias da etapa, validadas pelo modelo dela
 ```
 
-- Sem arquivo de config, usa-se um **config padrão embutido** (pipeline com as etapas disponíveis no marco atual).
+- Sem arquivo de config, ou com um config sem a seção `[pipeline]`, usa-se o **pipeline padrão embutido** (as etapas disponíveis no marco atual).
 - `enabled = false` remove a etapa da execução sem tirá-la da lista.
 
 ### 5.2 Validação
@@ -156,7 +156,7 @@ class Stage(ABC):
     version: ClassVar[str]              # mudar = invalidar cache (lógica ou prompt mudou)
     scope: ClassVar[StageScope]
     inputs: ClassVar[tuple[str, ...]] = ()   # etapas cujos artefatos esta lê
-    reads_source: ClassVar[bool] = False     # lê o arquivo de origem diretamente (entra no hash)
+    reads_source: ClassVar[bool] = False     # lê o arquivo de origem diretamente (entra no hash); só em escopo episode
     Options: ClassVar[type[BaseModel]] = NoOptions
 
     def __init__(self, options: BaseModel) -> None: ...
@@ -254,7 +254,8 @@ key = sha256( canonical_json({
     "version": version,
     "options": options.model_dump(mode="json"),
     "inputs": { nome_da_entrada: artifact_hash, ... },   # em ordem de nome
-    "source": fingerprint                                # só se reads_source == True
+    "source": fingerprint,                               # só se reads_source == True
+    "episodes": chaves_dos_episódios_ordenadas           # só em etapas de escopo series (elas veem ctx.episodes)
 }))
 ```
 

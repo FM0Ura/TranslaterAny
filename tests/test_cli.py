@@ -106,3 +106,59 @@ def test_corrupted_manifest_gives_clear_error(tmp_path: Path, data_dir: Path, se
         assert result.exit_code == 1, (args, result.output)
         assert "manifest inválido" in result.output
         assert "Traceback" not in result.output
+
+
+def test_run_unreadable_source_no_traceback(tmp_path: Path, data_dir: Path, series_dir: Path) -> None:
+    bad = series_dir / "Season 1" / "S01E02.mkv"
+    bad.chmod(0)
+    try:
+        result = _invoke("--config", str(_config(tmp_path, data_dir)), "run", str(series_dir))
+    finally:
+        bad.chmod(0o644)
+    assert result.exit_code == 1, result.output
+    assert "Traceback" not in result.output
+    assert "Resumo" in result.output
+
+
+def test_non_utf8_manifest_gives_clear_error(tmp_path: Path, data_dir: Path, series_dir: Path) -> None:
+    cfg = str(_config(tmp_path, data_dir))
+    _invoke("--config", cfg, "run", str(series_dir))
+    manifest = next((data_dir / "series").glob("*/episodes/*/manifest.json"))
+    manifest.write_bytes(
+        manifest.read_text(encoding="utf-8")
+        .replace('"skip_reason": null', '"skip_reason": "episódio"')
+        .encode("latin-1")
+    )
+    for args in (
+        ["run", str(series_dir)],
+        ["status", str(series_dir)],
+        ["retry", str(series_dir), "--from", "t_upper"],
+    ):
+        result = _invoke("--config", cfg, *args)
+        assert result.exit_code == 1, (args, result.output)
+        assert "manifest inválido" in result.output
+        assert "Traceback" not in result.output
+
+
+def test_status_with_corrupted_series_json(tmp_path: Path, data_dir: Path, series_dir: Path) -> None:
+    cfg = str(_config(tmp_path, data_dir))
+    _invoke("--config", cfg, "run", str(series_dir))
+    series_json = next((data_dir / "series").glob("*/series.json"))
+    series_json.write_text("{", encoding="utf-8")
+    result = _invoke("--config", cfg, "status")
+    assert result.exit_code == 0, result.output
+    assert series_json.parent.name[:12] in result.output
+    assert "Traceback" not in result.output
+
+
+def test_run_unwritable_data_dir_reports_doctor_failure(tmp_path: Path, series_dir: Path) -> None:
+    locked = tmp_path / "ro"
+    locked.mkdir()
+    locked.chmod(0o555)
+    try:
+        result = _invoke("--config", str(_config(tmp_path, locked / "data")), "run", str(series_dir))
+    finally:
+        locked.chmod(0o755)
+    assert result.exit_code == 2, result.output
+    assert "data_dir" in result.output
+    assert "Traceback" not in result.output

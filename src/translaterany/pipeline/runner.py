@@ -59,6 +59,8 @@ class Runner:
         self.on_progress = on_progress
         self._scopes: dict[str, StageScope] = {}
         for stage in self.stages:
+            if stage.reads_source and stage.scope is StageScope.SERIES:
+                raise ValueError(f"etapa '{stage.name}': reads_source não é suportado em etapas de série")
             for name in stage.inputs:
                 if name not in self._scopes:
                     raise ValueError(f"etapa '{stage.name}' depende de '{name}', que não vem antes dela")
@@ -124,25 +126,30 @@ class Runner:
     ) -> Outcome:
         manifest = manifests.get(episode)
         unit_name = episode.key if episode else series.key
-        source_fp = None
-        if stage.reads_source and episode is not None:
-            if episode.key not in fingerprints:
-                fingerprints[episode.key] = fingerprint(episode.source)
-            source_fp = fingerprints[episode.key]
-        key = compute_key(stage, self._input_hashes(stage, episode, episodes, manifests), source_fp)
         directory = self.store.artifact_dir(series.key, episode.key if episode else None)
-
-        record = manifest.stages.get(stage.name)
-        if (
-            record is not None
-            and record.status == "done"
-            and record.key == key
-            and record.artifact is not None
-            and (directory / record.artifact).exists()
-            and file_sha256(directory / record.artifact) == record.artifact_hash
-        ):
-            self.log.debug("%s: %s em cache", stage.name, unit_name)
-            return "cached"
+        started = datetime.now(UTC)
+        t0 = time.perf_counter()
+        try:  # origem ilegível ou artefato inacessível falham só esta unidade
+            source_fp = None
+            if stage.reads_source and episode is not None:
+                if episode.key not in fingerprints:
+                    fingerprints[episode.key] = fingerprint(episode.source)
+                source_fp = fingerprints[episode.key]
+            episode_set = [ep.key for ep in episodes] if episode is None else None
+            key = compute_key(stage, self._input_hashes(stage, episode, episodes, manifests), source_fp, episode_set)
+            record = manifest.stages.get(stage.name)
+            if (
+                record is not None
+                and record.status == "done"
+                and record.key == key
+                and record.artifact is not None
+                and (directory / record.artifact).exists()
+                and file_sha256(directory / record.artifact) == record.artifact_hash
+            ):
+                self.log.debug("%s: %s em cache", stage.name, unit_name)
+                return "cached"
+        except Exception as exc:
+            return self._fail(stage, manifests, episode, unit_name, exc, started, t0)
 
         writer = OutputWriter(directory, stage.name)
         ctx = StageContext(
@@ -162,13 +169,13 @@ class Runner:
             llm=self.llm,
             log=self.log.getChild(stage.name),
         )
-        started = datetime.now(UTC)
-        t0 = time.perf_counter()
         error: Exception | None = None
+        digest = ""
         try:
             stage.run(ctx)
             if writer.path is None:
                 raise RuntimeError(f"a etapa '{stage.name}' terminou sem gravar artefato")
+            digest = file_sha256(writer.path)
         except SkipEpisode as exc:
             if episode is None:
                 error = RuntimeError(f"SkipEpisode não é permitido em etapa de série: {exc.reason}")
@@ -181,33 +188,45 @@ class Runner:
         except Exception as exc:  # KeyboardInterrupt não é Exception: propaga
             error = exc
 
-        finished = datetime.now(UTC)
-        duration = round(time.perf_counter() - t0, 3)
         if error is not None:
-            self.log.error("%s: falha em %s — %s", stage.name, unit_name, error, exc_info=error)
-            manifest.stages[stage.name] = StageRecord(
-                status="failed",
-                started_at=started,
-                finished_at=finished,
-                duration_s=duration,
-                error=f"{type(error).__name__}: {error}",
-            )
-            manifest.status = "failed"
-            manifests.save(episode)
-            return "failed"
+            return self._fail(stage, manifests, episode, unit_name, error, started, t0)
 
-        assert writer.path is not None and writer.written is not None
+        assert writer.written is not None
         manifest.stages[stage.name] = StageRecord(
             status="done",
             key=key,
             artifact=writer.written,
-            artifact_hash=file_sha256(writer.path),
+            artifact_hash=digest,
             started_at=started,
-            finished_at=finished,
-            duration_s=duration,
+            finished_at=datetime.now(UTC),
+            duration_s=round(time.perf_counter() - t0, 3),
         )
         manifests.save(episode)
         return "done"
+
+    def _fail(
+        self,
+        stage: Stage,
+        manifests: ManifestSet,
+        episode: Episode | None,
+        unit_name: str,
+        error: Exception,
+        started: datetime,
+        t0: float,
+    ) -> Outcome:
+        self.log.error("%s: falha em %s — %s: %s", stage.name, unit_name, type(error).__name__, error)
+        self.log.debug("traceback da falha em %s", unit_name, exc_info=error)  # arquivo de log / --verbose
+        manifest = manifests.get(episode)
+        manifest.stages[stage.name] = StageRecord(
+            status="failed",
+            started_at=started,
+            finished_at=datetime.now(UTC),
+            duration_s=round(time.perf_counter() - t0, 3),
+            error=f"{type(error).__name__}: {error}",
+        )
+        manifest.status = "failed"
+        manifests.save(episode)
+        return "failed"
 
 
 def _done_hash(record: StageRecord | None, name: str) -> str:

@@ -50,7 +50,7 @@ def load_manifest(path: Path, unit: UnitInfo) -> Manifest:
         return Manifest(unit=unit)
     try:
         manifest = Manifest.model_validate_json(path.read_text(encoding="utf-8"))
-    except ValidationError as exc:
+    except (ValidationError, UnicodeDecodeError, OSError) as exc:
         raise ManifestError(f"manifest inválido em {path}: {exc}") from exc
     if manifest.schema_version != MANIFEST_SCHEMA:
         raise ManifestError(

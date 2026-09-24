@@ -136,3 +136,22 @@ def test_dependency_not_in_pipeline(tmp_path: Path, registry: StageRegistry) -> 
 def test_data_dir_tilde_is_expanded(tmp_path: Path, registry: StageRegistry) -> None:
     cfg = _load(tmp_path, registry, '[general]\ndata_dir = "~/tl-data"\n[pipeline]\nstages = ["t_source"]')
     assert cfg.data_dir == Path.home() / "tl-data"
+
+
+def test_config_without_pipeline_uses_default(tmp_path: Path, registry: StageRegistry) -> None:
+    cfg = _load(tmp_path, registry, f'[general]\ndata_dir = "{tmp_path / "d"}"')
+    assert [s.name for s in cfg.stages] == ["t_source"]
+    assert cfg.data_dir == tmp_path / "d"
+
+
+def test_series_stage_reading_source_rejected(tmp_path: Path, registry: StageRegistry) -> None:
+    from fake_stages import CollectStage
+
+    class SeriesSource(CollectStage):
+        name = "t_series_source"
+        inputs = ()
+        reads_source = True
+
+    registry.register(SeriesSource)
+    with pytest.raises(ConfigError, match="reads_source"):
+        _load(tmp_path, registry, '[pipeline]\nstages = ["t_series_source"]')

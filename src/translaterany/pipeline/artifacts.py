@@ -63,7 +63,11 @@ class ArtifactStore:
             return []
         found = []
         for info in sorted(root.glob("*/series.json")):
-            found.append(json.loads(info.read_text(encoding="utf-8")))
+            try:
+                found.append(json.loads(info.read_text(encoding="utf-8")))
+            except ValueError, OSError:  # series.json ilegível: identifica pela pasta
+                key = info.parent.name
+                found.append({"key": key, "name": f"{key} (series.json ilegível)", "root": ""})
         return found
 
     def episode_keys(self, series_key: str) -> list[str]:

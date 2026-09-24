@@ -49,3 +49,17 @@ def test_corrupted_manifest(tmp_path: Path) -> None:
     path.write_text("{não é json")
     with pytest.raises(ManifestError):
         load_manifest(path, UnitInfo(series="s"))
+
+
+def test_non_utf8_manifest(tmp_path: Path) -> None:
+    path = tmp_path / "manifest.json"
+    path.write_bytes('{"schema": 1, "unit": {"series": "s"}, "skip_reason": "episódio"}'.encode("latin-1"))
+    with pytest.raises(ManifestError):
+        load_manifest(path, UnitInfo(series="s"))
+
+
+def test_unreadable_manifest_path(tmp_path: Path) -> None:
+    path = tmp_path / "manifest.json"
+    path.mkdir()
+    with pytest.raises(ManifestError):
+        load_manifest(path, UnitInfo(series="s"))

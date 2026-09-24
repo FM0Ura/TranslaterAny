@@ -38,13 +38,12 @@ def run(
     """Executa o pipeline numa série."""
     state: AppState = ctx.obj
     cfg = load_or_exit(state)
-    setup_logging("DEBUG" if state.verbose else cfg.log_level, cfg.data_dir / "logs")
-
     results = run_checks(all_checks(cfg))
     if has_failure(results):
         console.print("[red]Verificação de ambiente falhou:[/red]")
         print_checks(results)
         raise typer.Exit(EXIT_USAGE)
+    setup_logging("DEBUG" if state.verbose else cfg.log_level, cfg.data_dir / "logs")
 
     try:
         series, episodes = discover(path)
@@ -70,6 +69,10 @@ def run(
             raise typer.Exit(EXIT_FAILURE) from exc
         except ManifestError as exc:
             console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(EXIT_FAILURE) from exc
+        except OSError as exc:
+            logging.getLogger(LOGGER_NAME).debug("erro de E/S", exc_info=exc)
+            console.print(f"[red]Erro de leitura/gravação: {exc}[/red]")
             raise typer.Exit(EXIT_FAILURE) from exc
         except KeyboardInterrupt as exc:
             console.print("[yellow]Interrompido. Rode o mesmo comando para retomar.[/yellow]")

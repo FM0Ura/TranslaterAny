@@ -26,5 +26,5 @@ class StageConfig(_Strict):
 
 class AppConfig(_Strict):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
-    pipeline: PipelineConfig
+    pipeline: PipelineConfig | None = None  # ausente = pipeline padrão
     stages: dict[str, StageConfig] = Field(default_factory=dict)

@@ -9,9 +9,9 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from translaterany.config.model import AppConfig
+from translaterany.config.model import AppConfig, PipelineConfig
 from translaterany.pipeline.registry import REGISTRY, StageRegistry
-from translaterany.pipeline.stage import Stage
+from translaterany.pipeline.stage import Stage, StageScope
 
 CONFIG_ENV = "TRANSLATERANY_CONFIG"
 
@@ -79,6 +79,8 @@ def load_config(
     except ValidationError as exc:
         raise ConfigError(_format_errors(where, exc)) from exc
 
+    if config.pipeline is None:
+        config.pipeline = PipelineConfig(stages=list(default_pipeline))
     stages = _build_stages(config, registry, where)
     data_dir = data_dir_override or config.general.data_dir or default_data_dir(env)
     return ResolvedConfig(
@@ -122,6 +124,8 @@ def _build_stages(config: AppConfig, registry: StageRegistry, where: str) -> lis
             continue
         if name not in enabled:
             continue
+        if cls.reads_source and cls.scope is StageScope.SERIES:
+            errors.append(f"stages.{name}: reads_source não é suportado em etapas de série")
         for dep in cls.inputs:
             if dep not in available:
                 if dep not in order:

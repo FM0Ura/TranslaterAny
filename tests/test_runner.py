@@ -8,7 +8,7 @@ from translaterany.llm import FakeLLM
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.lock import SeriesLock, SeriesLocked
 from translaterany.pipeline.runner import Runner
-from translaterany.pipeline.stage import Stage
+from translaterany.pipeline.stage import Stage, StageScope
 from translaterany.pipeline.units import discover
 
 
@@ -229,3 +229,44 @@ def test_skip_episode_in_series_stage_marks_series_failed(data_dir: Path, series
     manifest = _manifest(store, series.key, None)
     assert manifest["status"] == "failed"
     assert "SkipEpisode não é permitido" in manifest["stages"]["t_skipping_collect"]["error"]
+
+
+def test_unreadable_source_is_isolated(data_dir: Path, series_dir: Path) -> None:
+    bad = series_dir / "Season 1" / "S01E02.mkv"
+    bad.chmod(0)
+    try:
+        summary, store, series, episodes = _run(data_dir, series_dir, [SourceStage(), UpperStage()])
+    finally:
+        bad.chmod(0o644)
+    assert summary.stages["t_source"].done == 2 and summary.stages["t_source"].failed == 1
+    assert summary.stages["t_upper"].done == 2
+    manifest = _manifest(store, series.key, episodes[1].key)
+    assert manifest["status"] == "failed"
+    assert "PermissionError" in manifest["stages"]["t_source"]["error"]
+
+
+def test_series_stage_key_tracks_episode_set(data_dir: Path, series_dir: Path) -> None:
+    class CountStage(Stage):
+        name = "t_count"
+        version = "1"
+        scope = StageScope.SERIES
+
+        def run(self, ctx) -> None:
+            ctx.output.json(Text(text=str(len(ctx.episodes))))
+
+    _run(data_dir, series_dir, [CountStage()])
+    (series_dir / "Season 1" / "S01E04.mkv").write_text("episodio 4", encoding="utf-8")
+    summary, store, series, _ = _run(data_dir, series_dir, [CountStage()])
+    assert summary.stages["t_count"].done == 1
+    art = store.artifact_dir(series.key, None) / "t_count.json"
+    assert Text.model_validate_json(art.read_text()).text == "4"
+
+
+def test_runner_rejects_reads_source_on_series_stage() -> None:
+    class SeriesSource(CollectStage):
+        name = "t_series_source"
+        inputs = ()
+        reads_source = True
+
+    with pytest.raises(ValueError, match="reads_source"):
+        Runner([SeriesSource()], ArtifactStore(Path("/nao/usado")), FakeLLM())
