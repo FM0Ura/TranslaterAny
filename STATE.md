@@ -10,8 +10,8 @@
 ## Onde estamos
 
 - **Fase:** design geral concluído → decomposto em marcos.
-- **Marco atual:** **M1 — Mídia e legendas** — spec escrito, aguardando revisão.
-- **Próxima ação:** revisar o spec do M1; depois, plano de implementação.
+- **Marco atual:** **M1 — Mídia e legendas** — spec aprovado, plano escrito (código validado em protótipo e no aceite real), aguardando revisão.
+- **Próxima ação:** revisar o plano do M1 e escolher o modo de execução.
 
 ## Progresso dos marcos
 
@@ -20,7 +20,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | Marco | Status | Spec | Plano | Observações |
 |---|---|---|---|---|
 | M0 — Fundação | ✅ | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | concluído |
-| M1 — Mídia e legendas | 📝 | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | — | aguardando revisão |
+| M1 — Mídia e legendas | 📋 | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | [plano](docs/superpowers/plans/2026-09-24-m1-midia-legendas.md) | 11 tarefas; plano aguardando revisão |
 | M2 — Camada de IA e tradução básica | ⬜ | — | — | |
 | M3 — Memória da série | ⬜ | — | — | |
 | M4 — Tradução contextual | ⬜ | — | — | |
@@ -67,6 +67,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-24 | M0 executado (modo direto): 101 testes, aceite nas duas séries de teste (14 e 65 episódios), interrupção real com SIGINT retomada corretamente | Ctrl+C durante a importação dos módulos (antes de o comando começar) ainda mostra traceback — avaliado na revisão final |
 | 2026-09-24 | M1: abordagem A (parser próprio, cópia exata exceto texto); publicar só com tradução; remux substitui sem backup; PT-BR default, SDH removidas, demais sem default; base Full/Dialog > S&S, SDH nunca; `S01E01-02`; `series.toml` (faixa + estilos) | brainstorming do M1 |
 | 2026-09-24 | Medições: Charlotte `Dialog` ⊇ `S&S` (não há faixas divididas nos casos de teste); ~7 mil eventos → ~515 textos únicos; extração EN idêntica após remux | base do spec M1 |
+| 2026-09-24 | Spec M1 aprovado; desvios do plano incorporados ao spec: `cache_payload`, `enabled_by_default`, cenas no `classify`, `LC_ALL=C.UTF-8`, PT de terceiros em qualquer extensão, `run` em pasta de temporada, "Nenhuma série encontrada" | detectados ao prototipar o M1 |
 | 2026-09-24 | Casos de teste reais em `temporada-teste/` (fora do git): *Charlotte* (simples) e *High School D×D* (difícil); testes automatizados só com dados sintéticos | mídia e legendas reais não entram no repositório |
 
 ---
@@ -131,5 +132,5 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Revisar o spec do M1 e escrever o plano.
+1. Revisar o plano do M1 e escolher o modo de execução.
 2. Avaliar, no M1, os menores adiados da revisão do M0 que tocarem o mesmo código (status, descoberta `.MKV`, mensagens do config em PT-BR).

@@ -2,7 +2,7 @@
 
 - **Marco:** M1 (ver [`ROADMAP.md`](../../../ROADMAP.md))
 - **Data:** 2026-09-24
-- **Status:** rascunho para revisão
+- **Status:** aprovado (2026-09-24) · plano: [`2026-09-24-m1-midia-legendas.md`](../plans/2026-09-24-m1-midia-legendas.md) — desvios do plano já incorporados abaixo
 - **Depende de:** M0 ([spec](2026-09-24-m0-fundacao-design.md))
 
 ---
@@ -67,13 +67,16 @@ Medições estruturais feitas nas faixas reais (sem ler falas):
 | `StageContext.previous_output: Path \| None` — artefato anterior da própria etapa para a unidade, se houver | idempotência do remux |
 | `StageContext.force: bool` e `run --force`: reabre episódios `skipped` no início e permite sobrescrever PT-BR de terceiros; **não** entra na chave de cache | §12, §13 |
 | `units.discover` substituída por `library.discover` (§6) | descoberta real |
+| Gancho `Stage.cache_payload(series, episode) -> Any` (padrão `None`), incluído na chave de cache | `series.toml` fica fora do diretório de dados; sem isso, editá-lo não invalidaria `select_track`/`classify` |
+| `Stage.enabled_by_default: ClassVar[bool] = True` e `StageConfig.enabled: bool \| None = None` (None = padrão da etapa) | um config só com `[stages.remux.options]` não pode ligar o remux |
+| `[discovery] min_file_age` no config; `ResolvedConfig.min_file_age` | §6.2 |
 | Chave da série muda (D9) | dados do M0 ficam órfãos; sem usuários ainda — aceito |
 | `status`: "pasta nunca processada" em vez de tabela vazia; episódio cujo arquivo sumiu marcado "(arquivo ausente)" | menores adiados do M0 no mesmo código |
 
 ## 6. Descoberta (`library/`)
 
 ### 6.1 Série ou biblioteca
-`run <pasta>`: a pasta é **uma série** se contiver `tvshow.nfo`, subpastas `Season N`/`Specials`, ou `.mkv` diretamente; caso contrário, **cada subpasta** é avaliada como série (um nível). Arquivos `*.mkv`/`*.MKV` (sem diferenciar maiúsculas).
+`run <pasta>`: se a pasta se chama `Season N`/`Specials` e a pasta-mãe é uma série, processa **a série-mãe restrita àquela pasta** (mesma chave de série). Senão, a pasta é **uma série** se contiver `tvshow.nfo`, subpastas `Season N`/`Specials`, ou `.mkv` diretamente; caso contrário, **cada subpasta** é avaliada como série (um nível) e, se nenhuma for, a saída é "Nenhuma série encontrada" (código 0). Arquivos `*.mkv`/`*.MKV` (sem diferenciar maiúsculas); arquivos e pastas ocultos (`.algo`) são ignorados.
 
 ### 6.2 Episódios
 - Regex (sem diferenciar maiúsculas): `S(\d{1,2})E(\d{1,3})(?:-(\d{1,3}))?` → chave normalizada `S01E04` ou `S01E01-02` (temporada com 2 dígitos, episódio com ao menos 2).
@@ -98,13 +101,13 @@ Valores de `[styles]`: `dialogue`, `sign`, `song`, `romaji`, `karaoke`, `drawing
 
 ## 7. Seleção de faixa (`select_track`, escopo episódio, `reads_source`)
 
-Lê `mkvmerge -J` do MKV.
+Lê `mkvmerge -J` do MKV. Ferramentas externas rodam com `LC_ALL=C.UTF-8` e saída decodificada como UTF-8 — com `C`, o `mkvmerge` corrompe o JSON de nomes não ASCII.
 
 1. **Candidatas:** legendas com `text_subtitles: true` e `codec_id` `S_TEXT/ASS`, `S_TEXT/SSA` ou `S_TEXT/UTF8` (SRT), com idioma (`language_ietf`, senão `language`) `en`/`eng` ou `und`. Legendas em imagem: `codec_id` `S_HDMV/PGS` ou `S_VOBSUB`.
 2. **Descartes com motivo:**
    - SDH/CC — nome contém `SDH`, `CC` (palavra isolada) ou `hearing` (sem diferenciar maiúsculas), ou propriedade `flag_hearing_impaired: true` (só aparece quando marcada): **nunca** base; IDs guardados para o remux.
    - Faixa da própria app (nome com `TranslaterAny`): ignorada.
-3. **PT-BR de terceiros:** faixa com idioma `pt`/`por`/`pt-BR` que **não** seja da app, ou `<vídeo>.pt-BR.ass` ao lado sem a marca D10 ⇒ `SkipEpisode("já existe legenda PT-BR de outra fonte")`, exceto com `--force`.
+3. **PT-BR de terceiros:** faixa com idioma `pt`/`por`/`pt-BR` que **não** seja da app, ou legenda externa ao lado do vídeo com marca `.pt-BR`, `.pt`, `.por` ou `.pob` e extensão `.ass`, `.ssa`, `.srt`, `.vtt` ou `.sub` (sem diferenciar maiúsculas) sem a marca D10 ⇒ `SkipEpisode("já existe ... de outra fonte")`, exceto com `--force`.
 4. **Só legenda em imagem** (PGS/VobSub) ⇒ `SkipEpisode("legenda em imagem (OCR fora da v1)")`. Nenhuma candidata ⇒ `SkipEpisode("sem legenda em inglês")`. Só SDH ⇒ `SkipEpisode("só há legenda SDH")`.
 5. **Ordem de preferência:** override do `series.toml` (se casar com alguma candidata; se não casar, aviso e segue) > faixas que **não** são de placas/músicas (nome contém `sign`, `song`, `S&S`, `forced` ou flag `forced`) > `default` > menor ID.
 6. **Artefato** `select_track.json`:
@@ -167,7 +170,7 @@ class AssEvent:
 Chave = `(estilo, texto limpo normalizado, nº de marcadores)`, onde "texto limpo" é o texto com marcadores e espaços colapsados. Cada unidade guarda os eventos que a usam. Eventos `comment`, vazios ou só de desenho não formam unidade traduzível (ficam com `unit: null`).
 
 ### 10.3 Cenas
-Eventos de diálogo candidatos (não `comment`/`drawing`), em ordem de início, agrupados enquanto o intervalo até o próximo for ≤ `scene_gap_ms` (opção, padrão 5000).
+Calculadas no `classify` (§11.3), porque exigem saber o que é diálogo.
 
 ### 10.4 Artefato `normalize.json`
 ```json
@@ -177,8 +180,7 @@ Eventos de diálogo candidatos (não `comment`/`drawing`), em ordem de início, 
   "events": [{"index": 0, "line_no": 42, "kind": "dialogue", "style": "Default", "start_ms": 1000, "end_ms": 3000,
               "layer": 0, "name": "", "prefix": "{\\an8}", "text": "Hello ⟦1⟧world", "markers": ["{\\i1}"],
               "suffix": "", "drawing": false, "unit": "u12"}],
-  "units": [{"id": "u12", "style": "Default", "text": "Hello ⟦1⟧world", "markers": 1, "events": [0, 57]}],
-  "scenes": [{"id": "s1", "start_ms": 1000, "end_ms": 9000, "events": [0, 1, 2]}]
+  "units": [{"id": "u12", "style": "Default", "text": "Hello ⟦1⟧world", "markers": 1, "events": [0, 57]}]
 }
 ```
 
@@ -204,8 +206,12 @@ Eventos de diálogo candidatos (não `comment`/`drawing`), em ordem de início, 
 ```json
 {"main_style": "GJM_Main",
  "units": {"u12": {"type": "dialogue", "uncertain": false, "rule": "padrão"}},
- "counts": {"dialogue": 374, "sign": 58, "song": 30, "romaji": 59}}
+ "counts": {"dialogue": 377, "romaji": 59, "sign": 60, "song": 30},
+ "scenes": [{"id": "s1", "start_ms": 1000, "end_ms": 9000, "events": [0, 1, 2]}]}
 ```
+
+### 11.3 Cenas
+Eventos cujas unidades são `dialogue`, em ordem de início, agrupados enquanto o intervalo até o próximo for ≤ `scene_gap_ms` (opção do `classify`, padrão 5000).
 
 ## 12. Gravação e publicação
 
@@ -264,7 +270,7 @@ min_file_age = 120          # segundos
 [pipeline]
 stages = ["inventory", "select_track", "extract", "normalize", "classify", "write", "publish", "remux"]
 
-[stages.normalize.options]
+[stages.classify.options]
 scene_gap_ms = 5000
 
 [stages.write.options]
@@ -322,11 +328,12 @@ Sem conteúdo real de legenda no repositório; textos inventados.
 |---|---|
 | *Charlotte* (todos) | `Dialog - ENG` |
 | *D×D* T1–T4 | `Full Subtitle (...)` |
-| *D×D* S00E11–S00E17 | `Full Subtitle (CBM/IK)` |
+| *D×D* especiais com duas `Full` (S00E11–S00E14, S00E16, S00E17) | `Full Subtitle (CBM/IK)` |
+| *D×D* S00E15 e demais especiais com uma faixa | a própria `Full Subtitle (FFF)`/`(P/FFF)` |
 | *D×D* S00E18 | `Full Subtitle (Tensai/IK)` |
 
 3. Para os 79 episódios, `write.ass` é **idêntico byte a byte** a `extract.ass`.
-4. `classify` no *Charlotte* S01E01: estilo principal `GJM_Main`; unidades de diálogo na ordem de 370–380; romaji e karaokê não marcados como traduzíveis.
+4. `classify` no *Charlotte* S01E01: estilo principal `GJM_Main`; 377 unidades de diálogo (medido no protótipo); romaji e karaokê não marcados como traduzíveis.
 5. **Nenhum arquivo criado ou alterado em `temporada-teste/`** (verificado comparando listagem + mtimes antes/depois).
 6. Segunda execução: tudo em cache.
 
