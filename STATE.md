@@ -78,6 +78,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | Política global padrão de honoríficos (manter / adaptar / remover) | spec do M4 |
 | Nível padrão de palavrão | spec do M4 |
 | Parser de nome de episódio: `guessit` (se suportar 3.14) ou próprio | spec do M1 |
+| Ler metadados de MKV **só por saída JSON** (`mkvmerge -J` / `ffprobe -of json`): a saída de texto do `mkvmerge` sai traduzida conforme o idioma do sistema ("ID da faixa", "Anexo") | spec do M1 (constatado em 2026-09-24) |
 | **Faixas divididas** (`Dialog` + `S&S` separadas, como no Caso 1): traduzir as duas e **mesclar num único `.pt-BR.ass`** (players carregam uma legenda externa por vez) ou gerar duas saídas? Mesclar exige resolver conflito de nomes de estilo e `PlayResX/Y` diferentes | spec do M1 |
 | **Seleção de faixas** — regras que funcionem nos dois casos: `Dialog`+`S&S` (usar ambas) vs `Full`+`S&S` (usar só `Full`); desempate entre dois `Full` de grupos diferentes (config por série? mais linhas? grupo preferido?) | spec do M1 |
 | **Casamento pasta/temporada → AniList** quando o `.nfo` só tem TVDB/TMDB: busca por título + ano + nº de eps, ou usar bases comunitárias de mapeamento (ex.: projetos Anime-Lists / Fribb, que ligam TVDB/TMDB ↔ AniDB/AniList/MAL) — avaliar | spec do M3 |
@@ -123,7 +124,7 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 |---|---|
 | Python 3.14 via `uv` | ✅ |
 | `ffmpeg` / `ffprobe` | ✅ instalado |
-| `mkvtoolnix` (`mkvextract`, `mkvmerge`) | ❌ instalar antes do M1 |
+| `mkvtoolnix` (`mkvextract`, `mkvmerge`) | ✅ v102.0 via Homebrew (`/home/linuxbrew/.linuxbrew/bin`) |
 | Ollama | ❌ instalar antes do M2 |
 | LanguageTool | ❌ instalar antes do M7 |
 | GPU | NVIDIA RTX 3060 12 GB · 46 GB RAM · 12 threads |
@@ -132,6 +133,5 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Escrever o spec do **M1 — Mídia e legendas** (pendências: seleção de faixas, faixas divididas, parser de episódio).
-2. Instalar `mkvtoolnix` antes de implementar o M1.
-3. Avaliar, no M1, os menores adiados da revisão do M0 que tocarem o mesmo código (status, descoberta `.MKV`, mensagens do config em PT-BR).
+1. Escrever o spec do **M1 — Mídia e legendas** (pendências: seleção de faixas, faixas divididas, parser de episódio, leitura por JSON).
+2. Avaliar, no M1, os menores adiados da revisão do M0 que tocarem o mesmo código (status, descoberta `.MKV`, mensagens do config em PT-BR).
