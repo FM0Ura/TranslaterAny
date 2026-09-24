@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from fake_stages import TEST_STAGES
+from mkvtools import FULL_ASS, SIGNS_ASS, Sub, make_mkv
 
 from translaterany.pipeline.registry import REGISTRY, StageRegistry
 
@@ -39,3 +40,19 @@ def series_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def data_dir(tmp_path: Path) -> Path:
     return tmp_path / "data"
+
+
+@pytest.fixture
+def synthetic_series(tmp_path: Path) -> Path:
+    """Série com um MKV real (só legendas): S&S default, Dialog completa, SDH e 2 fontes."""
+    root = tmp_path / "lib" / "Serie (2020)"
+    make_mkv(
+        root / "Season 1" / "S01E01 - A.mkv",
+        [
+            Sub(SIGNS_ASS, "S&S", default=True),
+            Sub(FULL_ASS, "Dialog - ENG"),
+            Sub(FULL_ASS, "English SDH", hearing_impaired=True),
+        ],
+        fonts=2,
+    )
+    return root
