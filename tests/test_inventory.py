@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
 
+from translaterany.library import discover
 from translaterany.llm import FakeLLM
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import REGISTRY
 from translaterany.pipeline.runner import Runner
-from translaterany.pipeline.units import discover
 from translaterany.stages.inventory import InventoryStage
 
 
@@ -32,4 +32,14 @@ def test_builtin_stages_registered_and_default_pipeline() -> None:
     from translaterany.stages import DEFAULT_PIPELINE
 
     assert "inventory" in REGISTRY
-    assert DEFAULT_PIPELINE == ("inventory",)
+    assert DEFAULT_PIPELINE == (
+        "inventory",
+        "select_track",
+        "extract",
+        "normalize",
+        "classify",
+        "write",
+        "publish",
+        "remux",
+    )
+    assert REGISTRY.get("remux").enabled_by_default is False

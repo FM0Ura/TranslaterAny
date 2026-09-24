@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from translaterany.pipeline.artifacts import ArtifactStore
 
@@ -12,6 +13,7 @@ class UnitStatus:
     status: str  # ok | skipped | failed
     last_done: str | None  # última etapa concluída, na ordem do pipeline
     detail: str | None  # motivo do pulo ou erro da falha
+    missing: bool = False  # o arquivo de origem do episódio não existe mais
 
 
 def series_status(store: ArtifactStore, series_key: str, stage_order: Sequence[str]) -> list[UnitStatus]:
@@ -27,5 +29,6 @@ def series_status(store: ArtifactStore, series_key: str, stage_order: Sequence[s
         detail = manifest.skip_reason
         if manifest.status == "failed" and failed:
             detail = failed[-1].error
-        rows.append(UnitStatus(label, manifest.status, done[-1] if done else None, detail))
+        missing = episode_key is not None and bool(manifest.unit.source) and not Path(manifest.unit.source).exists()
+        rows.append(UnitStatus(label, manifest.status, done[-1] if done else None, detail, missing))
     return rows

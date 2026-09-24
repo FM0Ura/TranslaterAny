@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from mkvtools import FULL_ASS, SIGNS_ASS, Sub, make_mkv, needs_mkvtoolnix
 from typer.testing import CliRunner
 
 from translaterany.cli import app
@@ -9,7 +10,8 @@ runner = CliRunner()
 
 def _config(tmp_path: Path, data_dir: Path, stages: str = '"t_source", "t_upper"') -> Path:
     path = tmp_path / "config.toml"
-    path.write_text(f'[general]\ndata_dir = "{data_dir}"\n[pipeline]\nstages = [{stages}]\n', encoding="utf-8")
+    text = f'[general]\ndata_dir = "{data_dir}"\n[discovery]\nmin_file_age = 0\n[pipeline]\nstages = [{stages}]\n'
+    path.write_text(text, encoding="utf-8")
     return path
 
 
@@ -74,14 +76,19 @@ def test_doctor_ok_and_config_failure(tmp_path: Path, data_dir: Path) -> None:
     assert bad.exit_code == 1
 
 
-def test_default_config_runs_inventory(tmp_path: Path, series_dir: Path) -> None:
-    result = runner.invoke(
-        app,
-        ["--data-dir", str(tmp_path / "d"), "run", str(series_dir)],
-        env={"XDG_CONFIG_HOME": str(tmp_path / "sem-config"), "TRANSLATERANY_CONFIG": ""},
-    )
+@needs_mkvtoolnix
+def test_default_config_runs_m1_pipeline(tmp_path: Path) -> None:
+    root = tmp_path / "lib" / "Serie"
+    make_mkv(root / "S01E01.mkv", [Sub(SIGNS_ASS, "S&S", default=True), Sub(FULL_ASS, "Dialog - ENG")])
+    env = {"XDG_CONFIG_HOME": str(tmp_path / "sem-config"), "TRANSLATERANY_CONFIG": ""}
+    result = runner.invoke(app, ["--data-dir", str(tmp_path / "d"), "run", str(root)], env=env)
     assert result.exit_code == 0, result.output
-    assert "inventory" in result.output
+    for stage in ("inventory", "select_track", "extract", "normalize", "classify", "write", "publish"):
+        assert stage in result.output
+    assert "remux" not in result.output  # desligado por padrão
+    status = runner.invoke(app, ["--data-dir", str(tmp_path / "d"), "status", str(root)], env=env)
+    assert "Dialog - ENG" in status.output and "publish" in status.output
+    assert not list(root.glob("*.pt-BR.ass"))
 
 
 def test_run_empty_folder(tmp_path: Path, data_dir: Path) -> None:
@@ -89,7 +96,7 @@ def test_run_empty_folder(tmp_path: Path, data_dir: Path) -> None:
     empty.mkdir()
     result = _invoke("--config", str(_config(tmp_path, data_dir)), "run", str(empty))
     assert result.exit_code == 0, result.output
-    assert "0 episódio(s)" in result.output
+    assert "Nenhuma série encontrada" in result.output
 
 
 def test_corrupted_manifest_gives_clear_error(tmp_path: Path, data_dir: Path, series_dir: Path) -> None:
@@ -162,3 +169,37 @@ def test_run_unwritable_data_dir_reports_doctor_failure(tmp_path: Path, series_d
     assert result.exit_code == 2, result.output
     assert "data_dir" in result.output
     assert "Traceback" not in result.output
+
+
+def test_status_never_processed(tmp_path: Path, data_dir: Path, series_dir: Path) -> None:
+    result = _invoke("--config", str(_config(tmp_path, data_dir)), "status", str(series_dir))
+    assert result.exit_code == 0 and "Pasta nunca processada" in result.output
+
+
+def test_status_marks_missing_file(tmp_path: Path, data_dir: Path, series_dir: Path) -> None:
+    cfg = str(_config(tmp_path, data_dir))
+    _invoke("--config", cfg, "run", str(series_dir))
+    (series_dir / "Season 1" / "S01E03.mkv").unlink()
+    result = _invoke("--config", cfg, "status", str(series_dir))
+    assert "arquivo ausente" in result.output
+
+
+def test_run_library_with_broken_series_toml(tmp_path: Path, data_dir: Path) -> None:
+    lib = tmp_path / "Anime"
+    (lib / "Boa" / "Season 1").mkdir(parents=True)
+    (lib / "Boa" / "Season 1" / "S01E01.mkv").write_text("episodio", encoding="utf-8")
+    (lib / "Ruim" / "Season 1").mkdir(parents=True)
+    (lib / "Ruim" / "Season 1" / "S01E01.mkv").write_text("episodio", encoding="utf-8")
+    (lib / "Ruim" / "series.toml").write_text("[subtitles\n", encoding="utf-8")
+    result = _invoke("--config", str(_config(tmp_path, data_dir)), "run", str(lib))
+    assert result.exit_code == 1, result.output
+    assert "Série: Boa" in result.output and "Resumo — Boa" in result.output
+    assert "series.toml" in result.output and "Resumo — Ruim" not in result.output
+
+
+def test_run_lists_ignored_files(tmp_path: Path, data_dir: Path, series_dir: Path) -> None:
+    (series_dir / "Season 1" / "S01E01 - outra versão.mkv").write_text("dup", encoding="utf-8")
+    result = _invoke("--config", str(_config(tmp_path, data_dir)), "run", str(series_dir))
+    assert result.exit_code == 0, result.output
+    assert "ignorado nesta execução" in result.output and "duplicado" in result.output
+    assert "2 episódio(s)" in result.output

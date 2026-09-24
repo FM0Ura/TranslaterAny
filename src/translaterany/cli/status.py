@@ -1,5 +1,6 @@
 """Comando status."""
 
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -7,12 +8,23 @@ import typer
 from rich.table import Table
 
 from translaterany.cli.app import EXIT_FAILURE, EXIT_USAGE, AppState, app, console, load_or_exit
+from translaterany.library import discover
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.manifest import ManifestError
 from translaterany.pipeline.status import series_status
-from translaterany.pipeline.units import discover
 
 _COLORS = {"ok": "green", "skipped": "yellow", "failed": "red"}
+
+
+def _track_name(store: ArtifactStore, series_key: str, episode_key: str | None) -> str:
+    """Nome da faixa escolhida pelo select_track, se já existir."""
+    if episode_key is None:
+        return ""
+    path = store.artifact_dir(series_key, episode_key) / "select_track.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))["chosen"]["name"]
+    except OSError, ValueError, KeyError:
+        return ""
 
 
 @app.command()
@@ -30,6 +42,9 @@ def status(
         except NotADirectoryError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(EXIT_USAGE) from exc
+        if not store.series_dir(series.key).exists():
+            console.print(f"Pasta nunca processada: {series.name}")
+            return
         targets = [(series.key, series.name)]
     else:
         targets = [(info["key"], info["name"]) for info in store.known_series()]
@@ -40,7 +55,7 @@ def status(
     order = [s.name for s in cfg.stages]
     for key, name in targets:
         table = Table(title=name)
-        for column in ("Unidade", "Status", "Última etapa", "Detalhe"):
+        for column in ("Unidade", "Status", "Última etapa", "Faixa", "Detalhe"):
             table.add_column(column)
         try:
             rows = series_status(store, key, order)
@@ -49,5 +64,7 @@ def status(
             raise typer.Exit(EXIT_FAILURE) from exc
         for row in rows:
             color = _COLORS.get(row.status, "white")
-            table.add_row(row.unit, f"[{color}]{row.status}[/{color}]", row.last_done or "—", row.detail or "")
+            unit = row.unit + (" (arquivo ausente)" if row.missing else "")
+            track = _track_name(store, key, None if row.unit == "(série)" else row.unit)
+            table.add_row(unit, f"[{color}]{row.status}[/{color}]", row.last_done or "—", track, row.detail or "")
         console.print(table)
