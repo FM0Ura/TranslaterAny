@@ -1,0 +1,136 @@
+# Estado do projeto — TranslaterAny
+
+> Fotografia atual do desenvolvimento. O plano completo está em [`ROADMAP.md`](ROADMAP.md).
+> Atualize este arquivo ao concluir cada etapa de um marco (spec, plano, implementação) e sempre que uma decisão for tomada.
+
+**Última atualização:** 2026-09-24
+
+---
+
+## Onde estamos
+
+- **Fase:** design geral concluído → decomposto em marcos.
+- **Marco atual:** **M0 — Fundação** — spec aprovado, plano escrito (código validado em protótipo), aguardando revisão.
+- **Próxima ação:** revisar o plano do M0, configurar a identidade do git, fazer o commit inicial e escolher o modo de execução.
+
+## Progresso dos marcos
+
+Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação · ✅ pronto
+
+| Marco | Status | Spec | Plano | Observações |
+|---|---|---|---|---|
+| M0 — Fundação | 📋 | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | 10 tarefas; plano aguardando revisão |
+| M1 — Mídia e legendas | ⬜ | — | — | |
+| M2 — Camada de IA e tradução básica | ⬜ | — | — | |
+| M3 — Memória da série | ⬜ | — | — | |
+| M4 — Tradução contextual | ⬜ | — | — | |
+| M5 — Verificações e métricas | ⬜ | — | — | |
+| M6 — Refinamento I | ⬜ | — | — | |
+| M7 — Refinamento II | ⬜ | — | — | |
+| M8 — Portões e laço do QA | ⬜ | — | — | fim da v1 |
+
+---
+
+## Registro de decisões
+
+| Data | Decisão | Motivo / observação |
+|---|---|---|
+| 2026-09-24 | Abordagem: pipeline linear de etapas especializadas com artefatos persistidos | previsível, retomável, testável por etapa |
+| 2026-09-24 | Entrada: legendas **embutidas no MKV** | formato predominante da biblioteca |
+| 2026-09-24 | Saída: `.pt-BR.ass` externo por padrão; remux no MKV opcional | não mexe no original; remux quando desejado |
+| 2026-09-24 | Provedor de IA configurável **por etapa**; **local-first** (Ollama); nuvem = Gemini ou ChatGPT | custo baixo, GPU RTX 3060 12 GB disponível |
+| 2026-09-24 | Interface: **CLI primeiro**; core desacoplado para UI/daemon futuros | |
+| 2026-09-24 | **Totalmente automático** — sem paradas para revisão humana | YAMLs continuam editáveis depois |
+| 2026-09-24 | **Python 3.14** mantido | |
+| 2026-09-24 | Máxima modularidade: etapas plugáveis via config | |
+| 2026-09-24 | Memória da série construída sobre a **série inteira** (map-reduce), sem snapshots por episódio | consistência desde o ep. 1; risco de "spoiler" aceito |
+| 2026-09-24 | Personagens (nome, gênero, papel) vêm do **AniList**; IA extrai só estilo de fala e personagens ausentes | gênero determinístico |
+| 2026-09-24 | Sinopse por episódio via **Jikan** (usando `idMal` do AniList), como entrada extra da extração | sem chave de API |
+| 2026-09-24 | Termos do glossário: extração por IA nas legendas | AniList não fornece termos |
+| 2026-09-24 | Atribuição de falantes por IA com confiança; tradução neutra quando confiança baixa; diarização de áudio fora da v1 | |
+| 2026-09-24 | Sem lib de orquestração (Prefect/LangGraph); **runner próprio** + `tenacity` | fluxo decidido por regras, não pela IA |
+| 2026-09-24 | Camada de IA: **`pydantic-ai-slim`** (não LiteLLM), atrás da interface `LLMClient` | saída estruturada validada com retry; suporte oficial a 3.14 |
+| 2026-09-24 | Runner processa **por etapa** (todos os episódios) | evita troca de modelo na GPU |
+| 2026-09-24 | Revisão de sentido separada da **coloquialidade** (etapa própria) | pedido do usuário: revisor foca só em sentido |
+| 2026-09-24 | Roteamento por tipo de linha + novas etapas: classificar, análise de cena combinada, placas, músicas, coerência de tratamento, tipografia, ortografia (LanguageTool) | |
+| 2026-09-24 | Desempenho: respostas só com edições, triagem sem IA, análises combinadas, prefixo fixo para cache | saída (geração) é o gargalo em GPU local |
+| 2026-09-24 | Glossário filtrado **por episódio**, não por bloco | preserva cache de prefixo |
+| 2026-09-24 | Novas etapas aceitas: **memória de tradução**, **unir/redistribuir frases**, **leitura corrida final (ligada por padrão)** | |
+| 2026-09-24 | Recusadas: **guia de estilo por série** (por enquanto), **aprender com correções** | honoríficos e palavrão viram config global |
+| 2026-09-24 | `eval` e métricas camada 3 ficam para depois da v1; camadas 1 e 2 na v1 | |
+| 2026-09-24 | **Portões por etapa + laço do QA final** (ambos), com escalonamento, "nunca piorar", oscilação, orçamentos e *blame* | portões evitam propagação; QA pega regressões e problemas do arquivo final |
+| 2026-09-24 | Desenvolvimento em **marcos com spec próprio** (ROADMAP/STATE) em vez de um spec único | evitar tarefa gigantesca |
+| 2026-09-24 | Código e identificadores (inclusive nomes de etapas no config) em **inglês**; mensagens ao usuário em **PT-BR** | spec M0, D1 — pendente de revisão |
+| 2026-09-24 | Dados em `~/.local/share/translaterany/` e config em `~/.config/translaterany/config.toml` (XDG) | spec M0, D2/D3 |
+| 2026-09-24 | Runner por etapa e escopo `episode`/`series` já no M0; tipos de linha passam para o M1 | spec M0, D4/D5 |
+| 2026-09-24 | Spec do M0 aprovado. Desvios registrados no plano: `LLMRequest`/`LLMResponse`/`Usage` como dataclasses; `inventory` sem `mtime`; módulos `reset`, `status`, `log`, `cli/app`; manifest corrompido → mensagem clara e código 1 | detectados ao validar o plano em protótipo |
+| 2026-09-24 | Casos de teste reais em `temporada-teste/` (fora do git): *Charlotte* (simples) e *High School D×D* (difícil); testes automatizados só com dados sintéticos | mídia e legendas reais não entram no repositório |
+
+---
+
+## Pendências e perguntas em aberto
+
+| Pergunta | Quando decidir |
+|---|---|
+| Quais modelos locais concretos usar por etapa (famílias 7B–14B Q4 que cabem em 12 GB) | spec do M2 |
+| Obter chave de API Gemini e/ou OpenAI (opcional) | antes de testar perfis `hibrido`/`nuvem` (M2) |
+| Política global padrão de honoríficos (manter / adaptar / remover) | spec do M4 |
+| Nível padrão de palavrão | spec do M4 |
+| Parser de nome de episódio: `guessit` (se suportar 3.14) ou próprio | spec do M1 |
+| **Faixas divididas** (`Dialog` + `S&S` separadas, como no Caso 1): traduzir as duas e **mesclar num único `.pt-BR.ass`** (players carregam uma legenda externa por vez) ou gerar duas saídas? Mesclar exige resolver conflito de nomes de estilo e `PlayResX/Y` diferentes | spec do M1 |
+| **Seleção de faixas** — regras que funcionem nos dois casos: `Dialog`+`S&S` (usar ambas) vs `Full`+`S&S` (usar só `Full`); desempate entre dois `Full` de grupos diferentes (config por série? mais linhas? grupo preferido?) | spec do M1 |
+| **Casamento pasta/temporada → AniList** quando o `.nfo` só tem TVDB/TMDB: busca por título + ano + nº de eps, ou usar bases comunitárias de mapeamento (ex.: projetos Anime-Lists / Fribb, que ligam TVDB/TMDB ↔ AniDB/AniList/MAL) — avaliar | spec do M3 |
+| **Escopo da memória da série**: por pasta (show inteiro, todas as temporadas — glossário unificado) ou por temporada/entrada AniList? Metadados vêm por entrada AniList e precisam ser combinados | spec do M3 |
+| Modelos locais que **recusam conteúdo** (fan service) — critério na escolha dos modelos | spec do M2 |
+| LanguageTool via Docker ou `.jar` | spec do M7 |
+
+---
+
+## Casos de teste reais (cobaias)
+
+Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem trechos das legendas reais**; testes automatizados usam só dados sintéticos, os casos reais são para testes manuais/de fumaça).
+
+### Caso 1 — *Charlotte (2015)*: o caso simples
+
+| Característica | Valor | Implicação |
+|---|---|---|
+| Conteúdo | 13 eps (`Season 1/`) + 1 especial (`Specials/S00E02`), todos Bluray | uma temporada = uma entrada no AniList |
+| Estrutura | padrão Jellyfin/Sonarr, `tvshow.nfo`, `season.nfo`, `.nfo` por episódio | sinopses locais disponíveis além da Jikan |
+| Sobras de upgrade | `.nfo`/thumbs órfãos de versões HDTV antigas ao lado dos Bluray | varredura parte dos `.mkv`, ignora metadados órfãos |
+| Faixas de legenda | **`Dialog - ENG` + `S&S`** (diálogo e placas/músicas **divididos**) | é preciso usar as duas faixas |
+| Anexos | ~17 fontes por episódio | checagem de acentos e preservação no remux |
+| Áudio | inglês + japonês | — |
+
+### Caso 2 — *High School D×D (2012)*: o caso difícil
+
+| Característica | Valor | Implicação |
+|---|---|---|
+| Conteúdo | **4 temporadas** (12 eps cada, HDTV) + **17 especiais** (S00E02–S00E18, maioria Bluray) numa única pasta de série | uma pasta (TVDB) ↔ **várias entradas no AniList** (uma por temporada + OVAs/especiais) |
+| IDs no `tvshow.nfo` | TVDB, TMDB, IMDb — **sem AniList/MAL** | casamento temporada → AniList não sai direto do `.nfo` |
+| Faixas (T1–T4) | **`Full Subtitle` + `Signs & Songs`** | aqui o `Full` já contém tudo; o `S&S` serve a quem assiste dublado — **semântica oposta ao Caso 1** |
+| Faixas (T4) | Full de um grupo (`Tensai/IK`) e S&S de **outro grupo** (`LostYears`) | estilos/convenções diferentes entre faixas do mesmo episódio |
+| Faixas (especiais) | alguns com **duas faixas `Full` de grupos diferentes** (`CBM/IK` e `ADZ/IK`); outros com uma só | regra de desempate entre faixas "Full" equivalentes |
+| Fansubs por temporada | FFF/SCY → FFF → Tensai/IK | estilo de tradução EN muda entre temporadas; glossário precisa unificar |
+| Anexos | de 3 a 28 fontes por episódio | — |
+| Áudio | eng + jpn nas temporadas; **só jpn** nos especiais | — |
+| Nomes de arquivo | Unicode no caminho (`×`, `☆`, `~`) | slugs e caminhos precisam lidar com Unicode |
+| Conteúdo | fan service intenso | **teste real de recusa por filtro de segurança** (nuvem) e de modelos locais que recusam conteúdo |
+
+## Pré-requisitos de ambiente
+
+| Item | Situação |
+|---|---|
+| Python 3.14 via `uv` | ✅ |
+| `ffmpeg` / `ffprobe` | ✅ instalado |
+| `mkvtoolnix` (`mkvextract`, `mkvmerge`) | ❌ instalar antes do M1 |
+| Ollama | ❌ instalar antes do M2 |
+| LanguageTool | ❌ instalar antes do M7 |
+| GPU | NVIDIA RTX 3060 12 GB · 46 GB RAM · 12 threads |
+
+---
+
+## Próximos passos
+
+1. Revisar o plano do M0.
+2. Configurar `git config user.name` / `user.email` e fazer o commit inicial.
+3. Executar o plano (TDD), num branch `m0-fundacao`.
