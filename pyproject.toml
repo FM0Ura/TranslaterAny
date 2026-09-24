@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-translaterany = "translaterany:main"
+translaterany = "translaterany.cli:app"
 
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]
