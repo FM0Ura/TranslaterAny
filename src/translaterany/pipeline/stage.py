@@ -5,7 +5,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import ClassVar
+from pathlib import Path
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -41,14 +42,18 @@ class StageContext:
     output: OutputWriter
     llm: LLMClient
     log: logging.Logger
+    previous_output: Path | None = None  # artefato anterior desta etapa para a unidade, se houver
+    force: bool = False  # `run --force`: permite sobrescrever PT-BR de terceiros
 
 
 class Stage(ABC):
     name: ClassVar[str]
     version: ClassVar[str]  # mudar invalida o cache (lógica ou prompt mudou)
     scope: ClassVar[StageScope]
-    inputs: ClassVar[tuple[str, ...]] = ()
+    inputs: tuple[str, ...] = ()  # pode ser redefinido por instância (a partir das opções)
     reads_source: ClassVar[bool] = False  # lê o arquivo de origem diretamente
+    translates: ClassVar[bool] = False  # produz texto traduzido (libera publish/remux)
+    enabled_by_default: ClassVar[bool] = True  # sem [stages.X] no config, a etapa roda?
     Options: ClassVar[type[BaseModel]] = NoOptions
 
     def __init__(self, options: BaseModel | None = None) -> None:
@@ -57,6 +62,15 @@ class Stage(ABC):
     @abstractmethod
     def run(self, ctx: StageContext) -> None:
         """Lê entradas via ctx.inputs e grava exatamente um artefato via ctx.output."""
+
+    def cache_payload(self, series: Series, episode: Episode | None) -> Any:
+        """Dados extras (JSON) que entram na chave de cache — ex.: a parte do series.toml que a etapa usa."""
+        return None
+
+    def verify_cached(self, ctx: StageContext, artifact_path: Path) -> bool:
+        """Chamado num cache hit. Etapas com efeitos fora do diretório de dados conferem se eles
+        ainda estão como registrados; False força a reexecução."""
+        return True
 
     def doctor_checks(self) -> list[Check]:
         return []

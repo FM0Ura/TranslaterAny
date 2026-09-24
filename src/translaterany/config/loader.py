@@ -26,6 +26,7 @@ class ResolvedConfig:
     data_dir: Path
     log_level: str
     stages: tuple[Stage, ...]  # habilitadas, na ordem, já instanciadas
+    min_file_age: float = 120
 
 
 def default_config_path(env: Mapping[str, str] = os.environ) -> Path:
@@ -88,6 +89,7 @@ def load_config(
         data_dir=Path(data_dir).expanduser(),
         log_level=config.general.log_level,
         stages=tuple(stages),
+        min_file_age=config.discovery.min_file_age,
     )
 
 
@@ -108,7 +110,7 @@ def _build_stages(config: AppConfig, registry: StageRegistry, where: str) -> lis
     if errors:
         raise ConfigError(_format(where, errors))
 
-    enabled: list[str] = [n for n in order if config.stages.get(n) is None or config.stages[n].enabled]
+    enabled: list[str] = [n for n in order if _is_enabled(config, registry, n)]
     stages: list[Stage] = []
     available: set[str] = set()
     for name in order:
@@ -126,7 +128,8 @@ def _build_stages(config: AppConfig, registry: StageRegistry, where: str) -> lis
             continue
         if cls.reads_source and cls.scope is StageScope.SERIES:
             errors.append(f"stages.{name}: reads_source não é suportado em etapas de série")
-        for dep in cls.inputs:
+        stage = cls(options)  # as entradas podem depender das opções (ex.: write.text_source)
+        for dep in stage.inputs:
             if dep not in available:
                 if dep not in order:
                     reason = "não está no pipeline"
@@ -135,11 +138,18 @@ def _build_stages(config: AppConfig, registry: StageRegistry, where: str) -> lis
                 else:
                     reason = "não vem antes dela no pipeline"
                 errors.append(f"stages.{name}: depende de '{dep}', que {reason}")
-        stages.append(cls(options))
+        stages.append(stage)
         available.add(name)
     if errors:
         raise ConfigError(_format(where, errors))
     return stages
+
+
+def _is_enabled(config: AppConfig, registry: StageRegistry, name: str) -> bool:
+    section = config.stages.get(name)
+    if section is not None and section.enabled is not None:
+        return section.enabled
+    return registry.get(name).enabled_by_default
 
 
 def _format_errors(where: str, exc: ValidationError) -> str:

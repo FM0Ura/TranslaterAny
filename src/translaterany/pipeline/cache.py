@@ -1,6 +1,7 @@
 """Chave de cache de uma etapa para uma unidade."""
 
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 from translaterany.pipeline.stage import Stage
 from translaterany.util.fs import canonical_json, sha256_bytes
@@ -11,6 +12,7 @@ def compute_key(
     input_hashes: Mapping[str, str],
     source_fingerprint: str | None,
     episode_set: Sequence[str] | None = None,
+    extra: Any = None,
 ) -> str:
     """`episode_set`: chaves dos episódios da série (só para etapas de série, que veem `ctx.episodes`)."""
     payload = {
@@ -20,6 +22,7 @@ def compute_key(
         "inputs": dict(sorted(input_hashes.items())),
         "source": source_fingerprint,
         "episodes": sorted(episode_set) if episode_set is not None else None,
+        "extra": extra,  # Stage.cache_payload(): dados de fora do diretório de dados (ex.: series.toml)
     }
     return sha256_bytes(canonical_json(payload))
 

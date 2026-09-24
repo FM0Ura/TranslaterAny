@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Literal
 
 from translaterany.llm.client import LLMClient
@@ -66,7 +67,7 @@ class Runner:
                     raise ValueError(f"etapa '{stage.name}' depende de '{name}', que não vem antes dela")
             self._scopes[stage.name] = stage.scope
 
-    def run(self, series: Series, episodes: Sequence[Episode]) -> RunSummary:
+    def run(self, series: Series, episodes: Sequence[Episode], *, force: bool = False) -> RunSummary:
         with SeriesLock(self.store.lock_path(series.key)):
             cleanup_tmp(self.store.series_dir(series.key))
             self.store.write_series_info(series)
@@ -74,6 +75,9 @@ class Runner:
             for manifest in [manifests.series, *manifests.episodes.values()]:
                 if manifest.status == "failed":  # falhas anteriores tentam de novo
                     manifest.status = "ok"
+                elif force and manifest.status == "skipped":  # --force reabre os pulados
+                    manifest.status = "ok"
+                    manifest.skip_reason = None
             summary = RunSummary({s.name: StageCounts() for s in self.stages})
             fingerprints: dict[str, str] = {}
 
@@ -87,7 +91,7 @@ class Runner:
                     units = [ep for ep in episodes if manifests.get(ep).status == "ok"]
                 counts = summary.stages[stage.name]
                 for index, unit in enumerate(units, start=1):
-                    outcome = self._run_unit(stage, series, unit, episodes, manifests, fingerprints)
+                    outcome = self._run_unit(stage, series, unit, episodes, manifests, fingerprints, force)
                     setattr(counts, outcome, getattr(counts, outcome) + 1)
                     if self.on_progress:
                         self.on_progress(stage.name, index, len(units))
@@ -123,6 +127,7 @@ class Runner:
         episodes: Sequence[Episode],
         manifests: ManifestSet,
         fingerprints: dict[str, str],
+        force: bool = False,
     ) -> Outcome:
         manifest = manifests.get(episode)
         unit_name = episode.key if episode else series.key
@@ -136,39 +141,32 @@ class Runner:
                     fingerprints[episode.key] = fingerprint(episode.source)
                 source_fp = fingerprints[episode.key]
             episode_set = [ep.key for ep in episodes] if episode is None else None
-            key = compute_key(stage, self._input_hashes(stage, episode, episodes, manifests), source_fp, episode_set)
+            key = compute_key(
+                stage,
+                self._input_hashes(stage, episode, episodes, manifests),
+                source_fp,
+                episode_set,
+                stage.cache_payload(series, episode),
+            )
             record = manifest.stages.get(stage.name)
+            previous = None
+            if record is not None and record.status == "done" and record.artifact is not None:
+                candidate = directory / record.artifact
+                previous = candidate if candidate.exists() else None
+            writer = OutputWriter(directory, stage.name)
+            ctx = self._context(stage, series, episode, episodes, manifests, writer, previous, force)
             if (
-                record is not None
-                and record.status == "done"
+                previous is not None
+                and record is not None
                 and record.key == key
-                and record.artifact is not None
-                and (directory / record.artifact).exists()
-                and file_sha256(directory / record.artifact) == record.artifact_hash
+                and file_sha256(previous) == record.artifact_hash
+                and stage.verify_cached(ctx, previous)
             ):
                 self.log.debug("%s: %s em cache", stage.name, unit_name)
                 return "cached"
         except Exception as exc:
             return self._fail(stage, manifests, episode, unit_name, exc, started, t0)
 
-        writer = OutputWriter(directory, stage.name)
-        ctx = StageContext(
-            series=series,
-            episode=episode,
-            episodes=episodes,
-            inputs=InputReader(
-                self.store,
-                series,
-                episode,
-                episodes,
-                stage.inputs,
-                {n: self._scopes[n].value for n in stage.inputs},
-                manifests,
-            ),
-            output=writer,
-            llm=self.llm,
-            log=self.log.getChild(stage.name),
-        )
         error: Exception | None = None
         digest = ""
         try:
@@ -187,6 +185,53 @@ class Runner:
                 return "skipped"
         except Exception as exc:  # KeyboardInterrupt não é Exception: propaga
             error = exc
+        return self._finish(stage, manifests, episode, unit_name, error, digest, key, writer, started, t0)
+
+    def _context(
+        self,
+        stage: Stage,
+        series: Series,
+        episode: Episode | None,
+        episodes: Sequence[Episode],
+        manifests: ManifestSet,
+        writer: OutputWriter,
+        previous: Path | None,
+        force: bool,
+    ) -> StageContext:
+        return StageContext(
+            series=series,
+            episode=episode,
+            episodes=episodes,
+            inputs=InputReader(
+                self.store,
+                series,
+                episode,
+                episodes,
+                stage.inputs,
+                {n: self._scopes[n].value for n in stage.inputs},
+                manifests,
+            ),
+            output=writer,
+            llm=self.llm,
+            log=self.log.getChild(stage.name),
+            previous_output=previous,
+            force=force,
+        )
+
+    def _finish(
+        self,
+        stage: Stage,
+        manifests: ManifestSet,
+        episode: Episode | None,
+        unit_name: str,
+        error: Exception | None,
+        digest: str,
+        key: str,
+        writer: OutputWriter,
+        started: datetime,
+        t0: float,
+    ) -> Outcome:
+        manifest = manifests.get(episode)
 
         if error is not None:
             return self._fail(stage, manifests, episode, unit_name, error, started, t0)

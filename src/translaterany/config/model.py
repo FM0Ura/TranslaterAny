@@ -15,16 +15,21 @@ class GeneralConfig(_Strict):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
 
+class DiscoveryConfig(_Strict):
+    min_file_age: float = 120  # segundos; arquivos mais novos são ignorados (download em andamento)
+
+
 class PipelineConfig(_Strict):
     stages: list[str]
 
 
 class StageConfig(_Strict):
-    enabled: bool = True
+    enabled: bool | None = None  # None: usa o padrão da etapa (enabled_by_default)
     options: dict[str, Any] = Field(default_factory=dict)
 
 
 class AppConfig(_Strict):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
+    discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     pipeline: PipelineConfig | None = None  # ausente = pipeline padrão
     stages: dict[str, StageConfig] = Field(default_factory=dict)
