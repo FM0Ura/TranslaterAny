@@ -1,10 +1,13 @@
 [project]
 name = "translaterany"
 version = "0.1.0"
-description = "Add your description here"
+description = "Tradução de legendas de anime EN → PT-BR com IA, em múltiplas etapas"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pydantic>=2.13.5",
+    "typer>=0.27.2",
+]
 
 [project.scripts]
 translaterany = "translaterany:main"
@@ -12,3 +15,19 @@ translaterany = "translaterany:main"
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
