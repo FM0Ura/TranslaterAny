@@ -3,6 +3,27 @@
 from pathlib import Path
 
 import pytest
+from fake_stages import TEST_STAGES
+
+from translaterany.pipeline.registry import REGISTRY, StageRegistry
+
+for _cls in TEST_STAGES:  # disponíveis também no REGISTRY global (usado pela CLI)
+    if _cls.name not in REGISTRY:
+        REGISTRY.register(_cls)
+
+
+@pytest.fixture(autouse=True)
+def _reset_calls() -> None:
+    for cls in TEST_STAGES:
+        cls.calls = []
+
+
+@pytest.fixture
+def registry() -> StageRegistry:
+    reg = StageRegistry()
+    for cls in TEST_STAGES:
+        reg.register(cls)
+    return reg
 
 
 @pytest.fixture
