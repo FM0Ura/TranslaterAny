@@ -10,8 +10,8 @@
 ## Onde estamos
 
 - **Fase:** design geral concluído → decomposto em marcos.
-- **Marco atual:** **M0 — Fundação** — spec aprovado, plano escrito (código validado em protótipo), aguardando revisão.
-- **Próxima ação:** revisar o plano do M0, configurar a identidade do git, fazer o commit inicial e escolher o modo de execução.
+- **Marco atual:** **M1 — Mídia e legendas** — não iniciado (M0 concluído no branch `m0-fundacao`).
+- **Próxima ação:** integrar o branch `m0-fundacao`; depois, escrever o spec do M1.
 
 ## Progresso dos marcos
 
@@ -19,7 +19,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 
 | Marco | Status | Spec | Plano | Observações |
 |---|---|---|---|---|
-| M0 — Fundação | 📋 | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | 10 tarefas; plano aguardando revisão |
+| M0 — Fundação | ✅ | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | concluído |
 | M1 — Mídia e legendas | ⬜ | — | — | |
 | M2 — Camada de IA e tradução básica | ⬜ | — | — | |
 | M3 — Memória da série | ⬜ | — | — | |
@@ -64,6 +64,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-24 | Dados em `~/.local/share/translaterany/` e config em `~/.config/translaterany/config.toml` (XDG) | spec M0, D2/D3 |
 | 2026-09-24 | Runner por etapa e escopo `episode`/`series` já no M0; tipos de linha passam para o M1 | spec M0, D4/D5 |
 | 2026-09-24 | Spec do M0 aprovado. Desvios registrados no plano: `LLMRequest`/`LLMResponse`/`Usage` como dataclasses; `inventory` sem `mtime`; módulos `reset`, `status`, `log`, `cli/app`; manifest corrompido → mensagem clara e código 1 | detectados ao validar o plano em protótipo |
+| 2026-09-24 | M0 executado (modo direto): 101 testes, aceite nas duas séries de teste (14 e 65 episódios), interrupção real com SIGINT retomada corretamente | Ctrl+C durante a importação dos módulos (antes de o comando começar) ainda mostra traceback — avaliado na revisão final |
 | 2026-09-24 | Casos de teste reais em `temporada-teste/` (fora do git): *Charlotte* (simples) e *High School D×D* (difícil); testes automatizados só com dados sintéticos | mídia e legendas reais não entram no repositório |
 
 ---
@@ -131,6 +132,6 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Revisar o plano do M0.
-2. Configurar `git config user.name` / `user.email` e fazer o commit inicial.
-3. Executar o plano (TDD), num branch `m0-fundacao`.
+1. Integrar o branch `m0-fundacao`.
+2. Escrever o spec do **M1 — Mídia e legendas** (pendências: seleção de faixas, faixas divididas, parser de episódio).
+3. Instalar `mkvtoolnix` antes de implementar o M1.
