@@ -105,3 +105,29 @@ class ReadSeriesStage(Stage):
 
 
 TEST_STAGES: list[type[Stage]] = [SourceStage, UpperStage, LengthStage, CollectStage, ReadSeriesStage]
+
+
+class TranslateStage(Stage):
+    """Tradução falsa: põe em maiúsculas as unidades traduzíveis (mantém os marcadores)."""
+
+    name = "t_translate"
+    version = "1"
+    scope = StageScope.EPISODE
+    inputs = ("normalize", "classify")
+    translates = True
+    calls: list[str] = []
+
+    def run(self, ctx: StageContext) -> None:
+        from translaterany.subtitles.classify import TRANSLATABLE, Classification
+        from translaterany.subtitles.normalize import NormalizedDoc
+        from translaterany.subtitles.texts import UnitTexts
+
+        assert ctx.episode is not None
+        type(self).calls.append(ctx.episode.key)
+        doc = ctx.inputs.json("normalize", NormalizedDoc)
+        classes = ctx.inputs.json("classify", Classification)
+        texts = {u.id: u.text.upper() for u in doc.units if classes.units[u.id].type in TRANSLATABLE}
+        ctx.output.json(UnitTexts(texts=texts))
+
+
+TEST_STAGES.append(TranslateStage)
