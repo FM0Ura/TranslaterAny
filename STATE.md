@@ -10,8 +10,8 @@
 ## Onde estamos
 
 - **Fase:** design geral concluído → decomposto em marcos.
-- **Marco atual:** **M1 — Mídia e legendas** — não iniciado (M0 concluído no branch `m0-fundacao`).
-- **Próxima ação:** integrar o branch `m0-fundacao`; depois, escrever o spec do M1.
+- **Marco atual:** **M1 — Mídia e legendas** — não iniciado (M0 concluído e integrado ao `master`).
+- **Próxima ação:** escrever o spec do M1.
 
 ## Progresso dos marcos
 
@@ -132,6 +132,6 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Integrar o branch `m0-fundacao`.
-2. Escrever o spec do **M1 — Mídia e legendas** (pendências: seleção de faixas, faixas divididas, parser de episódio).
-3. Instalar `mkvtoolnix` antes de implementar o M1.
+1. Escrever o spec do **M1 — Mídia e legendas** (pendências: seleção de faixas, faixas divididas, parser de episódio).
+2. Instalar `mkvtoolnix` antes de implementar o M1.
+3. Avaliar, no M1, os menores adiados da revisão do M0 que tocarem o mesmo código (status, descoberta `.MKV`, mensagens do config em PT-BR).
