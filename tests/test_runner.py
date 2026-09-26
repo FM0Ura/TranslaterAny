@@ -4,12 +4,12 @@ from pathlib import Path
 import pytest
 from fake_stages import CollectStage, LengthStage, ReadSeriesStage, SourceStage, Text, UpperOptions, UpperStage
 
+from translaterany.library import discover
 from translaterany.llm import FakeLLM
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.lock import SeriesLock, SeriesLocked
 from translaterany.pipeline.runner import Runner
 from translaterany.pipeline.stage import Stage, StageScope
-from translaterany.pipeline.units import discover
 
 
 def _run(data_dir: Path, series_dir: Path, stages: list[Stage], progress: list | None = None):

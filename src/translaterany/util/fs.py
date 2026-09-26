@@ -12,11 +12,15 @@ _MIB = 1024 * 1024
 _NON_ALNUM = re.compile(r"[\W_]+")
 
 
+def slug_base(name: str) -> str:
+    """Parte legível do slug: minúsculas, não alfanuméricos viram `-`."""
+    return _NON_ALNUM.sub("-", name.lower()).strip("-") or "x"
+
+
 def slugify(name: str) -> str:
     """Slug estável e seguro para nomes de diretório, com sufixo de hash contra colisões."""
-    base = _NON_ALNUM.sub("-", name.lower()).strip("-") or "x"
     suffix = hashlib.sha256(name.encode("utf-8")).hexdigest()[:6]
-    return f"{base}-{suffix}"
+    return f"{slug_base(name)}-{suffix}"
 
 
 def sha256_bytes(data: bytes) -> str:

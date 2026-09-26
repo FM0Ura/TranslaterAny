@@ -4,12 +4,12 @@ from pathlib import Path
 import pytest
 from fake_stages import CollectStage, SourceStage, UpperStage
 
+from translaterany.library import discover
 from translaterany.llm import FakeLLM
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.reset import reset_from
 from translaterany.pipeline.runner import Runner
 from translaterany.pipeline.status import series_status
-from translaterany.pipeline.units import discover
 
 STAGES = [SourceStage(), UpperStage(), CollectStage()]
 ORDER = [s.name for s in STAGES]

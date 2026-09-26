@@ -6,11 +6,11 @@ from typing import Annotated
 import typer
 
 from translaterany.cli.app import EXIT_FAILURE, EXIT_USAGE, AppState, app, console, load_or_exit
+from translaterany.library import discover
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.lock import SeriesLocked
 from translaterany.pipeline.manifest import ManifestError
 from translaterany.pipeline.reset import reset_from
-from translaterany.pipeline.units import discover
 
 
 @app.command()
