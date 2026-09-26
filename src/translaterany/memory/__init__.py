@@ -1,10 +1,12 @@
 """Módulo de memória da série (metadados, personagens, glossário e história)."""
 
+from translaterany.memory.anilist import AniListClient, AniListMatch
 from translaterany.memory.artifacts import (
     ConsolidatedMemoryArtifact,
     ExtractTermsArtifact,
     MetadataArtifact,
 )
+from translaterany.memory.jikan import JikanClient
 from translaterany.memory.models import (
     CharacterEntry,
     CharacterRole,
@@ -18,6 +20,8 @@ from translaterany.memory.models import (
 from translaterany.memory.store import MemoryStore
 
 __all__ = [
+    "AniListClient",
+    "AniListMatch",
     "CharacterEntry",
     "CharacterRole",
     "ConsolidatedMemoryArtifact",
@@ -27,7 +31,9 @@ __all__ = [
     "Gender",
     "GlossaryCategory",
     "GlossaryEntry",
+    "JikanClient",
     "MemoryStore",
     "MetadataArtifact",
     "StoryMemory",
 ]
+
