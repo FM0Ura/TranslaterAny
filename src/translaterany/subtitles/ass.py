@@ -1,5 +1,6 @@
 """Parser e gravação de .ass orientados a linhas: tudo que não é texto de evento sai byte a byte."""
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Literal
@@ -7,6 +8,7 @@ from typing import Literal
 BOM = "﻿"
 MARKER = "; TranslaterAny"
 _EVENT_KINDS = {"dialogue": "dialogue", "comment": "comment"}
+_LINE_BREAK = re.compile(r"(?<=\n)|(?<=\r)(?!\n)")
 
 
 class AssError(Exception):
@@ -47,6 +49,12 @@ class AssDocument:
     events: list[AssEvent] = field(default_factory=list)
 
 
+def split_lines(text: str) -> list[str]:
+    """Quebra só em \\r\\n, \\n e \\r, mantendo os terminadores. `str.splitlines` também quebraria em
+    U+2028, \\x0c etc., que podem aparecer dentro do texto de um evento."""
+    return [line for line in _LINE_BREAK.split(text) if line]
+
+
 def ass_time_to_ms(value: str) -> int:
     """'H:MM:SS.cc' -> milissegundos."""
     try:
@@ -62,7 +70,7 @@ def parse_ass(data: bytes) -> AssDocument:
         text = data.decode("utf-8-sig" if bom else "utf-8")
     except UnicodeDecodeError as exc:
         raise AssError("ASS malformado: não é UTF-8") from exc
-    lines = text.splitlines(keepends=True)
+    lines = split_lines(text)
     newline = "\r\n" if sum(line.endswith("\r\n") for line in lines) * 2 > len(lines) else "\n"
     doc = AssDocument(lines=lines, bom=bom, newline=newline, format=[])
 
@@ -130,4 +138,4 @@ def render_ass(doc: AssDocument, new_texts: Mapping[int, str], *, marker: bool =
 def has_marker(data: bytes) -> bool:
     """O .ass foi produzido pela app a partir de uma tradução (marca D10)?"""
     text = data.decode("utf-8", errors="replace")
-    return any(line.strip() == MARKER for line in text.splitlines())
+    return any(line.strip() == MARKER for line in split_lines(text))

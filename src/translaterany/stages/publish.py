@@ -49,5 +49,8 @@ class PublishStage(Stage):
         art = PublishArtifact.model_validate_json(artifact_path.read_text(encoding="utf-8"))
         if not art.published or art.path is None:
             return True
+        assert ctx.episode is not None
         dest = Path(art.path)
+        if dest != external_ptbr_path(ctx.episode):  # vídeo renomeado ou movido
+            return False
         return dest.is_file() and file_sha256(dest) == art.sha256

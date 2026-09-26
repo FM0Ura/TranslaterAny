@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from translaterany.media.mkv import MediaError, probe, tool_available
-from translaterany.media.tracks import NoTrack, select_track
+from translaterany.media.tracks import NoTrack, is_own, is_portuguese, select_track
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import SkipEpisode, Stage, StageContext, StageScope
 from translaterany.pipeline.units import Episode, Series
@@ -44,6 +44,7 @@ class SelectTrackArtifact(BaseModel):
     own_track_ids: list[int]
     attachments: list[AttachmentModel]
     warnings: list[str]
+    foreign_accepted: bool = False  # PT-BR de terceiros aceito com --force (lembrado nas próximas execuções)
 
 
 SUBTITLE_EXTENSIONS = (".ass", ".ssa", ".srt", ".vtt", ".sub")
@@ -84,12 +85,14 @@ class SelectTrackStage(Stage):
 
     def run(self, ctx: StageContext) -> None:
         assert ctx.episode is not None
+        accepted = ctx.force or _previously_accepted(ctx.previous_output)
         foreign = foreign_portuguese_files(ctx.episode)
-        if foreign and not ctx.force:
+        if foreign and not accepted:
             raise SkipEpisode(f"já existe {foreign[0].name} de outra fonte (use --force para sobrescrever)")
         info = probe(ctx.episode.source)
+        foreign_tracks = any(is_portuguese(t) and not is_own(t) for t in info.subtitles)
         try:
-            sel = select_track(info, ctx.series.config.track, force=ctx.force)
+            sel = select_track(info, ctx.series.config.track, force=accepted)
         except NoTrack as exc:
             raise SkipEpisode(exc.reason) from exc
         for warning in sel.warnings:
@@ -111,11 +114,21 @@ class SelectTrackStage(Stage):
                 own_track_ids=sel.own_track_ids,
                 attachments=[AttachmentModel(**a.__dict__) for a in info.attachments],
                 warnings=sel.warnings,
+                foreign_accepted=accepted and bool(foreign or foreign_tracks),
             )
         )
 
     def doctor_checks(self) -> list[Check]:
         return [_tool_check("mkvmerge")]
+
+
+def _previously_accepted(previous: Path | None) -> bool:
+    if previous is None or not previous.is_file():
+        return False
+    try:
+        return SelectTrackArtifact.model_validate_json(previous.read_text(encoding="utf-8")).foreign_accepted
+    except ValueError:
+        return False
 
 
 def _tool_check(tool: str) -> Check:

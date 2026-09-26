@@ -89,7 +89,10 @@ def select_track(info: MkvInfo, preferred: str | None = None, *, force: bool = F
     chosen: Track | None = None
     reason = ""
     if preferred:
-        matches = [t for t in candidates if preferred.lower() in t.name.lower()]
+        matches = sorted(
+            (t for t in candidates if preferred.lower() in t.name.lower()),
+            key=lambda t: (is_signs(t), not t.default, t.id),
+        )
         if matches:
             chosen, reason = matches[0], f"escolha manual (series.toml: '{preferred}')"
         else:

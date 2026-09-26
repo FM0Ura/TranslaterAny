@@ -49,4 +49,5 @@ class WriteStage(Stage):
                 raise TextError(f"unidade {ev.unit}: o texto precisa conter exatamente os marcadores {expected}")
             new_texts[ev.index] = ev.prefix + fill(text, ev.markers) + ev.suffix
         translates = source in REGISTRY and REGISTRY.get(source).translates
-        ctx.output.file(".ass", render_ass(doc, new_texts, marker=translates))
+        changed = any(doc.events[i].text != text for i, text in new_texts.items())
+        ctx.output.file(".ass", render_ass(doc, new_texts, marker=translates and changed))

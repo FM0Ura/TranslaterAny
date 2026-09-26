@@ -69,6 +69,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-24 | Medições: Charlotte `Dialog` ⊇ `S&S` (não há faixas divididas nos casos de teste); ~7 mil eventos → ~515 textos únicos; extração EN idêntica após remux | base do spec M1 |
 | 2026-09-24 | Spec M1 aprovado; desvios do plano incorporados ao spec: `cache_payload`, `enabled_by_default`, cenas no `classify`, `LC_ALL=C.UTF-8`, PT de terceiros em qualquer extensão, `run` em pasta de temporada, "Nenhuma série encontrada" | detectados ao prototipar o M1 |
 | 2026-09-24 | M1 executado (modo direto): 228 testes; aceite real — 79 episódios, faixas conforme a tabela, `write.ass` idêntico em 79/79, Charlotte S01E01 com 377 unidades de diálogo, segunda execução em cache, pasta de temporada reconhecida, `temporada-teste/` intacta | |
+| 2026-09-26 | Revisão final do M1 (Opus): 1 crítico (commit da Tarefa 1 sem o pacote `library` — corrigido) e 7 importantes corrigidos (separadores Unicode no parser, `--force` lembrado, permissões e backup no remux, `status`/`retry` em pasta de temporada, escolha manual preferindo faixa completa, publicação após renomear vídeo) + marca de tradução só quando o texto muda | |
 | 2026-09-24 | Casos de teste reais em `temporada-teste/` (fora do git): *Charlotte* (simples) e *High School D×D* (difícil); testes automatizados só com dados sintéticos | mídia e legendas reais não entram no repositório |
 
 ---
@@ -135,4 +136,4 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 1. Integrar o branch `m1-midia-legendas`.
 2. Escrever o spec do **M2 — Camada de IA e tradução básica** (pendências: modelos locais concretos, modelos que recusam conteúdo, chaves de nuvem opcionais).
-3. Avaliar, no M1, os menores adiados da revisão do M0 que tocarem o mesmo código (status, descoberta `.MKV`, mensagens do config em PT-BR).
+3. Menores adiados ainda abertos (revisões do M0 e do M1) — ver o ledger/resumo do M1; o principal para o M2: mensagens de validação do config em PT-BR e detecção de legendas `.pt-BR.hi.srt`/`.forced` (Bazarr).

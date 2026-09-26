@@ -3,6 +3,7 @@
 import logging
 import os
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 
@@ -43,6 +44,23 @@ def verify(original: MkvInfo, result: MkvInfo, removed: int) -> None:
         raise MediaError("verificação do remux falhou: a faixa PT-BR não ficou como a única default")
 
 
+def _copy_ownership(source: Path, target: Path) -> None:
+    """Mesmo modo e grupo do original (Sonarr/Jellyfin podem depender deles)."""
+    st = source.stat()
+    os.chmod(target, stat.S_IMODE(st.st_mode))
+    try:
+        os.chown(target, -1, st.st_gid)
+    except OSError:
+        pass  # sem permissão para trocar o grupo: mantém o padrão
+
+
+def _link_or_copy(source: Path, target: Path) -> None:
+    try:
+        os.link(source, target)  # instantâneo e sem espaço extra; o original segue no lugar
+    except OSError:
+        shutil.copy2(source, target)
+
+
 def remux(
     mkv: Path,
     ass: Path,
@@ -69,10 +87,12 @@ def remux(
         elif result.returncode != 0:
             raise MediaError(f"mkvmerge falhou no remux: {result.stdout.strip()[-300:] or result.returncode}")
         verify(original, probe(tmp), len(remove_ids))
+        _copy_ownership(mkv, tmp)
         backup = None
         if keep_backup:
             backup = mkv.with_name(mkv.name + ".bak")
-            os.replace(mkv, backup)
+            if not backup.exists():  # o backup guarda sempre o original mais antigo
+                _link_or_copy(mkv, backup)
         os.replace(tmp, mkv)
         return backup
     finally:

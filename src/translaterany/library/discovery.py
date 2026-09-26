@@ -98,8 +98,13 @@ def scan_series(
 
 
 def discover(path: Path) -> tuple[Series, list[Episode]]:
-    """Atalho para uma única série, sem filtro de idade (usado por retry/status e nos testes)."""
-    scan = scan_series(path)
+    """Atalho para uma única série, sem filtro de idade (usado por retry/status e nos testes).
+    Uma pasta `Season N`/`Specials` resolve para a série-mãe, como no `run`."""
+    root = path.resolve()
+    if root.is_dir() and _SEASON_DIR.match(root.name) and is_series_dir(root.parent):
+        scan = scan_series(root.parent, only=root)
+    else:
+        scan = scan_series(path)
     return scan.series, scan.episodes
 
 
