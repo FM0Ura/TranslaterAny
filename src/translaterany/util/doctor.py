@@ -68,3 +68,110 @@ def run_checks(checks: Iterable[Check]) -> list[tuple[str, CheckResult]]:
 
 def has_failure(results: Iterable[tuple[str, CheckResult]]) -> bool:
     return any(result.status == "fail" for _, result in results)
+
+
+def check_ollama_status(url: str = "http://localhost:11434") -> tuple[bool, str]:
+    import httpx
+
+    clean_url = url.rstrip("/")
+    if clean_url.endswith("/v1"):
+        clean_url = clean_url[:-3]
+    try:
+        resp = httpx.get(f"{clean_url}/api/tags", timeout=5.0)
+        if resp.status_code != 200:
+            return False, f"Ollama em {clean_url} não está acessível (HTTP {resp.status_code})"
+        data = resp.json()
+        models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+        if models:
+            return True, f"Ollama acessível ({', '.join(models)})"
+        return True, "Ollama acessível (nenhum modelo instalado)"
+    except Exception as exc:
+        return False, f"Ollama não está acessível em {clean_url}: {exc}"
+
+
+check_ollama_service = check_ollama_status
+
+
+def check_ollama_models(
+    url: str = "http://localhost:11434",
+    required_models: list[str] | None = None,
+) -> tuple[bool, str]:
+    import httpx
+
+    if required_models is None:
+        required_models = ["translategemma:12b", "gemma4:12b"]
+
+    clean_url = url.rstrip("/")
+    if clean_url.endswith("/v1"):
+        clean_url = clean_url[:-3]
+    try:
+        resp = httpx.get(f"{clean_url}/api/tags", timeout=5.0)
+        if resp.status_code != 200:
+            return False, f"Ollama não está acessível em {clean_url} (HTTP {resp.status_code})"
+        data = resp.json()
+        available_names = {m.get("name", "") for m in data.get("models", [])}
+        missing = [
+            req
+            for req in required_models
+            if req not in available_names and f"{req}:latest" not in available_names
+        ]
+        if missing:
+            return False, f"Modelos ausentes no Ollama: {', '.join(missing)} (execute 'ollama pull <modelo>')"
+        return True, f"Modelos presentes: {', '.join(required_models)}"
+    except Exception as exc:
+        return False, f"Ollama não está acessível em {clean_url}: {exc}"
+
+
+def check_nvidia_gpu() -> tuple[bool, str]:
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+        )
+        if proc.returncode != 0:
+            return False, f"nvidia-smi retornou erro ({proc.returncode}): {proc.stderr.strip()}"
+        lines = [line.strip() for line in proc.stdout.strip().splitlines() if line.strip()]
+        if not lines:
+            return False, "nvidia-smi não retornou informações de GPU"
+        gpus: list[str] = []
+        for line in lines:
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) >= 3:
+                name, total, free = parts[0], parts[1], parts[2]
+                gpus.append(f"{name} ({free} MiB livres / {total} MiB total)")
+            else:
+                gpus.append(line)
+        return True, "; ".join(gpus)
+    except FileNotFoundError:
+        return False, "nvidia-smi não encontrado no PATH"
+    except Exception as exc:
+        return False, f"Erro ao consultar nvidia-smi: {exc}"
+
+
+def ollama_check(url: str = "http://localhost:11434") -> Check:
+    def run() -> CheckResult:
+        ok, msg = check_ollama_status(url)
+        return CheckResult("ok" if ok else "fail", msg)
+
+    return FunctionCheck("ollama", run)
+
+
+def ollama_models_check(url: str = "http://localhost:11434", required: list[str] | None = None) -> Check:
+    def run() -> CheckResult:
+        ok, msg = check_ollama_models(url, required)
+        return CheckResult("ok" if ok else "fail", msg)
+
+    return FunctionCheck("ollama_models", run)
+
+
+def nvidia_gpu_check() -> Check:
+    def run() -> CheckResult:
+        ok, msg = check_nvidia_gpu()
+        return CheckResult("ok" if ok else "warn", msg)
+
+    return FunctionCheck("gpu", run)
+

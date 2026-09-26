@@ -60,3 +60,7 @@ def print_checks(results: list[tuple[str, CheckResult]]) -> None:
     for name, result in results:
         table.add_row(_ICONS[result.status], name, result.message)
     console.print(table)
+
+
+from translaterany.cli import doctor, estimate, retry, run, status  # noqa: E402, F401
+
