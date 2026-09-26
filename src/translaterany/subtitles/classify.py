@@ -4,7 +4,7 @@ import re
 from collections import Counter
 from collections.abc import Mapping
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from translaterany.subtitles.normalize import EventInfo, NormalizedDoc
 
@@ -40,6 +40,24 @@ class Classification(BaseModel):
     units: dict[str, UnitClass]
     counts: dict[str, int]
     scenes: list[Scene]
+
+
+class ClassifiedUnit(BaseModel):
+    id: str
+    line_type: str = "dialogue"
+    raw_text: str = ""
+    clean_text: str = ""
+    prefix: str = ""
+    suffix: str = ""
+    start_ms: int = 0
+    end_ms: int = 0
+    style: str = "Default"
+    actor: str = ""
+    layer: int = 0
+
+
+class ClassifiedUnitCollection(BaseModel):
+    units: list[ClassifiedUnit] = Field(default_factory=list)
 
 
 def style_tokens(style: str) -> list[str]:

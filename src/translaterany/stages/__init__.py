@@ -8,6 +8,7 @@ from translaterany.stages import (  # noqa: F401
     publish,
     remux,
     select_track,
+    translate_dialogue,
     write,
 )
 

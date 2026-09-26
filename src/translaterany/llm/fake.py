@@ -1,5 +1,6 @@
 """LLM falso e roteirizável, para testes sem IA real."""
 
+import re
 from collections import deque
 from collections.abc import Callable, Iterable
 from typing import Any
@@ -20,10 +21,16 @@ class FakeLLM:
     - `FakeLLM(lambda req: ...)`: calcula a resposta a partir da requisição.
     """
 
-    def __init__(self, script: Iterable[Scripted] | ScriptFn | None = None) -> None:
+    def __init__(
+        self,
+        script: Iterable[Scripted] | ScriptFn | None = None,
+        *,
+        responses: dict[str, str] | None = None,
+    ) -> None:
         self.calls: list[LLMRequest[Any]] = []
         self._fn: ScriptFn | None = None
         self._queue: deque[Scripted] | None = None
+        self._responses: dict[str, str] | None = responses
         if callable(script):
             self._fn = script
         elif script is not None:
@@ -37,6 +44,27 @@ class FakeLLM:
             if not self._queue:
                 raise LLMConfigError("roteiro do FakeLLM esgotado")
             item = self._queue.popleft()
+        elif self._responses is not None:
+            from translaterany.subtitles.translator import TranslationBatch, TranslationItem
+
+            items: list[TranslationItem] = []
+            for line in request.prompt.splitlines():
+                m = re.match(r"^\[([^\]]+)\]\s*(.*)$", line.strip())
+                if m:
+                    line_id, text = m.group(1), m.group(2)
+                    if line_id.startswith("CTX-"):
+                        continue
+                    tr = self._responses.get(text)
+                    if tr is None:
+                        for k, v in self._responses.items():
+                            if k in text:
+                                tr = v
+                                break
+                    items.append(TranslationItem(id=line_id, text=tr if tr is not None else text))
+            if issubclass(request.output_type, TranslationBatch) or request.output_type is TranslationBatch:
+                item = TranslationBatch(items=items)
+            else:
+                item = request.output_type(items=items)
         else:
             raise LLMConfigError("nenhum provedor de IA configurado")
 
