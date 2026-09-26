@@ -79,6 +79,38 @@ query ($search: String, $year: Int) {
 }
 """
 
+ANILIST_GET_BY_ID_QUERY = """
+query ($id: Int) {
+  Media (id: $id, type: ANIME) {
+    id
+    idMal
+    title {
+      romaji
+      english
+      native
+    }
+    seasonYear
+    startDate {
+      year
+    }
+    episodes
+    genres
+    characters (sort: [ROLE, RELEVANCE]) {
+      edges {
+        role
+        node {
+          name {
+            full
+            native
+          }
+          gender
+        }
+      }
+    }
+  }
+}
+"""
+
 
 def _is_retryable_http_error(exc: BaseException) -> bool:
     """Retorna True se o erro HTTP for passível de nova tentativa (429 ou 5xx)."""
@@ -95,6 +127,74 @@ class AniListMatch(BaseModel):
     year: int | None = None
     genres: list[str] = Field(default_factory=list)
     characters: list[CharacterEntry] = Field(default_factory=list)
+
+
+def _parse_media_to_match(media: dict, fallback_title: str) -> AniListMatch:
+    title_dict = media.get("title") or {}
+    romaji = title_dict.get("romaji") or ""
+    anime_title = title_dict.get("english") or romaji or title_dict.get("native") or fallback_title
+
+    characters: list[CharacterEntry] = []
+    edges = media.get("characters", {}).get("edges", []) or []
+    for edge in edges:
+        if not isinstance(edge, dict):
+            continue
+        node = edge.get("node") or {}
+        name_dict = node.get("name") or {}
+        full_name = name_dict.get("full") or name_dict.get("userPreferred") or ""
+        if not full_name:
+            continue
+        native_name = name_dict.get("native")
+
+        role_raw = str(edge.get("role") or "").strip().lower()
+        if role_raw == "main":
+            role = CharacterRole.MAIN
+        elif role_raw == "supporting":
+            role = CharacterRole.SUPPORTING
+        elif role_raw == "background":
+            role = CharacterRole.BACKGROUND
+        else:
+            role = CharacterRole.SUPPORTING
+
+        gender_raw = str(node.get("gender") or "").strip().lower()
+        if gender_raw in ("male", "man", "m"):
+            gender = Gender.MALE
+        elif gender_raw in ("female", "woman", "f"):
+            gender = Gender.FEMALE
+        elif gender_raw in ("neutral", "non-binary"):
+            gender = Gender.NEUTRAL
+        else:
+            gender = Gender.UNKNOWN
+
+        characters.append(
+            CharacterEntry(
+                name=full_name,
+                native_name=native_name,
+                role=role,
+                gender=gender,
+                source=EntrySource.METADATA,
+            )
+        )
+
+    mal_id_raw = media.get("idMal")
+    try:
+        mal_id = int(mal_id_raw) if mal_id_raw is not None else None
+    except ValueError, TypeError:
+        mal_id = None
+
+    start_date = media.get("startDate")
+    start_year = start_date.get("year") if isinstance(start_date, dict) else None
+    year_val = media.get("seasonYear") or start_year
+
+    return AniListMatch(
+        anilist_id=int(media["id"]),
+        mal_id=mal_id,
+        title=anime_title,
+        romaji=romaji,
+        year=year_val,
+        genres=media.get("genres") or [],
+        characters=characters,
+    )
 
 
 class AniListClient:
@@ -174,71 +274,57 @@ class AniListClient:
         if not media or not isinstance(media, dict):
             return None
 
-        title_dict = media.get("title") or {}
-        romaji = title_dict.get("romaji") or ""
-        anime_title = title_dict.get("english") or romaji or title_dict.get("native") or title
+        match = _parse_media_to_match(media, fallback_title=title)
 
-        characters: list[CharacterEntry] = []
-        edges = media.get("characters", {}).get("edges", []) or []
-        for edge in edges:
-            if not isinstance(edge, dict):
-                continue
-            node = edge.get("node") or {}
-            name_dict = node.get("name") or {}
-            full_name = name_dict.get("full") or name_dict.get("userPreferred") or ""
-            if not full_name:
-                continue
-            native_name = name_dict.get("native")
-
-            role_raw = str(edge.get("role") or "").strip().lower()
-            if role_raw == "main":
-                role = CharacterRole.MAIN
-            elif role_raw == "supporting":
-                role = CharacterRole.SUPPORTING
-            elif role_raw == "background":
-                role = CharacterRole.BACKGROUND
-            else:
-                role = CharacterRole.SUPPORTING
-
-            gender_raw = str(node.get("gender") or "").strip().lower()
-            if gender_raw in ("male", "man", "m"):
-                gender = Gender.MALE
-            elif gender_raw in ("female", "woman", "f"):
-                gender = Gender.FEMALE
-            elif gender_raw in ("neutral", "non-binary"):
-                gender = Gender.NEUTRAL
-            else:
-                gender = Gender.UNKNOWN
-
-            characters.append(
-                CharacterEntry(
-                    name=full_name,
-                    native_name=native_name,
-                    role=role,
-                    gender=gender,
-                    source=EntrySource.METADATA,
-                )
-            )
-
-        mal_id_raw = media.get("idMal")
         try:
-            mal_id = int(mal_id_raw) if mal_id_raw is not None else None
-        except (ValueError, TypeError):
-            mal_id = None
+            cache_file.write_text(match.model_dump_json(indent=2), encoding="utf-8")
+        except Exception as exc:
+            logger.warning("Falha ao salvar cache do AniList em %s: %s", cache_file, exc)
 
-        start_date = media.get("startDate")
-        start_year = start_date.get("year") if isinstance(start_date, dict) else None
-        year_val = media.get("seasonYear") or start_year
+        return match
 
-        match = AniListMatch(
-            anilist_id=int(media["id"]),
-            mal_id=mal_id,
-            title=anime_title,
-            romaji=romaji,
-            year=year_val,
-            genres=media.get("genres") or [],
-            characters=characters,
-        )
+    def get_anime_by_id(self, anilist_id: int) -> AniListMatch | None:
+        """Busca metadados de anime no AniList pelo ID com fallback para cache em disco."""
+        cache_file = self.anilist_dir / f"id_{anilist_id}.json"
+        if cache_file.exists():
+            try:
+                data = json.loads(cache_file.read_text(encoding="utf-8"))
+                return AniListMatch.model_validate(data)
+            except Exception as exc:
+                logger.warning("Falha ao ler cache do AniList em %s: %s", cache_file, exc)
+
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        payload = {"query": ANILIST_GET_BY_ID_QUERY, "variables": {"id": anilist_id}}
+
+        try:
+            resp = self._post_with_retry(ANILIST_API_URL, json=payload, headers=headers)
+        except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+            logger.warning("Falha de rede/HTTP ao consultar AniList para id=%s: %s", anilist_id, exc)
+            return None
+
+        if resp.status_code != 200:
+            logger.warning("AniList retornou status code %s para id=%s", resp.status_code, anilist_id)
+            return None
+
+        try:
+            body = resp.json()
+        except Exception as exc:
+            logger.warning("Falha ao decodificar JSON do AniList para id=%s: %s", anilist_id, exc)
+            return None
+
+        if not isinstance(body, dict):
+            logger.warning("Resposta inválida do AniList (não-dicionário) para id=%s", anilist_id)
+            return None
+
+        data = body.get("data")
+        if not isinstance(data, dict):
+            return None
+
+        media = data.get("Media")
+        if not media or not isinstance(media, dict):
+            return None
+
+        match = _parse_media_to_match(media, fallback_title=f"AniList-{anilist_id}")
 
         try:
             cache_file.write_text(match.model_dump_json(indent=2), encoding="utf-8")

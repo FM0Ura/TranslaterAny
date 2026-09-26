@@ -35,6 +35,20 @@ def test_series_toml_metadata_invalid_id(tmp_path: Path) -> None:
         load_series_config(tmp_path)
 
 
+def test_series_toml_metadata_invalid_float(tmp_path: Path) -> None:
+    toml_file = tmp_path / "series.toml"
+    toml_file.write_text("[metadata]\nanilist_id = 12.34\n", encoding="utf-8")
+    with pytest.raises(SeriesConfigError, match=r"\[metadata\] anilist_id deve ser um número inteiro"):
+        load_series_config(tmp_path)
+
+
+def test_series_toml_metadata_invalid_non_positive(tmp_path: Path) -> None:
+    toml_file = tmp_path / "series.toml"
+    toml_file.write_text("[metadata]\nanilist_id = 0\n", encoding="utf-8")
+    with pytest.raises(SeriesConfigError, match=r"\[metadata\] anilist_id deve ser maior que zero"):
+        load_series_config(tmp_path)
+
+
 def test_metadata_stage_runs_and_writes_artifact(tmp_path: Path) -> None:
     captured: MetadataArtifact | None = None
 
@@ -130,20 +144,30 @@ def test_metadata_stage_with_override_in_series_config(tmp_path: Path) -> None:
             captured = obj
 
     class MockAniList:
-        def search_anime(self, title: str, year: int | None) -> AniListMatch | None:
+        def __init__(self) -> None:
+            self.get_by_id_called_with = None
+            self.search_called = False
+
+        def get_anime_by_id(self, anilist_id: int) -> AniListMatch | None:
+            self.get_by_id_called_with = anilist_id
             return AniListMatch(
-                anilist_id=99999,
+                anilist_id=anilist_id,
                 mal_id=28999,
-                title="Charlotte",
-                romaji="Charlotte",
+                title="Charlotte Override",
+                romaji="Charlotte Override",
                 year=2015,
                 genres=["Drama"],
-                characters=[],
+                characters=[CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE)],
             )
 
-    stage = MetadataStage(anilist_client=MockAniList(), jikan_client=None)
+        def search_anime(self, title: str, year: int | None) -> AniListMatch | None:
+            self.search_called = True
+            return None
+
+    mock_anilist = MockAniList()
+    stage = MetadataStage(anilist_client=mock_anilist, jikan_client=None)
     config = SeriesConfig(metadata=SeriesMetadataConfig(anilist_id=20954))
-    series = Series(name="Charlotte (2015)", path=tmp_path, config=config)
+    series = Series(name="Wrong Title (2020)", path=tmp_path, config=config)
     ctx = SimpleNamespace(
         series=series,
         episode=None,
@@ -151,10 +175,25 @@ def test_metadata_stage_with_override_in_series_config(tmp_path: Path) -> None:
         inputs=SimpleNamespace(json=lambda *a: None),
     )
     stage.run(ctx)
+    assert mock_anilist.get_by_id_called_with == 20954
+    assert mock_anilist.search_called is False
     assert captured is not None
     assert captured.matched is True
-    # The override 20954 should take precedence over search result 99999
     assert captured.anilist_id == 20954
+    assert captured.title == "Charlotte Override"
+
+
+def test_metadata_stage_cache_payload(tmp_path: Path) -> None:
+    stage = MetadataStage()
+    series_without_override = Series(name="Charlotte", path=tmp_path)
+    assert stage.cache_payload(series_without_override, None) == {"anilist_id": None}
+
+    series_with_override = Series(
+        name="Charlotte",
+        path=tmp_path,
+        config=SeriesConfig(metadata=SeriesMetadataConfig(anilist_id=20954)),
+    )
+    assert stage.cache_payload(series_with_override, None) == {"anilist_id": 20954}
 
 
 def test_metadata_stage_offline_fallback(tmp_path: Path) -> None:

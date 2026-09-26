@@ -41,12 +41,11 @@ def load_series_config(root: Path) -> SeriesConfig:
     if "metadata" in raw:
         raw_id = metadata_raw.get("anilist_id")
         if raw_id is not None:
-            if isinstance(raw_id, bool):
+            if isinstance(raw_id, bool) or not isinstance(raw_id, int):
                 raise SeriesConfigError(f"{path}: [metadata] anilist_id deve ser um número inteiro")
-            try:
-                anilist_id = int(raw_id)
-            except (ValueError, TypeError) as exc:
-                raise SeriesConfigError(f"{path}: [metadata] anilist_id deve ser um número inteiro") from exc
+            if raw_id <= 0:
+                raise SeriesConfigError(f"{path}: [metadata] anilist_id deve ser maior que zero")
+            anilist_id = raw_id
         else:
             anilist_id = None
         metadata_config = SeriesMetadataConfig(anilist_id=anilist_id)

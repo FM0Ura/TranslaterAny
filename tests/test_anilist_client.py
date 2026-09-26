@@ -217,3 +217,86 @@ def test_anilist_search_with_year_query_includes_start_date(tmp_path: Path, monk
     assert "startDate" in query_str
 
 
+def test_anilist_get_anime_by_id_success(tmp_path: Path, monkeypatch):
+    client = AniListClient(cache_dir=tmp_path / "cache")
+    captured_payload = {}
+
+    def mock_post(url, **kw):
+        nonlocal captured_payload
+        captured_payload = kw.get("json", {})
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "Media": {
+                        "id": 20954,
+                        "idMal": 28999,
+                        "title": {"romaji": "Charlotte", "english": "Charlotte"},
+                        "seasonYear": 2015,
+                        "genres": ["Drama"],
+                        "characters": {
+                            "edges": [
+                                {
+                                    "role": "MAIN",
+                                    "node": {"name": {"full": "Yuu Otosaka"}, "gender": "Male"},
+                                }
+                            ]
+                        },
+                    }
+                }
+            },
+        )
+
+    monkeypatch.setattr(httpx, "post", mock_post)
+    res = client.get_anime_by_id(20954)
+    assert res is not None
+    assert res.anilist_id == 20954
+    assert res.mal_id == 28999
+    assert res.title == "Charlotte"
+    assert len(res.characters) == 1
+    assert captured_payload["variables"] == {"id": 20954}
+    assert (tmp_path / "cache" / "anilist" / "id_20954.json").exists()
+
+
+def test_anilist_get_anime_by_id_cache_hit(tmp_path: Path, monkeypatch):
+    client = AniListClient(cache_dir=tmp_path / "cache")
+    call_count = 0
+
+    def mock_post(*a, **kw):
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "Media": {
+                        "id": 20954,
+                        "idMal": 28999,
+                        "title": {"romaji": "Charlotte"},
+                        "genres": [],
+                        "characters": {"edges": []},
+                    }
+                }
+            },
+        )
+
+    monkeypatch.setattr(httpx, "post", mock_post)
+    res1 = client.get_anime_by_id(20954)
+    assert res1 is not None
+    assert call_count == 1
+
+    res2 = client.get_anime_by_id(20954)
+    assert res2 is not None
+    assert res2.anilist_id == 20954
+    assert call_count == 1
+
+
+def test_anilist_get_anime_by_id_offline(tmp_path: Path, monkeypatch):
+    client = AniListClient(cache_dir=tmp_path / "cache")
+
+    def mock_post(*a, **kw):
+        raise httpx.ConnectError("Offline")
+
+    monkeypatch.setattr(httpx, "post", mock_post)
+    res = client.get_anime_by_id(20954)
+    assert res is None
