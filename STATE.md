@@ -3,15 +3,15 @@
 > Fotografia atual do desenvolvimento. O plano completo está em [`ROADMAP.md`](ROADMAP.md).
 > Atualize este arquivo ao concluir cada etapa de um marco (spec, plano, implementação) e sempre que uma decisão for tomada.
 
-**Última atualização:** 2026-09-24
+**Última atualização:** 2026-09-26
 
 ---
 
 ## Onde estamos
 
-- **Fase:** design geral concluído → decomposto em marcos.
-- **Marco atual:** **M2 — Camada de IA e tradução básica** — plano escrito e pronto para execução.
-- **Próxima ação:** execução do plano de implementação do M2.
+- **Fase:** M2 concluído com sucesso.
+- **Marco atual:** **M2 — Camada de IA e tradução básica** — concluído (✅), suíte completa com 289 testes automatizados passando.
+- **Próxima ação:** elaboração da spec e planejamento do **M3 — Memória da série**.
 
 ## Progresso dos marcos
 
@@ -19,9 +19,9 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 
 | Marco | Status | Spec | Plano | Observações |
 |---|---|---|---|---|
-| M0 — Fundação | ✅ | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | concluído |
-| M1 — Mídia e legendas | ✅ | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | [plano](docs/superpowers/plans/2026-09-24-m1-midia-legendas.md) | concluído |
-| M2 — Camada de IA e tradução básica | 📋 | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | plano pronto |
+| M0 — Fundação | ✅ | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | concluído (101 testes) |
+| M1 — Mídia e legendas | ✅ | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | [plano](docs/superpowers/plans/2026-09-24-m1-midia-legendas.md) | concluído (237 testes) |
+| M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
 | M3 — Memória da série | ⬜ | — | — | |
 | M4 — Tradução contextual | ⬜ | — | — | |
 | M5 — Verificações e métricas | ⬜ | — | — | |
@@ -71,6 +71,8 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-24 | M1 executado (modo direto): 228 testes; aceite real — 79 episódios, faixas conforme a tabela, `write.ass` idêntico em 79/79, Charlotte S01E01 com 377 unidades de diálogo, segunda execução em cache, pasta de temporada reconhecida, `temporada-teste/` intacta | |
 | 2026-09-26 | Revisão final do M1 (Opus): 1 crítico (commit da Tarefa 1 sem o pacote `library` — corrigido) e 7 importantes corrigidos (separadores Unicode no parser, `--force` lembrado, permissões e backup no remux, `status`/`retry` em pasta de temporada, escolha manual preferindo faixa completa, publicação após renomear vídeo) + marca de tradução só quando o texto muda | |
 | 2026-09-24 | Casos de teste reais em `temporada-teste/` (fora do git): *Charlotte* (simples) e *High School D×D* (difícil); testes automatizados só com dados sintéticos | mídia e legendas reais não entram no repositório |
+| 2026-09-26 | M2 executado: 289 testes (+52 novos testes); camada LLM via `PydanticAIClient` (Ollama/OpenAI/Gemini), chunking semântico com overlap de contexto, preservação de marcadores inline (`⟦1⟧`), resiliência com fallback para texto original | |
+| 2026-09-26 | M2 CLI e Pipeline: comandos `doctor` (checagens de Ollama/GPU/modelos) e `estimate` (contagem de tokens e estimativa de custos) implementados; `run` integrado com `PydanticAIClient` para Ollama; pipeline E2E validado | |
 
 ---
 

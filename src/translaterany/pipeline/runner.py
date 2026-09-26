@@ -43,6 +43,10 @@ class RunSummary:
     def failed(self) -> bool:
         return any(c.failed for c in self.stages.values())
 
+    @property
+    def status(self) -> str:
+        return "failed" if self.failed else "success"
+
 
 class Runner:
     def __init__(
@@ -278,3 +282,41 @@ def _done_hash(record: StageRecord | None, name: str) -> str:
     if record is None or record.status != "done" or record.artifact_hash is None:
         raise InputError(f"entrada '{name}' ainda não foi produzida")
     return record.artifact_hash
+
+
+class PipelineRunner:
+    """Helper de conveniência para executar o pipeline em uma série."""
+
+    def __init__(
+        self,
+        config: object = None,
+        client: LLMClient | None = None,
+        store: ArtifactStore | None = None,
+    ) -> None:
+        from translaterany.config.loader import ResolvedConfig, load_config
+        from translaterany.config.model import AppConfig
+        from translaterany.llm.fake import FakeLLM
+
+        if isinstance(config, ResolvedConfig):
+            self.stages = config.stages
+            self.data_dir = config.data_dir
+        elif isinstance(config, AppConfig):
+            data_dir = config.general.data_dir
+            resolved = load_config(data_dir_override=data_dir)
+            self.stages = resolved.stages
+            self.data_dir = resolved.data_dir
+        else:
+            resolved = load_config()
+            self.stages = resolved.stages
+            self.data_dir = resolved.data_dir
+
+        self._store = store
+        self.client = client if client is not None else FakeLLM()
+
+    def run_series(self, path: Path, *, force: bool = False) -> RunSummary:
+        from translaterany.library import discover
+
+        series, episodes = discover(path)
+        store = self._store or ArtifactStore(path / ".translaterany_data")
+        runner = Runner(self.stages, store, self.client)
+        return runner.run(series, episodes, force=force)

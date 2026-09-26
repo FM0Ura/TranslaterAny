@@ -22,7 +22,7 @@ from translaterany.cli.app import (
 )
 from translaterany.config import ResolvedConfig
 from translaterany.library import SeriesScan, scan_library
-from translaterany.llm import FakeLLM
+from translaterany.llm import PydanticAIClient
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.lock import SeriesLocked
 from translaterany.pipeline.manifest import ManifestError
@@ -83,7 +83,7 @@ def _run_series(scan: SeriesScan, cfg: ResolvedConfig, force: bool) -> bool:
                 tasks[stage] = progress.add_task(stage, total=total)
             progress.update(tasks[stage], completed=done)
 
-        runner = Runner(cfg.stages, ArtifactStore(cfg.data_dir), FakeLLM(), log, on_progress)
+        runner = Runner(cfg.stages, ArtifactStore(cfg.data_dir), PydanticAIClient(cfg.llm), log, on_progress)
         try:
             summary = runner.run(series, scan.episodes, force=force)
         except SeriesLocked:

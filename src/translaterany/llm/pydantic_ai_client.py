@@ -30,6 +30,13 @@ try:
 except ImportError:
     pass
 
+try:
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    network_errors.append(ModelHTTPError)
+except ImportError:
+    pass
+
 NETWORK_ERRORS = tuple(set(network_errors))
 
 try:

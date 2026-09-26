@@ -74,3 +74,47 @@ def make_mkv(path: Path, subs: list[Sub], fonts: int = 1, age: float = 3600) -> 
     old = time.time() - age
     os.utime(path, (old, old))
     return path
+
+
+def create_synthetic_mkv(
+    path: Path,
+    dialogues: list[tuple[str, str, str]] | None = None,
+    subs: list[Sub] | None = None,
+    fonts: int = 1,
+) -> Path:
+    """Cria um MKV sintético contendo faixas de legenda especificadas ou geradas a partir de diálogos."""
+    if subs is None:
+        if dialogues is not None:
+            events = []
+            for start, end, text in dialogues:
+                s = start
+                if s.count(":") == 2:
+                    h, m, sec_ms = s.split(":")
+                    h = str(int(h))
+                    if "." in sec_ms:
+                        sec, ms = sec_ms.split(".")
+                        s = f"{h}:{m}:{sec}.{ms[:2]:0<2}"
+                    else:
+                        s = f"{h}:{m}:{sec_ms}.00"
+                e = end
+                if e.count(":") == 2:
+                    h, m, sec_ms = e.split(":")
+                    h = str(int(h))
+                    if "." in sec_ms:
+                        sec, ms = sec_ms.split(".")
+                        e = f"{h}:{m}:{sec}.{ms[:2]:0<2}"
+                    else:
+                        e = f"{h}:{m}:{sec_ms}.00"
+                events.append(f"Dialogue: 0,{s},{e},Default,,0,0,0,,{text}")
+            content = ass(events)
+            subs = [
+                Sub(SIGNS_ASS, "S&S", default=True),
+                Sub(content, "Dialog - ENG"),
+            ]
+        else:
+            subs = [
+                Sub(SIGNS_ASS, "S&S", default=True),
+                Sub(FULL_ASS, "Dialog - ENG"),
+                Sub(FULL_ASS, "English SDH", hearing_impaired=True),
+            ]
+    return make_mkv(path, subs, fonts=fonts)
