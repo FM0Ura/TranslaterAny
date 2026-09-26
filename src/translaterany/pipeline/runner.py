@@ -220,6 +220,7 @@ class Runner:
             log=self.log.getChild(stage.name),
             previous_output=previous,
             force=force,
+            store=self.store,
         )
 
     def _finish(

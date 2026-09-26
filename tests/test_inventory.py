@@ -34,10 +34,13 @@ def test_builtin_stages_registered_and_default_pipeline() -> None:
     assert "inventory" in REGISTRY
     assert DEFAULT_PIPELINE == (
         "inventory",
+        "metadata",
         "select_track",
         "extract",
         "normalize",
         "classify",
+        "extract_terms",
+        "consolidate_memory",
         "translate_dialogue",
         "write",
         "publish",

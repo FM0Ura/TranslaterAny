@@ -40,31 +40,37 @@ class FakeLLM:
         self.calls.append(request)
         if self._fn is not None:
             item = self._fn(request)
-        elif self._queue is not None:
-            if not self._queue:
-                raise LLMConfigError("roteiro do FakeLLM esgotado")
+        elif self._queue:
             item = self._queue.popleft()
         elif self._responses is not None:
             from translaterany.subtitles.translator import TranslationBatch, TranslationItem
 
-            items: list[TranslationItem] = []
-            for line in request.prompt.splitlines():
-                m = re.match(r"^\[([^\]]+)\]\s*(.*)$", line.strip())
-                if m:
-                    line_id, text = m.group(1), m.group(2)
-                    if line_id.startswith("CTX-"):
-                        continue
-                    tr = self._responses.get(text)
-                    if tr is None:
-                        for k, v in self._responses.items():
-                            if k in text:
-                                tr = v
-                                break
-                    items.append(TranslationItem(id=line_id, text=tr if tr is not None else text))
             if issubclass(request.output_type, TranslationBatch) or request.output_type is TranslationBatch:
+                items: list[TranslationItem] = []
+                for line in request.prompt.splitlines():
+                    m = re.match(r"^\[([^\]]+)\]\s*(.*)$", line.strip())
+                    if m:
+                        line_id, text = m.group(1), m.group(2)
+                        if line_id.startswith("CTX-"):
+                            continue
+                        tr = self._responses.get(text)
+                        if tr is None:
+                            for k, v in self._responses.items():
+                                if k in text:
+                                    tr = v
+                                    break
+                        items.append(TranslationItem(id=line_id, text=tr if tr is not None else text))
                 item = TranslationBatch(items=items)
             else:
-                item = request.output_type(items=items)
+                try:
+                    item = request.output_type()
+                except Exception:
+                    try:
+                        item = request.output_type.model_validate({})
+                    except Exception:
+                        item = request.output_type.model_construct()
+        elif self._queue is not None and not self._queue:
+            raise LLMConfigError("roteiro do FakeLLM esgotado")
         else:
             raise LLMConfigError("nenhum provedor de IA configurado")
 

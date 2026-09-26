@@ -53,3 +53,29 @@ def test_wrong_output_type_is_rejected() -> None:
     llm = FakeLLM([Other(n=1)])
     with pytest.raises(TypeError):
         llm.generate(_req())
+
+
+def test_generic_output_type_from_responses() -> None:
+    class GenericModel(BaseModel):
+        msg: str = "default"
+
+    llm = FakeLLM(responses={})
+    req = LLMRequest(model="test", instructions="", prompt="", output_type=GenericModel)
+    resp = llm.generate(req)
+    assert isinstance(resp.output, GenericModel)
+    assert resp.output.msg == "default"
+
+
+def test_script_exhaustion_falls_back_to_responses() -> None:
+    from translaterany.subtitles.translator import TranslationBatch
+
+    llm = FakeLLM(
+        script=[Answer(value="custom")],
+        responses={"hello": "olá"},
+    )
+    # Primeiro pedido consome da fila de script
+    assert llm.generate(_req("req1")).output.value == "custom"
+    # Segundo pedido cai em responses
+    tr_req = LLMRequest(model="test", instructions="", prompt="[0] hello", output_type=TranslationBatch)
+    tr_resp = llm.generate(tr_req)
+    assert tr_resp.output.items[0].text == "olá"

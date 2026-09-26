@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict
 
 from translaterany.llm.client import LLMClient
-from translaterany.pipeline.artifacts import InputReader, OutputWriter
+from translaterany.pipeline.artifacts import ArtifactStore, InputReader, OutputWriter
 from translaterany.pipeline.units import Episode, Series
 from translaterany.util.doctor import Check
 
@@ -44,6 +44,7 @@ class StageContext:
     log: logging.Logger
     previous_output: Path | None = None  # artefato anterior desta etapa para a unidade, se houver
     force: bool = False  # `run --force`: permite sobrescrever PT-BR de terceiros
+    store: ArtifactStore | None = None
 
 
 class Stage(ABC):

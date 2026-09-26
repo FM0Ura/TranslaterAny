@@ -53,6 +53,8 @@ class Series:
 
 @dataclass(frozen=True)
 class Episode:
-    series: Series
-    key: str
-    source: Path
+    series: Series | None = None
+    key: str = ""
+    source: Path = field(default_factory=lambda: Path("."))
+    number: int | None = None
+    season: int | None = None

@@ -1,0 +1,202 @@
+from pathlib import Path
+from types import SimpleNamespace
+
+from translaterany.memory.artifacts import ConsolidatedMemoryArtifact, ExtractTermsArtifact, MetadataArtifact
+from translaterany.memory.models import CharacterEntry, EntrySource, Gender, GlossaryCategory, GlossaryEntry
+from translaterany.pipeline.artifacts import ArtifactStore
+from translaterany.pipeline.stage import StageScope
+from translaterany.pipeline.units import Series
+from translaterany.stages.consolidate_memory import ConsolidateMemoryStage
+
+
+def test_consolidate_memory_stage_produces_yamls_and_artifact(tmp_path: Path) -> None:
+    meta = MetadataArtifact(
+        matched=True,
+        anilist_id=20954,
+        title="Charlotte",
+        characters=[CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE)],
+    )
+    ep1_terms = ExtractTermsArtifact(
+        episode_key="S01E01",
+        terms=[GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)],
+        character_mentions=["Yuu"],
+    )
+
+    captured: ConsolidatedMemoryArtifact | None = None
+
+    class MockOutput:
+        def json(self, obj: ConsolidatedMemoryArtifact) -> None:
+            nonlocal captured
+            captured = obj
+
+    class MockInputs:
+        def json(self, name: str, model: type) -> object:
+            if name == "metadata":
+                return meta
+            raise ValueError(name)
+
+        def json_all(self, name: str, model: type) -> dict[str, ExtractTermsArtifact]:
+            if name == "extract_terms":
+                return {"S01E01": ep1_terms}
+            raise ValueError(name)
+
+    series = Series(name="Charlotte (2015)", path=tmp_path)
+    store = ArtifactStore(tmp_path / "data")
+    stage = ConsolidateMemoryStage()
+    ctx = SimpleNamespace(
+        series=series,
+        episode=None,
+        inputs=MockInputs(),
+        output=MockOutput(),
+        store=store,
+        llm=None,
+    )
+    stage.run(ctx)
+    assert captured is not None
+    assert captured.series_name == "Charlotte (2015)"
+    assert captured.glossary_count == 1
+    assert captured.characters_count == 1
+    assert "Plunder" in captured.glossary_terms
+    assert len(captured.characters_hash) == 64
+    assert len(captured.glossary_hash) == 64
+    assert len(captured.story_hash) == 64
+
+    # Verifica que os arquivos YAML foram gravados em data_dir/series/<key>/memory/
+    mem_dir = store.series_dir(series.key) / "memory"
+    assert (mem_dir / "glossary.yaml").exists()
+    assert (mem_dir / "characters.yaml").exists()
+    assert (mem_dir / "story.yaml").exists()
+
+
+def test_consolidate_memory_stage_properties() -> None:
+    stage = ConsolidateMemoryStage()
+    assert stage.name == "consolidate_memory"
+    assert stage.scope == StageScope.SERIES
+    assert stage.inputs == ("metadata", "extract_terms")
+    assert stage.translates is False
+    assert stage.enabled_by_default is True
+
+
+def test_consolidate_memory_preserves_user_entries(tmp_path: Path) -> None:
+    from translaterany.memory.store import MemoryStore
+
+    series = Series(name="Charlotte (2015)", path=tmp_path)
+    store = ArtifactStore(tmp_path / "data")
+    mem_dir = store.series_dir(series.key) / "memory"
+    mem_store = MemoryStore(mem_dir)
+
+    # Pré-cria entrada manual de usuário
+    mem_store.save_glossary(
+        [
+            GlossaryEntry(
+                term="Plunder",
+                translation="Roubo Divino",  # Tradução personalizada do usuário
+                category=GlossaryCategory.TECHNIQUE,
+                source=EntrySource.USER,
+            )
+        ]
+    )
+
+    meta = MetadataArtifact(matched=True, anilist_id=20954, title="Charlotte")
+    ep1_terms = ExtractTermsArtifact(
+        episode_key="S01E01",
+        terms=[GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)],
+        character_mentions=[],
+    )
+
+    captured: ConsolidatedMemoryArtifact | None = None
+
+    class MockOutput:
+        def json(self, obj: ConsolidatedMemoryArtifact) -> None:
+            nonlocal captured
+            captured = obj
+
+    class MockInputs:
+        def json(self, name: str, model: type) -> object:
+            if name == "metadata":
+                return meta
+            raise ValueError(name)
+
+        def json_all(self, name: str, model: type) -> dict[str, ExtractTermsArtifact]:
+            if name == "extract_terms":
+                return {"S01E01": ep1_terms}
+            raise ValueError(name)
+
+    stage = ConsolidateMemoryStage()
+    ctx = SimpleNamespace(
+        series=series,
+        episode=None,
+        inputs=MockInputs(),
+        output=MockOutput(),
+        store=store,
+        llm=None,
+    )
+    stage.run(ctx)
+
+    # Carrega e verifica que a tradução do usuário foi estritamente preservada
+    loaded_glossary = mem_store.load_glossary()
+    assert loaded_glossary["Plunder"].translation == "Roubo Divino"
+    assert loaded_glossary["Plunder"].source == EntrySource.USER
+
+
+def test_consolidate_memory_multiple_episodes_and_new_characters(tmp_path: Path) -> None:
+    from translaterany.memory.store import MemoryStore
+
+    series = Series(name="Charlotte (2015)", path=tmp_path)
+    store = ArtifactStore(tmp_path / "data")
+
+    meta = MetadataArtifact(
+        matched=True,
+        anilist_id=20954,
+        title="Charlotte",
+        characters=[CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE)],
+    )
+    ep1 = ExtractTermsArtifact(
+        episode_key="S01E01",
+        terms=[GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)],
+        character_mentions=["Yuu"],
+    )
+    ep2 = ExtractTermsArtifact(
+        episode_key="S01E02",
+        terms=[GlossaryEntry(term="Collapse", translation="Colapso", category=GlossaryCategory.TECHNIQUE)],
+        character_mentions=["Ayumi Otosaka"],  # Novo personagem mencionado
+    )
+
+    class MockOutput:
+        def json(self, obj: ConsolidatedMemoryArtifact) -> None:
+            pass
+
+    class MockInputs:
+        def json(self, name: str, model: type) -> object:
+            if name == "metadata":
+                return meta
+            raise ValueError(name)
+
+        def json_all(self, name: str, model: type) -> dict[str, ExtractTermsArtifact]:
+            if name == "extract_terms":
+                return {"S01E01": ep1, "S01E02": ep2}
+            raise ValueError(name)
+
+    stage = ConsolidateMemoryStage()
+    ctx = SimpleNamespace(
+        series=series,
+        episode=None,
+        inputs=MockInputs(),
+        output=MockOutput(),
+        store=store,
+        llm=None,
+    )
+    stage.run(ctx)
+
+    mem_store = MemoryStore(store.series_dir(series.key) / "memory")
+    chars = mem_store.load_characters()
+    glossary = mem_store.load_glossary()
+
+    assert len(chars) == 2
+    char_names = {c.name for c in chars}
+    assert "Yuu Otosaka" in char_names
+    assert "Ayumi Otosaka" in char_names
+
+    assert len(glossary) == 2
+    assert "Plunder" in glossary
+    assert "Collapse" in glossary
