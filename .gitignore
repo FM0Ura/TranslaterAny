@@ -11,3 +11,7 @@ wheels/
 
 # Temporada de teste local (mídia real, nunca versionar)
 temporada-teste/
+
+# Ferramentas e workspaces temporários
+.superpowers/
+graphify-out/
