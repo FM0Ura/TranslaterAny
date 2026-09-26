@@ -49,6 +49,7 @@ class ExtractTermsResponse(BaseModel):
 class ExtractTermsOptions(BaseModel):
     model: str = "review"
     fallback_model: str | None = None
+    max_sample_lines: int | None = 500
 
 
 @register_stage
@@ -112,7 +113,12 @@ class ExtractTermsStage(Stage):
                 names = [c.name for c in meta.characters[:20]]
                 context_parts.append(f"Known characters from metadata: {', '.join(names)}")
 
-        sample_lines = "\n".join(f"- {u.text}" for u in units[:200])
+        if self.options.max_sample_lines is not None:
+            sampled_units = units[: self.options.max_sample_lines]
+        else:
+            sampled_units = units
+
+        sample_lines = "\n".join(f"- {u.text}" for u in sampled_units)
         prompt = (
             f"{chr(10).join(context_parts)}\n\n"
             f"Episode dialogue lines:\n{sample_lines}\n\n"
@@ -139,8 +145,24 @@ class ExtractTermsStage(Stage):
             resp = client.generate(req)
             llm_output = resp.output
         except Exception as exc:
-            logger.warning("Falha na chamada LLM em extract_terms: %s", exc)
-            llm_output = ExtractTermsResponse()
+            if self.options.fallback_model and self.options.fallback_model != self.options.model:
+                logger.warning(
+                    "Falha ao chamar modelo primário '%s' (%s). Tentando fallback '%s'.",
+                    self.options.model,
+                    exc,
+                    self.options.fallback_model,
+                )
+                fallback_req = LLMRequest(
+                    model=self.options.fallback_model,
+                    instructions=instructions,
+                    prompt=prompt,
+                    output_type=ExtractTermsResponse,
+                    tag="extract_terms",
+                )
+                resp = client.generate(fallback_req)
+                llm_output = resp.output
+            else:
+                raise
 
         entries: list[GlossaryEntry] = []
         seen_terms: set[str] = set()
