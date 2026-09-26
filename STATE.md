@@ -10,8 +10,8 @@
 ## Onde estamos
 
 - **Fase:** design geral concluído → decomposto em marcos.
-- **Marco atual:** **M2 — Camada de IA e tradução básica** — não iniciado (M1 concluído no branch `m1-midia-legendas`).
-- **Próxima ação:** integrar o branch `m1-midia-legendas`; depois, escrever o spec do M2.
+- **Marco atual:** **M2 — Camada de IA e tradução básica** — não iniciado (M1 concluído e integrado ao `master`).
+- **Próxima ação:** escrever o spec do M2.
 
 ## Progresso dos marcos
 
@@ -134,6 +134,5 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Integrar o branch `m1-midia-legendas`.
-2. Escrever o spec do **M2 — Camada de IA e tradução básica** (pendências: modelos locais concretos, modelos que recusam conteúdo, chaves de nuvem opcionais).
-3. Menores adiados ainda abertos (revisões do M0 e do M1) — ver o ledger/resumo do M1; o principal para o M2: mensagens de validação do config em PT-BR e detecção de legendas `.pt-BR.hi.srt`/`.forced` (Bazarr).
+1. Escrever o spec do **M2 — Camada de IA e tradução básica** (pendências: modelos locais concretos, modelos que recusam conteúdo, chaves de nuvem opcionais).
+2. Menores adiados ainda abertos (revisões do M0 e do M1) — ver o ledger/resumo do M1; o principal para o M2: mensagens de validação do config em PT-BR e detecção de legendas `.pt-BR.hi.srt`/`.forced` (Bazarr).
