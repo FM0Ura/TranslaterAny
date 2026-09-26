@@ -77,16 +77,25 @@ def check_ollama_status(url: str = "http://localhost:11434") -> tuple[bool, str]
     if clean_url.endswith("/v1"):
         clean_url = clean_url[:-3]
     try:
+        version = None
+        resp_v = httpx.get(f"{clean_url}/api/version", timeout=5.0)
+        if resp_v.status_code == 200:
+            v_data = resp_v.json()
+            if isinstance(v_data, dict):
+                version = v_data.get("version")
+
         resp = httpx.get(f"{clean_url}/api/tags", timeout=5.0)
         if resp.status_code != 200:
             return False, f"Ollama em {clean_url} não está acessível (HTTP {resp.status_code})"
         data = resp.json()
         models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+        version_part = f" v{version}" if version else ""
         if models:
-            return True, f"Ollama acessível ({', '.join(models)})"
-        return True, "Ollama acessível (nenhum modelo instalado)"
+            return True, f"Ollama{version_part} acessível ({', '.join(models)})"
+        return True, f"Ollama{version_part} acessível (nenhum modelo instalado)"
     except Exception as exc:
         return False, f"Ollama não está acessível em {clean_url}: {exc}"
+
 
 
 check_ollama_service = check_ollama_status

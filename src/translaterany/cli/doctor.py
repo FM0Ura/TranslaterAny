@@ -44,6 +44,7 @@ def llm_doctor_checks(cfg: ResolvedConfig) -> list[tuple[str, CheckResult]]:
                     req_models.append(m_cfg.model)
         if not req_models:
             req_models = ["translategemma:12b", "gemma4:12b"]
+        req_models = list(dict.fromkeys(req_models))
 
         models_ok, models_msg = check_ollama_models(ollama_url, req_models)
         results.append(

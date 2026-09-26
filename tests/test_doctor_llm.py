@@ -30,6 +30,28 @@ def test_check_ollama_status_ok(monkeypatch):
     assert "translategemma:12b" in msg
 
 
+def test_check_ollama_status_with_version(monkeypatch):
+    import httpx
+
+    def mock_get(url, *args, **kwargs):
+        class MockResp:
+            status_code = 200
+
+            def json(self):
+                if "/api/version" in url:
+                    return {"version": "0.3.14"}
+                return {"models": [{"name": "translategemma:12b"}]}
+
+        return MockResp()
+
+    monkeypatch.setattr(httpx, "get", mock_get)
+
+    ok, msg = check_ollama_status("http://localhost:11434")
+    assert ok is True
+    assert "v0.3.14" in msg
+    assert "translategemma:12b" in msg
+
+
 def test_check_ollama_models_present(monkeypatch):
     import httpx
 

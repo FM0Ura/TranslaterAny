@@ -1,4 +1,4 @@
-"""Comando estimate: estatísticas e estimativa de tokens e custos para tradução."""
+"""Comando estimate: estatísticas e estimativa de tokens, custos e tempo para tradução."""
 
 from pathlib import Path
 from typing import Annotated
@@ -9,7 +9,16 @@ from rich.table import Table
 from translaterany.cli.app import EXIT_OK, EXIT_USAGE, AppState, app, console, load_or_exit
 from translaterany.library import scan_library
 from translaterany.pipeline.artifacts import ArtifactStore
-from translaterany.subtitles.classify import ClassifiedUnitCollection
+from translaterany.subtitles.chunking import estimate_tokens
+from translaterany.subtitles.classify import Classification
+from translaterany.subtitles.normalize import NormalizedDoc
+
+
+def _format_time(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    minutes = seconds / 60.0
+    return f"{minutes:.1f} min"
 
 
 @app.command()
@@ -46,6 +55,7 @@ def estimate(
     total_dialogues = 0
     total_input_tokens = 0
     total_output_tokens = 0
+    total_seconds = 0.0
 
     table = Table(title="Estimativa de Tradução de Legendas")
     table.add_column("Série", style="bold")
@@ -54,6 +64,7 @@ def estimate(
     table.add_column("Tokens Entrada", justify="right")
     table.add_column("Tokens Saída", justify="right")
     table.add_column("Custo Est. (USD)", justify="right")
+    table.add_column("Tempo Est.", justify="right")
 
     for scan in scans:
         series = scan.series
@@ -61,16 +72,32 @@ def estimate(
             total_episodes += 1
             art_dir = store.artifact_dir(series.key, ep.key)
             classify_file = art_dir / "classify.json"
+            normalize_file = art_dir / "normalize.json"
+
             dialogues = 0
+            input_tokens = 0
+            output_tokens = 0
+
             if classify_file.exists():
                 try:
-                    data = classify_file.read_text(encoding="utf-8")
-                    collection = ClassifiedUnitCollection.model_validate_json(data)
-                    dialogue_units = [u for u in collection.units if u.line_type == "dialogue"]
-                    dialogues = len(dialogue_units)
-                    char_count = sum(len(u.clean_text) for u in dialogue_units)
-                    input_tokens = max(1, char_count // 4) + (dialogues * 8)
-                    output_tokens = max(1, char_count // 4)
+                    c_data = classify_file.read_text(encoding="utf-8")
+                    classification = Classification.model_validate_json(c_data)
+                    dialogue_unit_ids = {
+                        uid for uid, uclass in classification.units.items() if uclass.type == "dialogue"
+                    }
+                    dialogues = classification.counts.get("dialogue", len(dialogue_unit_ids))
+
+                    if normalize_file.exists():
+                        n_data = normalize_file.read_text(encoding="utf-8")
+                        norm_doc = NormalizedDoc.model_validate_json(n_data)
+                        dialogue_units = [u for u in norm_doc.units if u.id in dialogue_unit_ids]
+                        dialogues = len(dialogue_units)
+                        char_tokens = sum(estimate_tokens(u.text) for u in dialogue_units)
+                        input_tokens = char_tokens + (dialogues * 8)
+                        output_tokens = char_tokens
+                    else:
+                        input_tokens = dialogues * 17
+                        output_tokens = dialogues * 11
                 except Exception:
                     dialogues = 350
                     input_tokens = 6000
@@ -80,14 +107,23 @@ def estimate(
                 input_tokens = 6000
                 output_tokens = 4000
 
+            # Custo financeiro
             if provider == "ollama" or profile_name == "local":
                 cost_usd = 0.0
             else:
                 cost_usd = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
 
+            # Projeção de tempo (~25 tokens/s em GPU local; na nuvem ~50 tokens/s + 1s por bloco)
+            if provider == "ollama" or profile_name == "local":
+                ep_seconds = max(1.0, output_tokens / 25.0)
+            else:
+                batches = max(1, dialogues // 10)
+                ep_seconds = (output_tokens / 50.0) + (batches * 1.0)
+
             total_dialogues += dialogues
             total_input_tokens += input_tokens
             total_output_tokens += output_tokens
+            total_seconds += ep_seconds
 
             table.add_row(
                 series.name,
@@ -96,6 +132,7 @@ def estimate(
                 f"{input_tokens:,}",
                 f"{output_tokens:,}",
                 f"${cost_usd:.4f}",
+                _format_time(ep_seconds),
             )
 
     console.print(table)
@@ -107,6 +144,7 @@ def estimate(
         f"- Total estimado de tokens: {total_input_tokens + total_output_tokens:,} "
         f"({total_input_tokens:,} entrada / {total_output_tokens:,} saída)"
     )
+    console.print(f"- Tempo estimado: ~{_format_time(total_seconds)}")
     console.print(
         f"- Perfil LLM: [cyan]{profile_name}[/cyan] "
         f"(Modelo: [cyan]{translate_model_name}[/cyan] via [cyan]{provider}[/cyan])"
