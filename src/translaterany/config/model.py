@@ -10,13 +10,56 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ProviderConfig(_Strict):
+    base_url: str | None = None
+    api_key: str | None = None
+
+
+class ModelConfig(_Strict):
+    provider: str
+    model: str
+    num_ctx: int = 4096
+    temperature: float = 0.3
+
+
+class ProfileConfig(_Strict):
+    translate: str = "translategemma"
+    review: str = "gemma4"
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class LLMConfig(_Strict):
+    profile: Literal["local", "hibrido", "nuvem"] = "local"
+    max_cost_usd: float = 5.0
+    providers: dict[str, ProviderConfig] = Field(
+        default_factory=lambda: {
+            "ollama": ProviderConfig(base_url="http://localhost:11434/v1", api_key="ollama"),
+            "gemini": ProviderConfig(api_key=None),
+            "openai": ProviderConfig(api_key=None),
+        }
+    )
+    models: dict[str, ModelConfig] = Field(
+        default_factory=lambda: {
+            "translategemma": ModelConfig(provider="ollama", model="translategemma:12b", num_ctx=4096, temperature=0.3),
+            "gemma4": ModelConfig(provider="ollama", model="gemma4:12b", num_ctx=8192, temperature=0.7),
+        }
+    )
+    profiles: dict[str, ProfileConfig] = Field(
+        default_factory=lambda: {
+            "local": ProfileConfig(translate="translategemma", review="gemma4"),
+            "hibrido": ProfileConfig(translate="translategemma", review="gemma4"),
+            "nuvem": ProfileConfig(translate="translategemma", review="gemma4"),
+        }
+    )
+
+
 class GeneralConfig(_Strict):
     data_dir: Path | None = None
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
 
 class DiscoveryConfig(_Strict):
-    min_file_age: float = 120  # segundos; arquivos mais novos são ignorados (download em andamento)
+    min_file_age: float = 120
 
 
 class PipelineConfig(_Strict):
@@ -24,12 +67,13 @@ class PipelineConfig(_Strict):
 
 
 class StageConfig(_Strict):
-    enabled: bool | None = None  # None: usa o padrão da etapa (enabled_by_default)
+    enabled: bool | None = None
     options: dict[str, Any] = Field(default_factory=dict)
 
 
 class AppConfig(_Strict):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
-    pipeline: PipelineConfig | None = None  # ausente = pipeline padrão
+    llm: LLMConfig = Field(default_factory=LLMConfig)
+    pipeline: PipelineConfig | None = None
     stages: dict[str, StageConfig] = Field(default_factory=dict)

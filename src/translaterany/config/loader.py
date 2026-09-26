@@ -3,20 +3,20 @@
 import os
 import tomllib
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
-from translaterany.config.model import AppConfig, PipelineConfig
+from translaterany.config.model import AppConfig, LLMConfig, PipelineConfig
 from translaterany.pipeline.registry import REGISTRY, StageRegistry
 from translaterany.pipeline.stage import Stage, StageScope
 
 CONFIG_ENV = "TRANSLATERANY_CONFIG"
 
 
-class ConfigError(Exception):
+class ConfigError(ValueError):
     """Configuração inválida. A mensagem já vem pronta para o usuário (PT-BR)."""
 
 
@@ -27,6 +27,7 @@ class ResolvedConfig:
     log_level: str
     stages: tuple[Stage, ...]  # habilitadas, na ordem, já instanciadas
     min_file_age: float = 120
+    llm: LLMConfig = field(default_factory=LLMConfig)
 
 
 def default_config_path(env: Mapping[str, str] = os.environ) -> Path:
@@ -52,6 +53,20 @@ def find_config(explicit: Path | None, env: Mapping[str, str] = os.environ) -> P
         return path
     path = default_config_path(env)
     return path if path.exists() else None
+
+
+def load_config_from_str(toml_text: str) -> AppConfig:
+    """Lê e valida uma string TOML diretamente em um AppConfig."""
+    raw: dict[str, Any] = {}
+    if toml_text.strip():
+        try:
+            raw = tomllib.loads(toml_text)
+        except tomllib.TOMLDecodeError as exc:
+            raise ConfigError(f"Erro no config: TOML inválido — {exc}") from exc
+    try:
+        return AppConfig.model_validate(raw)
+    except ValidationError as exc:
+        raise ConfigError(_format_errors("config string", exc)) from exc
 
 
 def load_config(
@@ -90,6 +105,7 @@ def load_config(
         log_level=config.general.log_level,
         stages=tuple(stages),
         min_file_age=config.discovery.min_file_age,
+        llm=config.llm,
     )
 
 
@@ -122,7 +138,7 @@ def _build_stages(config: AppConfig, registry: StageRegistry, where: str) -> lis
         except ValidationError as exc:
             for err in exc.errors():
                 loc = ".".join(str(p) for p in err["loc"])
-                errors.append(f"stages.{name}.options.{loc}: {err['msg']}")
+                errors.append(f"stages.{name}.options.{loc}: {_translate_pydantic_error(err)}")
             continue
         if name not in enabled:
             continue
@@ -152,11 +168,33 @@ def _is_enabled(config: AppConfig, registry: StageRegistry, name: str) -> bool:
     return registry.get(name).enabled_by_default
 
 
+def _translate_pydantic_error(err: dict[str, Any]) -> str:
+    loc = ".".join(str(p) for p in err.get("loc", []))
+    err_type = err.get("type", "")
+    inp = err.get("input")
+    ctx = err.get("ctx", {})
+
+    if loc == "llm.profile" or loc.endswith("profile"):
+        return f"Campo inválido: Perfil de IA desconhecido '{inp}'. Opções válidas: 'local', 'hibrido', 'nuvem'."
+    if err_type == "extra_forbidden":
+        return "Campo desconhecido não permitido"
+    if err_type == "missing":
+        return "Campo obrigatório ausente"
+    if "literal" in err_type:
+        expected = ctx.get("expected", "")
+        return f"Campo inválido: valor deve ser um de {expected}"
+    if "type" in err_type:
+        expected = ctx.get("expected", "")
+        return f"Campo inválido: tipo incorreto (esperado {expected})" if expected else "Campo inválido: tipo incorreto"
+    return f"Campo inválido: {err.get('msg', 'valor inválido')}"
+
+
 def _format_errors(where: str, exc: ValidationError) -> str:
     lines = []
     for err in exc.errors():
         loc = ".".join(str(p) for p in err["loc"]) or "(raiz)"
-        lines.append(f"{loc}: {err['msg']}")
+        msg = _translate_pydantic_error(err)
+        lines.append(f"{loc}: {msg}")
     return _format(where, lines)
 
 

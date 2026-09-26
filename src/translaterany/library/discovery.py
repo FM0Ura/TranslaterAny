@@ -110,3 +110,12 @@ def discover(path: Path) -> tuple[Series, list[Episode]]:
 
 def _is_video(path: Path) -> bool:
     return path.suffix.lower() == ".mkv"
+
+
+_BAZARR_AUX_PATTERN = re.compile(r"\.(forced|hi|sdh|cc)\.[^.]+$", re.IGNORECASE)
+
+
+def is_bazarr_auxiliary_subtitle(path: str | Path) -> bool:
+    """Verifica se o caminho refere-se a uma legenda auxiliar gerada pelo Bazarr (ex.: .hi.srt, .forced.ass)."""
+    name = path.name if isinstance(path, Path) else Path(path).name
+    return _BAZARR_AUX_PATTERN.search(name) is not None
