@@ -86,7 +86,7 @@ class DialogueBatchTranslator:
                 target_model = self.fallback_model
                 try:
                     output, usage = self._call_model(prompt, target_model)
-                except LLMRefusalError, LLMOutputError:
+                except (LLMRefusalError, LLMOutputError):  # fmt: skip
                     output, usage = None, Usage()
             else:
                 output, usage = None, Usage()
@@ -148,7 +148,10 @@ class DialogueBatchTranslator:
             all_translations.update(batch_result)
             for line in batch.lines:
                 recent_context.append(ContextLine(text=batch_result.get(line.id, line.text)))
-            if len(recent_context) > self.max_context_lines:
-                recent_context = recent_context[-self.max_context_lines :]
+            if self.max_context_lines > 0:
+                if len(recent_context) > self.max_context_lines:
+                    recent_context = recent_context[-self.max_context_lines :]
+            else:
+                recent_context = []
 
         return all_translations

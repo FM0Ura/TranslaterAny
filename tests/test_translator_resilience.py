@@ -94,7 +94,7 @@ def test_translator_refusal_fallback_to_local_model():
     assert translator.total_usage.output_tokens == 5
 
 
-def test_translator_retries_transient_error():
+def test_translator_retries_transient_error(monkeypatch):
     # Simula erro transitório (timeout/rate-limit) resolvido na 2ª chamada via tenacity
     from tenacity import wait_none
 
@@ -109,10 +109,40 @@ def test_translator_retries_transient_error():
 
     client = MockLLM(behavior)
     translator = DialogueBatchTranslator(client=client, model_name="translategemma")
-    # Para testes unitários rápidos, substituir o wait do retry
-    translator._call_model.retry.wait = wait_none()
+    # Substituir o wait do retry via monkeypatch para evitar vazamento entre testes
+    monkeypatch.setattr(translator._call_model.retry, "wait", wait_none())
 
     lines = [DialogueLine(id="1", text="Hello")]
     res = translator.translate_lines(lines)
     assert res == {"1": "Olá"}
     assert client.calls == 2
+
+
+def test_translator_max_context_lines_zero():
+    # Verifica que com max_context_lines=0 nenhum contexto recente é propagado entre batches
+    recorded_prompts: list[str] = []
+
+    def behavior(call_count, req):
+        recorded_prompts.append(req.prompt)
+        line_id = str(call_count)
+        return LLMResponse(
+            output=TranslationBatch(items=[TranslationItem(id=line_id, text=f"Texto {line_id}")]),
+            model_id="test",
+        )
+
+    client = MockLLM(behavior)
+    translator = DialogueBatchTranslator(
+        client=client,
+        model_name="translategemma",
+        max_tokens_per_batch=10,
+        max_context_lines=0,
+    )
+    lines = [
+        DialogueLine(id="1", text="First line of dialogue"),
+        DialogueLine(id="2", text="Second line of dialogue"),
+    ]
+    res = translator.translate_lines(lines)
+    assert res == {"1": "Texto 1", "2": "Texto 2"}
+    assert len(recorded_prompts) == 2
+    for p in recorded_prompts:
+        assert "[CONTEXTO RECENTE" not in p
