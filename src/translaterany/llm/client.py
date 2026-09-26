@@ -1,7 +1,7 @@
 """Interface da camada de IA. As etapas dependem só disto, nunca de uma biblioteca de IA."""
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -50,5 +50,6 @@ class LLMResponse[T: BaseModel]:
     usage: Usage = field(default_factory=Usage)
 
 
+@runtime_checkable
 class LLMClient(Protocol):
     def generate[T: BaseModel](self, request: LLMRequest[T]) -> LLMResponse[T]: ...

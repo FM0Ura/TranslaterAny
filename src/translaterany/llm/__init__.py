@@ -10,6 +10,7 @@ from translaterany.llm.client import (
     Usage,
 )
 from translaterany.llm.fake import FakeLLM
+from translaterany.llm.pydantic_ai_client import PydanticAIClient
 
 __all__ = [
     "FakeLLM",
@@ -21,5 +22,6 @@ __all__ = [
     "LLMRequest",
     "LLMResponse",
     "LLMTransientError",
+    "PydanticAIClient",
     "Usage",
 ]
