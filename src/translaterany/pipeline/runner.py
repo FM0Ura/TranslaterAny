@@ -293,18 +293,23 @@ class PipelineRunner:
         client: LLMClient | None = None,
         store: ArtifactStore | None = None,
     ) -> None:
-        from translaterany.config.loader import ResolvedConfig, load_config
-        from translaterany.config.model import AppConfig
+        from translaterany.config.loader import ResolvedConfig, _build_stages, default_data_dir, load_config
+        from translaterany.config.model import AppConfig, PipelineConfig
         from translaterany.llm.fake import FakeLLM
+        from translaterany.pipeline.registry import REGISTRY
+        from translaterany.stages import DEFAULT_PIPELINE
 
         if isinstance(config, ResolvedConfig):
             self.stages = config.stages
             self.data_dir = config.data_dir
         elif isinstance(config, AppConfig):
-            data_dir = config.general.data_dir
-            resolved = load_config(data_dir_override=data_dir)
-            self.stages = resolved.stages
-            self.data_dir = resolved.data_dir
+            cfg_copy = config.model_copy(deep=True)
+            if cfg_copy.pipeline is None:
+                cfg_copy.pipeline = PipelineConfig(stages=list(DEFAULT_PIPELINE))
+            stages = _build_stages(cfg_copy, REGISTRY, "AppConfig")
+            data_dir = cfg_copy.general.data_dir or default_data_dir()
+            self.stages = tuple(stages)
+            self.data_dir = Path(data_dir).expanduser()
         else:
             resolved = load_config()
             self.stages = resolved.stages
