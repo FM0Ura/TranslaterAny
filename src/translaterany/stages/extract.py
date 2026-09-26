@@ -34,5 +34,5 @@ class ExtractStage(Stage):
             raise SkipEpisode("faixa 'und' não parece inglês")
         ctx.output.file(".ass", data)
 
-    def doctor_checks(self) -> list[Check]:
+    def doctor_checks(self, cfg: object = None) -> list[Check]:
         return [_tool_check("mkvextract")]

@@ -41,8 +41,8 @@ class DialogueBatchTranslator:
     def __init__(
         self,
         client: LLMClient,
-        model_name: str = "translategemma",
-        fallback_model: str | None = None,
+        model_name: str = "translate",
+        fallback_model: str | None = "translategemma",
         max_tokens_per_batch: int = 800,
         max_context_lines: int = 5,
     ):

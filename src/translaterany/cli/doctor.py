@@ -65,10 +65,7 @@ def llm_doctor_checks(cfg: ResolvedConfig) -> list[tuple[str, CheckResult]]:
     elif cfg.llm.profile == "nuvem":
         results.append(("gemini", CheckResult("warn", "chave não configurada")))
 
-    openai_key = (
-        cfg.llm.providers.get("openai", ProviderConfig()).api_key
-        or os.environ.get("OPENAI_API_KEY")
-    )
+    openai_key = cfg.llm.providers.get("openai", ProviderConfig()).api_key or os.environ.get("OPENAI_API_KEY")
     if openai_key:
         results.append(("openai", CheckResult("ok", "chave configurada")))
     elif cfg.llm.profile == "nuvem" and not gemini_key:
@@ -87,10 +84,16 @@ def doctor(ctx: typer.Context) -> None:
         print_checks([("config", CheckResult("fail", str(exc)))])
         raise typer.Exit(EXIT_FAILURE) from exc
     where = str(cfg.source) if cfg.source else "padrão embutido"
-    results = [
+    raw_results = [
         ("config", CheckResult("ok", f"configuração válida ({where})")),
         *run_checks(all_checks(cfg)),
         *llm_doctor_checks(cfg),
     ]
+    seen_names: set[str] = set()
+    results: list[tuple[str, CheckResult]] = []
+    for name, res in raw_results:
+        if name not in seen_names:
+            seen_names.add(name)
+            results.append((name, res))
     print_checks(results)
     raise typer.Exit(EXIT_FAILURE if has_failure(results) else EXIT_OK)

@@ -1,8 +1,9 @@
 import logging
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 
+from translaterany.config.model import ProviderConfig
 from translaterany.llm.client import LLMClient
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
@@ -12,8 +13,19 @@ from translaterany.subtitles.normalize import NormalizedDoc
 from translaterany.subtitles.segments import marker_ids
 from translaterany.subtitles.texts import UnitTexts
 from translaterany.subtitles.translator import DialogueBatchTranslator
+from translaterany.util.doctor import Check, ollama_check, ollama_models_check
+
+if TYPE_CHECKING:
+    from translaterany.config.loader import ResolvedConfig
 
 logger = logging.getLogger(__name__)
+
+
+class TranslateDialogueOptions(BaseModel):
+    model: str = "translate"
+    fallback_model: str | None = "translategemma"
+    max_tokens_per_batch: int = 800
+    max_context_lines: int = 5
 
 
 @register_stage
@@ -24,6 +36,7 @@ class StageTranslateDialogue(Stage):
     translates: ClassVar[bool] = True
     inputs: ClassVar[tuple[str, ...]] = ("normalize", "classify")
     enabled_by_default: ClassVar[bool] = True
+    Options: ClassVar[type[BaseModel]] = TranslateDialogueOptions
 
     def __init__(
         self,
@@ -33,7 +46,12 @@ class StageTranslateDialogue(Stage):
         if isinstance(client, BaseModel) and options is None:
             options = client
             client = None
+        if options is None:
+            options = TranslateDialogueOptions()
+        elif not isinstance(options, TranslateDialogueOptions):
+            options = TranslateDialogueOptions.model_validate(options)
         super().__init__(options)
+        self.options: TranslateDialogueOptions = options
         self.client = client
 
     def translate_collection(self, collection: ClassifiedUnitCollection) -> ClassifiedUnitCollection:
@@ -42,7 +60,13 @@ class StageTranslateDialogue(Stage):
             return collection
 
         lines = [DialogueLine(id=u.id, text=u.clean_text) for u in dialogue_units]
-        translator = DialogueBatchTranslator(client=self.client)
+        translator = DialogueBatchTranslator(
+            client=self.client,
+            model_name=self.options.model,
+            fallback_model=self.options.fallback_model,
+            max_tokens_per_batch=self.options.max_tokens_per_batch,
+            max_context_lines=self.options.max_context_lines,
+        )
         translations = translator.translate_lines(lines)
 
         new_units: list[ClassifiedUnit] = []
@@ -72,12 +96,14 @@ class StageTranslateDialogue(Stage):
             return
 
         lines = [DialogueLine(id=u.id, text=u.text) for u in dialogue_units]
-        try:
-            translator = DialogueBatchTranslator(client=client)
-            translated_texts = translator.translate_lines(lines)
-        except Exception as exc:
-            logger.warning("Falha na tradução de diálogos: %s. Mantendo textos originais.", exc)
-            translated_texts = {}
+        translator = DialogueBatchTranslator(
+            client=client,
+            model_name=self.options.model,
+            fallback_model=self.options.fallback_model,
+            max_tokens_per_batch=self.options.max_tokens_per_batch,
+            max_context_lines=self.options.max_context_lines,
+        )
+        translated_texts = translator.translate_lines(lines)
 
         final_texts: dict[str, str] = {}
         for u in dialogue_units:
@@ -95,3 +121,34 @@ class StageTranslateDialogue(Stage):
             final_texts[u.id] = tr
 
         ctx.output.json(UnitTexts(texts=final_texts))
+
+    def doctor_checks(self, cfg: ResolvedConfig | None = None) -> list[Check]:
+        if cfg is None:
+            return []
+
+        prof = cfg.llm.profiles.get(cfg.llm.profile)
+        req_models: list[str] = []
+        uses_ollama = False
+        if prof:
+            for key in (prof.translate, prof.review):
+                m_cfg = cfg.llm.models.get(key)
+                if m_cfg and m_cfg.provider == "ollama":
+                    uses_ollama = True
+                    req_models.append(m_cfg.model)
+        elif cfg.llm.profile in ("local", "hibrido"):
+            uses_ollama = True
+
+        if not uses_ollama:
+            return []
+
+        if not req_models:
+            req_models = ["translategemma:12b", "gemma4:12b"]
+        req_models = list(dict.fromkeys(req_models))
+
+        ollama_provider = cfg.llm.providers.get("ollama", ProviderConfig())
+        ollama_url = ollama_provider.base_url or "http://localhost:11434"
+
+        return [
+            ollama_check(ollama_url),
+            ollama_models_check(ollama_url, req_models),
+        ]

@@ -153,4 +153,3 @@ def test_doctor_command_integration(monkeypatch, tmp_path):
     assert "ollama" in result.output
     assert "RTX 4090" in result.output
     assert "translategemma:12b" in result.output
-

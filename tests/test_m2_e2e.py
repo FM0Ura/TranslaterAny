@@ -173,6 +173,16 @@ def test_m2_pipeline_cli_integration(tmp_path: Path, monkeypatch) -> None:
     fake_llm = FakeLLM(responses={"Good evening.": "Boa noite."})
     monkeypatch.setattr("translaterany.cli.run.PydanticAIClient", lambda cfg: fake_llm)
 
+    import httpx
+
+    class MockResp:
+        status_code = 200
+
+        def json(self):
+            return {"models": [{"name": "translategemma:12b"}, {"name": "gemma4:12b"}]}
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: MockResp())
+
     cli_runner = CliRunner()
     result = cli_runner.invoke(
         app,

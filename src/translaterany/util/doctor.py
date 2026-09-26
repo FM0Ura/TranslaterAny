@@ -97,7 +97,6 @@ def check_ollama_status(url: str = "http://localhost:11434") -> tuple[bool, str]
         return False, f"Ollama não está acessível em {clean_url}: {exc}"
 
 
-
 check_ollama_service = check_ollama_status
 
 
@@ -120,9 +119,7 @@ def check_ollama_models(
         data = resp.json()
         available_names = {m.get("name", "") for m in data.get("models", [])}
         missing = [
-            req
-            for req in required_models
-            if req not in available_names and f"{req}:latest" not in available_names
+            req for req in required_models if req not in available_names and f"{req}:latest" not in available_names
         ]
         if missing:
             return False, f"Modelos ausentes no Ollama: {', '.join(missing)} (execute 'ollama pull <modelo>')"
@@ -183,4 +180,3 @@ def nvidia_gpu_check() -> Check:
         return CheckResult("ok" if ok else "warn", msg)
 
     return FunctionCheck("gpu", run)
-

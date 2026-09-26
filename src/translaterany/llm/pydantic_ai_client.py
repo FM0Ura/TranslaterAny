@@ -91,9 +91,15 @@ class PydanticAIClient(LLMClient):
             if model_cfg.provider == "openai":
                 api_key = os.environ.get("OPENAI_API_KEY")
             elif model_cfg.provider == "gemini":
-                api_key = os.environ.get("GEMINI_API_KEY")
+                api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
             elif model_cfg.provider == "ollama":
                 api_key = "ollama"
+
+        if model_cfg.provider != "ollama" and not api_key:
+            raise LLMConfigError(
+                f"Chave de API não configurada para o provedor '{model_cfg.provider}'. "
+                "Defina api_key no config.toml ou variável de ambiente correspondente."
+            )
 
         extra_args: dict[str, Any] = {"temperature": model_cfg.temperature}
         if model_cfg.num_ctx:

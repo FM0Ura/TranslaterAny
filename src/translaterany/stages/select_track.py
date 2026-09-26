@@ -118,7 +118,7 @@ class SelectTrackStage(Stage):
             )
         )
 
-    def doctor_checks(self) -> list[Check]:
+    def doctor_checks(self, cfg: object = None) -> list[Check]:
         return [_tool_check("mkvmerge")]
 
 

@@ -166,6 +166,98 @@ def test_translate_dialogue_fallback_when_markers_lost() -> None:
     assert captured_output.texts["u2"] == "Texto normal"
 
 
+def test_translate_dialogue_bubbles_up_transient_error(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    import pytest
+
+    from translaterany.llm.client import LLMClient, LLMTransientError
+    from translaterany.subtitles.classify import Classification, UnitClass
+    from translaterany.subtitles.normalize import Encoding, NormalizedDoc, Unit
+
+    class FailingLLM(LLMClient):
+        def generate(self, request):
+            raise LLMTransientError("API connection timeout")
+
+    doc = NormalizedDoc(
+        encoding=Encoding(bom=False, newline="\n"),
+        format=[],
+        events=[],
+        units=[Unit(id="u1", style="Default", text="Hello world", markers=0, events=[0])],
+    )
+    classification = Classification(
+        main_style="Default",
+        units={"u1": UnitClass(type="dialogue", uncertain=False, rule="test")},
+        counts={"dialogue": 1},
+        scenes=[],
+    )
+
+    class MockInputs:
+        def json(self, name: str, model: type):
+            if name == "normalize":
+                return doc
+            if name == "classify":
+                return classification
+            raise ValueError(name)
+
+    stage = StageTranslateDialogue(client=FailingLLM())
+    ctx = SimpleNamespace(
+        inputs=MockInputs(),
+        output=SimpleNamespace(json=lambda x: None),
+        llm=FailingLLM(),
+    )
+
+    with pytest.raises(LLMTransientError, match="API connection timeout"):
+        stage.run(ctx)  # type: ignore[arg-type]
+
+
+def test_translate_dialogue_options_and_doctor_checks() -> None:
+    from translaterany.config.loader import ResolvedConfig
+    from translaterany.config.model import LLMConfig, ModelConfig, ProfileConfig
+    from translaterany.stages.translate_dialogue import TranslateDialogueOptions
+
+    opts = TranslateDialogueOptions(
+        model="custom-translate",
+        fallback_model="custom-fallback",
+        max_tokens_per_batch=400,
+        max_context_lines=3,
+    )
+    stage = StageTranslateDialogue(opts)
+    assert stage.options.model == "custom-translate"
+    assert stage.options.fallback_model == "custom-fallback"
+    assert stage.options.max_tokens_per_batch == 400
+    assert stage.options.max_context_lines == 3
+
+    # doctor_checks com perfil local (usa ollama)
+    cfg_local = ResolvedConfig(
+        source=None,
+        data_dir=Path("/tmp"),
+        log_level="INFO",
+        stages=(stage,),
+        llm=LLMConfig(profile="local"),
+    )
+    checks_local = stage.doctor_checks(cfg_local)
+    assert len(checks_local) == 2
+    check_names = [c.name for c in checks_local]
+    assert "ollama" in check_names
+    assert "ollama_models" in check_names
+
+    # doctor_checks com perfil nuvem sem ollama
+    cfg_nuvem = ResolvedConfig(
+        source=None,
+        data_dir=Path("/tmp"),
+        log_level="INFO",
+        stages=(stage,),
+        llm=LLMConfig(
+            profile="nuvem",
+            profiles={"nuvem": ProfileConfig(translate="gpt-4o", review="gpt-4o")},
+            models={"gpt-4o": ModelConfig(provider="openai", model="gpt-4o")},
+        ),
+    )
+    checks_nuvem = stage.doctor_checks(cfg_nuvem)
+    assert len(checks_nuvem) == 0
+
+
 @needs_mkvtoolnix
 def test_pipeline_integration_translate_dialogue(data_dir: Path, synthetic_series: Path) -> None:
     from pipeline_helpers import artifact

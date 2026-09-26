@@ -67,4 +67,3 @@ def test_chunking_zero_max_context_lines():
     batches = create_dialogue_batches(lines, max_tokens_per_batch=10, max_context_lines=0)
     for batch in batches:
         assert len(batch.context) == 0
-

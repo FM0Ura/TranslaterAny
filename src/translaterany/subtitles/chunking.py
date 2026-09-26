@@ -1,5 +1,6 @@
 """Agrupamento de falas de diálogo em lotes (chunking) com janela de contexto deslizante."""
 
+from collections import deque
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -33,15 +34,16 @@ def create_dialogue_batches(
     batches: list[DialogueBatch] = []
     current_lines: list[DialogueLine] = []
     current_tokens = 0
-    recent_history: list[ContextLine] = []
+    recent_history: deque[ContextLine] = deque(maxlen=max_context_lines if max_context_lines > 0 else 0)
 
     for line in lines:
         line_tokens = estimate_tokens(line.text) + 6  # overhead por fala
         if current_lines and (current_tokens + line_tokens > max_tokens_per_batch):
-            context_slice = list(recent_history[-max_context_lines:]) if max_context_lines > 0 else []
+            context_slice = list(recent_history) if max_context_lines > 0 else []
             batches.append(DialogueBatch(lines=current_lines, context=context_slice))
-            for cl in current_lines:
-                recent_history.append(ContextLine(text=cl.text))
+            if max_context_lines > 0:
+                for cl in current_lines:
+                    recent_history.append(ContextLine(text=cl.text))
             current_lines = [line]
             current_tokens = line_tokens
         else:
@@ -49,7 +51,7 @@ def create_dialogue_batches(
             current_tokens += line_tokens
 
     if current_lines:
-        context_slice = list(recent_history[-max_context_lines:]) if max_context_lines > 0 else []
+        context_slice = list(recent_history) if max_context_lines > 0 else []
         batches.append(DialogueBatch(lines=current_lines, context=context_slice))
 
     return batches

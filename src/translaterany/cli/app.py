@@ -48,7 +48,10 @@ def load_or_exit(state: AppState) -> ResolvedConfig:
 def all_checks(cfg: ResolvedConfig) -> list[Check]:
     checks: list[Check] = [python_version_check(), data_dir_check(cfg.data_dir)]
     for stage in cfg.stages:
-        checks.extend(stage.doctor_checks())
+        try:
+            checks.extend(stage.doctor_checks(cfg))  # type: ignore[call-arg]
+        except TypeError:
+            checks.extend(stage.doctor_checks())
     return checks
 
 
@@ -63,4 +66,3 @@ def print_checks(results: list[tuple[str, CheckResult]]) -> None:
 
 
 from translaterany.cli import doctor, estimate, retry, run, status  # noqa: E402, F401
-

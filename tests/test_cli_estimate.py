@@ -84,4 +84,3 @@ def test_estimate_command_with_artifacts(tmp_path: Path):
     assert "350" not in result.output
     assert "Serie" in result.output and "Real" in result.output
     assert "tempo" in result.output.lower()
-

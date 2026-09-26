@@ -128,7 +128,7 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 | Python 3.14 via `uv` | ✅ |
 | `ffmpeg` / `ffprobe` | ✅ instalado |
 | `mkvtoolnix` (`mkvextract`, `mkvmerge`) | ✅ v102.0 via Homebrew (`/home/linuxbrew/.linuxbrew/bin`) |
-| Ollama | ❌ instalar antes do M2 |
+| Ollama | ✅ instalado / Docker |
 | LanguageTool | ❌ instalar antes do M7 |
 | GPU | NVIDIA RTX 3060 12 GB · 46 GB RAM · 12 threads |
 
@@ -136,5 +136,6 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Escrever o spec do **M2 — Camada de IA e tradução básica** (pendências: modelos locais concretos, modelos que recusam conteúdo, chaves de nuvem opcionais).
-2. Menores adiados ainda abertos (revisões do M0 e do M1) — ver o ledger/resumo do M1; o principal para o M2: mensagens de validação do config em PT-BR e detecção de legendas `.pt-BR.hi.srt`/`.forced` (Bazarr).
+1. Escrever o spec do **M3 — Memória da série** (extração AniList/Jikan, glossário global e por série, consistência de personagens e estilo).
+2. Definir estratégia para mapeamento TVDB/TMDB → AniList/MAL quando `.nfo` não tem IDs diretos.
+

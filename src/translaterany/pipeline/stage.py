@@ -72,5 +72,5 @@ class Stage(ABC):
         ainda estão como registrados; False força a reexecução."""
         return True
 
-    def doctor_checks(self) -> list[Check]:
+    def doctor_checks(self, cfg: Any = None) -> list[Check]:
         return []

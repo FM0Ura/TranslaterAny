@@ -77,7 +77,20 @@ def test_doctor_ok_and_config_failure(tmp_path: Path, data_dir: Path) -> None:
 
 
 @needs_mkvtoolnix
-def test_default_config_runs_m1_pipeline(tmp_path: Path) -> None:
+def test_default_config_runs_m1_pipeline(tmp_path: Path, monkeypatch) -> None:
+    import httpx
+
+    from translaterany.llm.fake import FakeLLM
+
+    class MockResp:
+        status_code = 200
+
+        def json(self):
+            return {"models": [{"name": "translategemma:12b"}, {"name": "gemma4:12b"}]}
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: MockResp())
+    monkeypatch.setattr("translaterany.cli.run.PydanticAIClient", lambda cfg: FakeLLM(responses={}))
+
     root = tmp_path / "lib" / "Serie"
     make_mkv(root / "S01E01.mkv", [Sub(SIGNS_ASS, "S&S", default=True), Sub(FULL_ASS, "Dialog - ENG")])
     env = {"XDG_CONFIG_HOME": str(tmp_path / "sem-config"), "TRANSLATERANY_CONFIG": ""}

@@ -174,7 +174,7 @@ def _translate_pydantic_error(err: dict[str, Any]) -> str:
     inp = err.get("input")
     ctx = err.get("ctx", {})
 
-    if loc == "llm.profile" or loc.endswith("profile"):
+    if loc in ("llm.profile", "profile"):
         return f"Campo inválido: Perfil de IA desconhecido '{inp}'. Opções válidas: 'local', 'hibrido', 'nuvem'."
     if err_type == "extra_forbidden":
         return "Campo desconhecido não permitido"

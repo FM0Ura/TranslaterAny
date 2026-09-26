@@ -307,3 +307,18 @@ def test_pydantic_ai_client_implements_protocol():
     config = LLMConfig()
     client = PydanticAIClient(config)
     assert isinstance(client, LLMClient)
+
+
+def test_pydantic_ai_client_cloud_provider_missing_api_key_raises_config_error(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    config = LLMConfig()
+    config.models["gpt-4o"] = ModelConfig(
+        provider="openai",
+        model="gpt-4o",
+    )
+    client = PydanticAIClient(config)
+
+    with pytest.raises(LLMConfigError, match="Chave de API não configurada para o provedor 'openai'"):
+        client._resolve_model("gpt-4o")

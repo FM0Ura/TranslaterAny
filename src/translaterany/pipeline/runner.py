@@ -322,6 +322,6 @@ class PipelineRunner:
         from translaterany.library import discover
 
         series, episodes = discover(path)
-        store = self._store or ArtifactStore(path / ".translaterany_data")
+        store = self._store or ArtifactStore(self.data_dir)
         runner = Runner(self.stages, store, self.client)
         return runner.run(series, episodes, force=force)
