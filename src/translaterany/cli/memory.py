@@ -21,38 +21,67 @@ from translaterany.memory.models import (
 from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.artifacts import ArtifactStore
 
+_CATEGORY_LABELS: dict[str, str] = {
+    "name": "Nome",
+    "place": "Lugar",
+    "technique": "Técnica",
+    "object": "Objeto",
+    "org": "Organização",
+    "general": "Geral",
+}
+
+_GENDER_LABELS: dict[str, str] = {
+    "male": "Masculino",
+    "female": "Feminino",
+    "neutral": "Neutro",
+    "unknown": "Desconhecido",
+}
+
+_ROLE_LABELS: dict[str, str] = {
+    "main": "Principal",
+    "supporting": "Secundário",
+    "background": "Figurante",
+}
+
+_SOURCE_LABELS: dict[str, str] = {
+    "user": "Usuário",
+    "metadata": "Metadados",
+    "extracted": "Extraído",
+}
+
 
 def _load_yaml_content(path: Path) -> Any:
     yaml = YAML(typ="safe")
     return yaml.load(path.read_text(encoding="utf-8"))
 
 
-def _import_file_into_store(file_path: Path, mem_store: MemoryStore) -> None:
+def _import_file_into_store(file_path: Path, mem_store: MemoryStore) -> tuple[int, int, bool]:
     data = _load_yaml_content(file_path)
     if not data:
-        return
+        return 0, 0, False
+
+    terms_count = 0
+    chars_count = 0
+    story_imported = False
 
     if isinstance(data, list):
-        if data and isinstance(data[0], dict) and "term" in data[0]:
-            entries: list[GlossaryEntry] = []
-            for item in data:
-                if isinstance(item, dict) and "term" in item:
-                    item_copy = dict(item)
-                    if "source" not in item_copy:
-                        item_copy["source"] = EntrySource.USER
+        entries: list[GlossaryEntry] = []
+        chars: list[CharacterEntry] = []
+        for item in data:
+            if isinstance(item, dict):
+                item_copy = dict(item)
+                if "source" not in item_copy:
+                    item_copy["source"] = EntrySource.USER
+                if "term" in item_copy:
                     entries.append(GlossaryEntry.model_validate(item_copy))
-            if entries:
-                mem_store.merge_glossary(entries)
-        elif data and isinstance(data[0], dict) and "name" in data[0]:
-            chars: list[CharacterEntry] = []
-            for item in data:
-                if isinstance(item, dict) and "name" in item:
-                    item_copy = dict(item)
-                    if "source" not in item_copy:
-                        item_copy["source"] = EntrySource.USER
+                elif "name" in item_copy:
                     chars.append(CharacterEntry.model_validate(item_copy))
-            if chars:
-                mem_store.merge_characters(chars)
+        if entries:
+            mem_store.merge_glossary(entries)
+            terms_count += len(entries)
+        if chars:
+            mem_store.merge_characters(chars)
+            chars_count += len(chars)
     elif isinstance(data, dict):
         if "glossary" in data and isinstance(data["glossary"], list):
             entries = []
@@ -64,7 +93,8 @@ def _import_file_into_store(file_path: Path, mem_store: MemoryStore) -> None:
                     entries.append(GlossaryEntry.model_validate(item_copy))
             if entries:
                 mem_store.merge_glossary(entries)
-        elif "characters" in data and isinstance(data["characters"], list):
+                terms_count += len(entries)
+        if "characters" in data and isinstance(data["characters"], list):
             chars = []
             for item in data["characters"]:
                 if isinstance(item, dict) and "name" in item:
@@ -74,9 +104,17 @@ def _import_file_into_store(file_path: Path, mem_store: MemoryStore) -> None:
                     chars.append(CharacterEntry.model_validate(item_copy))
             if chars:
                 mem_store.merge_characters(chars)
-        elif "title" in data or "synopsis" in data:
+                chars_count += len(chars)
+        if "story" in data and isinstance(data["story"], dict):
+            story = StoryMemory.model_validate(data["story"])
+            mem_store.save_story(story)
+            story_imported = True
+        elif ("title" in data or "synopsis" in data) and not ("glossary" in data or "characters" in data):
             story = StoryMemory.model_validate(data)
             mem_store.save_story(story)
+            story_imported = True
+
+    return terms_count, chars_count, story_imported
 
 
 @app.command()
@@ -129,29 +167,52 @@ def memory(
 
         anilist = AniListClient(cache_dir)
         jikan = JikanClient(cache_dir)
-        match = anilist.search_anime(title, year)
-        if match:
-            synopses: dict[int, EpisodeSynopsis] = {}
-            if match.mal_id:
-                try:
-                    synopses = jikan.get_episode_synopses(match.mal_id) or {}
-                except Exception:
-                    synopses = {}
-            episodes_map = {
-                (syn.episode_key if getattr(syn, "episode_key", None) else f"EP{num}"): syn
-                for num, syn in synopses.items()
-            }
-            story = StoryMemory(
-                title=match.title,
-                romaji_title=match.romaji,
-                year=match.year,
-                synopsis="",
-                genres=match.genres,
-                episodes=episodes_map,
-            )
-            mem_store.save_story(story)
-            if match.characters:
-                mem_store.merge_characters(match.characters)
+
+        metadata_cfg = getattr(getattr(series, "config", None), "metadata", None)
+        override_id: int | None = getattr(metadata_cfg, "anilist_id", None)
+
+        match = None
+        if override_id is not None and hasattr(anilist, "get_anime_by_id"):
+            try:
+                match = anilist.get_anime_by_id(override_id)
+            except Exception as exc:
+                console.print(f"[yellow]Aviso ao consultar AniList por ID {override_id}: {exc}[/yellow]")
+
+        if match is None:
+            try:
+                match = anilist.search_anime(title, year)
+            except Exception as exc:
+                console.print(f"[yellow]Aviso ao buscar AniList para '{title}': {exc}[/yellow]")
+
+        if match is None:
+            console.print(f"[yellow]Nenhum metadado encontrado no AniList para a série '{series.name}'.[/yellow]")
+            return
+
+        synopses: dict[int, EpisodeSynopsis] = {}
+        if match.mal_id:
+            try:
+                synopses = jikan.get_episode_synopses(match.mal_id) or {}
+            except Exception:
+                synopses = {}
+        episodes_map = {
+            (syn.episode_key if getattr(syn, "episode_key", None) else f"EP{num}"): syn
+            for num, syn in synopses.items()
+        }
+
+        existing_story = mem_store.load_story()
+        synopsis = existing_story.synopsis if existing_story and existing_story.synopsis else ""
+
+        story = StoryMemory(
+            title=match.title,
+            romaji_title=match.romaji,
+            year=match.year,
+            synopsis=synopsis,
+            genres=match.genres,
+            episodes=episodes_map,
+        )
+        mem_store.save_story(story)
+        if match.characters:
+            mem_store.merge_characters(match.characters)
         console.print(f"[green]Metadados e memória da série '{series.name}' atualizados com sucesso.[/green]")
         return
 
@@ -171,15 +232,35 @@ def memory(
             console.print(f"[red]Caminho de importação não encontrado: {import_path}[/red]")
             raise typer.Exit(EXIT_USAGE)
 
+        total_terms = 0
+        total_chars = 0
+        total_story = 0
+
         if import_path.is_dir():
             for fname in ("characters.yaml", "glossary.yaml", "story.yaml"):
                 f = import_path / fname
                 if f.is_file():
-                    _import_file_into_store(f, mem_store)
+                    t, c, s = _import_file_into_store(f, mem_store)
+                    total_terms += t
+                    total_chars += c
+                    if s:
+                        total_story += 1
         else:
-            _import_file_into_store(import_path, mem_store)
+            t, c, s = _import_file_into_store(import_path, mem_store)
+            total_terms += t
+            total_chars += c
+            if s:
+                total_story += 1
 
-        console.print(f"[green]Memória importada com sucesso a partir de {import_path}.[/green]")
+        parts = []
+        if total_terms:
+            parts.append(f"{total_terms} termo(s)")
+        if total_chars:
+            parts.append(f"{total_chars} personagem(ns)")
+        if total_story:
+            parts.append("história")
+        summary_str = f" ({', '.join(parts)})" if parts else ""
+        console.print(f"[green]Memória importada com sucesso a partir de {import_path}{summary_str}.[/green]")
         return
 
     glossary = mem_store.load_glossary()
@@ -209,10 +290,10 @@ def memory(
             src_val = c.source.value if hasattr(c.source, "value") else str(c.source)
             char_table.add_row(
                 c.name,
-                gender_val,
-                role_val,
+                _GENDER_LABELS.get(gender_val, gender_val),
+                _ROLE_LABELS.get(role_val, role_val),
                 c.speech_style or "—",
-                src_val,
+                _SOURCE_LABELS.get(src_val, src_val),
                 c.notes or "—",
             )
         console.print(char_table)
@@ -228,8 +309,8 @@ def memory(
             gloss_table.add_row(
                 entry.term,
                 entry.translation,
-                cat_val,
-                src_val,
+                _CATEGORY_LABELS.get(cat_val, cat_val),
+                _SOURCE_LABELS.get(src_val, src_val),
                 entry.notes or "—",
             )
         console.print(gloss_table)

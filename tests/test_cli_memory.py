@@ -154,3 +154,126 @@ def test_memory_command_refresh(tmp_path: Path, monkeypatch):
     result = runner.invoke(app, ["--config", str(cfg_file), "memory", str(series_dir), "--refresh"])
     assert result.exit_code == 0
     assert "atualizados com sucesso" in result.output.lower()
+
+
+def test_memory_command_import_compound_yaml(tmp_path: Path):
+    series_dir = tmp_path / "Charlotte (2015)"
+    series_dir.mkdir()
+    data_dir = tmp_path / "data"
+    store = ArtifactStore(data_dir)
+    series = Series(name="Charlotte (2015)", path=series_dir)
+    mem_dir = store.series_dir(series.key) / "memory"
+    mem_dir.mkdir(parents=True, exist_ok=True)
+    mem_store = MemoryStore(mem_dir)
+
+    compound_file = tmp_path / "compound.yaml"
+    compound_file.write_text(
+        "glossary:\n"
+        "  - term: Plunder\n"
+        "    translation: Saque\n"
+        "    category: technique\n"
+        "characters:\n"
+        "  - name: Nao Tomori\n"
+        "    gender: female\n"
+        "    role: main\n",
+        encoding="utf-8",
+    )
+
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(f'[general]\ndata_dir = "{data_dir}"\n', encoding="utf-8")
+
+    result = runner.invoke(app, ["--config", str(cfg_file), "memory", str(series_dir), "--import", str(compound_file)])
+    assert result.exit_code == 0
+    assert "1 termo(s)" in result.output
+    assert "1 personagem(ns)" in result.output
+
+    glossary = mem_store.load_glossary()
+    characters = mem_store.load_characters()
+    assert "Plunder" in glossary
+    assert glossary["Plunder"].translation == "Saque"
+    assert any(c.name == "Nao Tomori" for c in characters)
+
+
+def test_memory_command_refresh_with_override_id(tmp_path: Path, monkeypatch):
+    series_dir = tmp_path / "Charlotte (2015)"
+    series_dir.mkdir()
+    (series_dir / "series.toml").write_text("[metadata]\nanilist_id = 99999\n", encoding="utf-8")
+
+    called_with_id = None
+
+    class MockAniListClient:
+        def __init__(self, cache_dir):
+            pass
+
+        def get_anime_by_id(self, anilist_id: int):
+            nonlocal called_with_id
+            called_with_id = anilist_id
+            from translaterany.memory.anilist import AniListMatch
+            return AniListMatch(anilist_id=anilist_id, title="Overridden Anime", romaji="Overridden")
+
+        def search_anime(self, title: str, year: int | None = None):
+            raise AssertionError("search_anime não deveria ser chamado quando get_anime_by_id tem sucesso")
+
+    monkeypatch.setattr("translaterany.memory.anilist.AniListClient", MockAniListClient)
+
+    data_dir = tmp_path / "data"
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(f'[general]\ndata_dir = "{data_dir}"\n', encoding="utf-8")
+
+    result = runner.invoke(app, ["--config", str(cfg_file), "memory", str(series_dir), "--refresh"])
+    assert result.exit_code == 0
+    assert called_with_id == 99999
+    assert "atualizados com sucesso" in result.output.lower()
+
+
+def test_memory_command_refresh_not_found(tmp_path: Path, monkeypatch):
+    class MockAniListClient:
+        def __init__(self, cache_dir):
+            pass
+
+        def search_anime(self, title: str, year: int | None = None):
+            return None
+
+    monkeypatch.setattr("translaterany.memory.anilist.AniListClient", MockAniListClient)
+
+    series_dir = tmp_path / "Desconhecido (2099)"
+    series_dir.mkdir()
+    data_dir = tmp_path / "data"
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(f'[general]\ndata_dir = "{data_dir}"\n', encoding="utf-8")
+
+    result = runner.invoke(app, ["--config", str(cfg_file), "memory", str(series_dir), "--refresh"])
+    assert result.exit_code == 0
+    assert "nenhum metadado encontrado" in result.output.lower()
+
+
+def test_memory_command_refresh_preserves_existing_synopsis(tmp_path: Path, monkeypatch):
+    series_dir = tmp_path / "Charlotte (2015)"
+    series_dir.mkdir()
+    data_dir = tmp_path / "data"
+    store = ArtifactStore(data_dir)
+    series = Series(name="Charlotte (2015)", path=series_dir)
+    mem_dir = store.series_dir(series.key) / "memory"
+    mem_dir.mkdir(parents=True, exist_ok=True)
+    mem_store = MemoryStore(mem_dir)
+    mem_store.save_story(StoryMemory(title="Charlotte", synopsis="Sinopse existente de teste."))
+
+    class MockAniListClient:
+        def __init__(self, cache_dir):
+            pass
+
+        def search_anime(self, title: str, year: int | None = None):
+            from translaterany.memory.anilist import AniListMatch
+            return AniListMatch(anilist_id=20954, title="Charlotte", romaji="Charlotte")
+
+    monkeypatch.setattr("translaterany.memory.anilist.AniListClient", MockAniListClient)
+
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(f'[general]\ndata_dir = "{data_dir}"\n', encoding="utf-8")
+
+    result = runner.invoke(app, ["--config", str(cfg_file), "memory", str(series_dir), "--refresh"])
+    assert result.exit_code == 0
+
+    reloaded_story = mem_store.load_story()
+    assert reloaded_story is not None
+    assert reloaded_story.synopsis == "Sinopse existente de teste."
