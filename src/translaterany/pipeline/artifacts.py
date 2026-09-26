@@ -21,7 +21,21 @@ class ArtifactStore:
         self.data_dir = data_dir
 
     def series_dir(self, series_key: str) -> Path:
-        return self.data_dir / "series" / series_key
+        target = self.data_dir / "series" / series_key
+        if not target.exists() and (self.data_dir / "series").is_dir():
+            candidates = [
+                p
+                for p in (self.data_dir / "series").iterdir()
+                if p.is_dir()
+                and (
+                    p.name.startswith(f"{series_key}-")
+                    or series_key.startswith(f"{p.name}-")
+                    or p.name == series_key
+                )
+            ]
+            if len(candidates) == 1:
+                return candidates[0]
+        return target
 
     def lock_path(self, series_key: str) -> Path:
         return self.series_dir(series_key) / ".lock"

@@ -65,4 +65,4 @@ def print_checks(results: list[tuple[str, CheckResult]]) -> None:
     console.print(table)
 
 
-from translaterany.cli import doctor, estimate, retry, run, status  # noqa: E402, F401
+from translaterany.cli import doctor, estimate, memory, retry, run, status  # noqa: E402, F401

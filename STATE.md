@@ -9,9 +9,9 @@
 
 ## Onde estamos
 
-- **Fase:** M2 concluído com sucesso.
-- **Marco atual:** **M2 — Camada de IA e tradução básica** — concluído (✅), suíte completa com 289 testes automatizados passando.
-- **Próxima ação:** elaboração da spec e planejamento do **M3 — Memória da série**.
+- **Fase:** M3 concluído com sucesso.
+- **Marco atual:** **M3 — Memória da série** — concluído (✅), suíte completa com 364 testes automatizados passando.
+- **Próxima ação:** elaboração da spec e planejamento do **M4 — Tradução contextual**.
 
 ## Progresso dos marcos
 
@@ -22,7 +22,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M0 — Fundação | ✅ | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | concluído (101 testes) |
 | M1 — Mídia e legendas | ✅ | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | [plano](docs/superpowers/plans/2026-09-24-m1-midia-legendas.md) | concluído (237 testes) |
 | M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
-| M3 — Memória da série | ⬜ | — | — | |
+| M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (364 testes) |
 | M4 — Tradução contextual | ⬜ | — | — | |
 | M5 — Verificações e métricas | ⬜ | — | — | |
 | M6 — Refinamento I | ⬜ | — | — | |
@@ -73,6 +73,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-24 | Casos de teste reais em `temporada-teste/` (fora do git): *Charlotte* (simples) e *High School D×D* (difícil); testes automatizados só com dados sintéticos | mídia e legendas reais não entram no repositório |
 | 2026-09-26 | M2 executado: 289 testes (+52 novos testes); camada LLM via `PydanticAIClient` (Ollama/OpenAI/Gemini), chunking semântico com overlap de contexto, preservação de marcadores inline (`⟦1⟧`), resiliência com fallback para texto original | |
 | 2026-09-26 | M2 CLI e Pipeline: comandos `doctor` (checagens de Ollama/GPU/modelos) e `estimate` (contagem de tokens e estimativa de custos) implementados; `run` integrado com `PydanticAIClient` para Ollama; pipeline E2E validado | |
+| 2026-09-26 | M3 executado: 364 testes (+75 novos testes); metadados canônicos via AniList/Jikan, etapas metadata, extract_terms e consolidate_memory integradas ao pipeline; persistência em YAML (characters, glossary, story) com precedência estrita (user > metadata > extracted); injeção de glossário por episódio e rastreamento de staleness com retry --stale; comando CLI memory e testes E2E | |
 
 ---
 
@@ -136,6 +137,6 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Escrever o spec do **M3 — Memória da série** (extração AniList/Jikan, glossário global e por série, consistência de personagens e estilo).
-2. Definir estratégia para mapeamento TVDB/TMDB → AniList/MAL quando `.nfo` não tem IDs diretos.
+1. Escrever o spec do **M4 — Tradução contextual** (tratamento e honoríficos, consistência de tom, diálogos entre múltiplos personagens, contextualização de falas ambíguas).
+2. Validação prática do pipeline do M3 em casos de teste reais com modelos locais.
 
