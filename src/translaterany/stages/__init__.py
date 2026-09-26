@@ -19,6 +19,7 @@ DEFAULT_PIPELINE: tuple[str, ...] = (
     "extract",
     "normalize",
     "classify",
+    "translate_dialogue",
     "write",
     "publish",
     "remux",

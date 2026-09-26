@@ -1,5 +1,5 @@
-from pathlib import Path
-from typing import Any, ClassVar
+import logging
+from typing import ClassVar
 
 from pydantic import BaseModel
 
@@ -7,29 +7,32 @@ from translaterany.llm.client import LLMClient
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.subtitles.chunking import DialogueLine
-from translaterany.subtitles.classify import ClassifiedUnit, ClassifiedUnitCollection
+from translaterany.subtitles.classify import Classification, ClassifiedUnit, ClassifiedUnitCollection
+from translaterany.subtitles.normalize import NormalizedDoc
+from translaterany.subtitles.segments import marker_ids
+from translaterany.subtitles.texts import UnitTexts
 from translaterany.subtitles.translator import DialogueBatchTranslator
+
+logger = logging.getLogger(__name__)
 
 
 @register_stage
 class StageTranslateDialogue(Stage):
     name: ClassVar[str] = "translate_dialogue"
     version: ClassVar[str] = "1"
-    scope: ClassVar[str] = StageScope.EPISODE.value
+    scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
-    inputs: ClassVar[list[str]] = ["classify"]
+    inputs: ClassVar[tuple[str, ...]] = ("normalize", "classify")
     enabled_by_default: ClassVar[bool] = True
 
     def __init__(
         self,
         client: LLMClient | BaseModel | None = None,
-        options: BaseModel | dict[str, Any] | None = None,
+        options: BaseModel | None = None,
     ) -> None:
         if isinstance(client, BaseModel) and options is None:
             options = client
             client = None
-        elif isinstance(options, dict):
-            options = None
         super().__init__(options)
         self.client = client
 
@@ -46,7 +49,6 @@ class StageTranslateDialogue(Stage):
         for u in collection.units:
             if u.id in translations:
                 tr_text = translations[u.id]
-                # Reinsere prefixos/sufixos de tags
                 new_raw = f"{u.prefix}{tr_text}{u.suffix}"
                 new_units.append(u.model_copy(update={"clean_text": tr_text, "raw_text": new_raw}))
             else:
@@ -54,35 +56,42 @@ class StageTranslateDialogue(Stage):
 
         return ClassifiedUnitCollection(units=new_units)
 
-    def run(self, ctx: StageContext) -> Path | None:
-        if self.client is None and hasattr(ctx, "llm"):
-            self.client = ctx.llm
+    def run(self, ctx: StageContext) -> None:
+        client = self.client or ctx.llm
+        normalized = ctx.inputs.json("normalize", NormalizedDoc)
+        classification = ctx.inputs.json("classify", Classification)
 
-        input_artifacts = getattr(ctx, "input_artifacts", None)
-        if isinstance(input_artifacts, dict) and "classify" in input_artifacts:
-            input_file = input_artifacts["classify"]
-            data = input_file.read_text(encoding="utf-8")
-            collection = ClassifiedUnitCollection.model_validate_json(data)
-        elif hasattr(ctx, "inputs"):
-            try:
-                collection = ctx.inputs.json("classify", ClassifiedUnitCollection)
-            except Exception:
-                input_path = ctx.inputs.path("classify")
-                data = input_path.read_text(encoding="utf-8")
-                collection = ClassifiedUnitCollection.model_validate_json(data)
-        else:
-            raise ValueError("Contexto não possui entradas válidas para a etapa")
+        dialogue_units = [
+            u
+            for u in normalized.units
+            if classification.units.get(u.id) and classification.units[u.id].type == "dialogue"
+        ]
 
-        translated = self.translate_collection(collection)
+        if not dialogue_units or not client:
+            ctx.output.json(UnitTexts(texts={}))
+            return
 
-        out_path: Path | None = None
-        if hasattr(ctx, "artifact_dir"):
-            out_path = ctx.artifact_dir / "translated_units.json"
-            out_path.write_text(translated.model_dump_json(indent=2), encoding="utf-8")
+        lines = [DialogueLine(id=u.id, text=u.text) for u in dialogue_units]
+        try:
+            translator = DialogueBatchTranslator(client=client)
+            translated_texts = translator.translate_lines(lines)
+        except Exception as exc:
+            logger.warning("Falha na tradução de diálogos: %s. Mantendo textos originais.", exc)
+            translated_texts = {}
 
-        if hasattr(ctx, "output") and ctx.output is not None:
-            ctx.output.json(translated)
-            if out_path is None and hasattr(ctx.output, "path"):
-                out_path = ctx.output.path
+        final_texts: dict[str, str] = {}
+        for u in dialogue_units:
+            tr = translated_texts.get(u.id, u.text)
+            if u.markers > 0:
+                expected = list(range(1, u.markers + 1))
+                if sorted(marker_ids(tr)) != expected:
+                    logger.warning(
+                        "Unidade %s: tradução perdeu marcadores %s (obtido %s). Fazendo fallback para texto original.",
+                        u.id,
+                        expected,
+                        marker_ids(tr),
+                    )
+                    tr = u.text
+            final_texts[u.id] = tr
 
-        return out_path
+        ctx.output.json(UnitTexts(texts=final_texts))

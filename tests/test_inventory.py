@@ -38,6 +38,7 @@ def test_builtin_stages_registered_and_default_pipeline() -> None:
         "extract",
         "normalize",
         "classify",
+        "translate_dialogue",
         "write",
         "publish",
         "remux",

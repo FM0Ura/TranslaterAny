@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from mkvtools import needs_mkvtoolnix
+
 from translaterany.llm.fake import FakeLLM
 from translaterany.pipeline.registry import REGISTRY
 from translaterany.pipeline.stage import StageScope
@@ -99,43 +101,105 @@ def test_translate_dialogue_preserves_metadata() -> None:
 def test_translate_dialogue_stage_metadata() -> None:
     assert StageTranslateDialogue.name == "translate_dialogue"
     assert StageTranslateDialogue.translates is True
-    assert StageTranslateDialogue.scope in (StageScope.EPISODE, "episode")
+    assert StageTranslateDialogue.scope is StageScope.EPISODE
+    assert StageTranslateDialogue.inputs == ("normalize", "classify")
     assert StageTranslateDialogue.enabled_by_default is True
     assert "translate_dialogue" in REGISTRY
 
 
-def test_translate_dialogue_run_artifact(tmp_path: Path) -> None:
-    classify_file = tmp_path / "classify.json"
-    unit = ClassifiedUnit(
-        id="u1",
-        line_type="dialogue",
-        raw_text="Hello world!",
-        clean_text="Hello world!",
-        prefix="",
-        suffix="",
-        start_ms=1000,
-        end_ms=2500,
-        style="Default",
-    )
-    collection = ClassifiedUnitCollection(units=[unit])
-    classify_file.write_text(collection.model_dump_json(indent=2), encoding="utf-8")
-
-    artifact_dir = tmp_path / "artifacts"
-    artifact_dir.mkdir()
-
+def test_translate_dialogue_fallback_when_markers_lost() -> None:
     from types import SimpleNamespace
 
-    ctx = SimpleNamespace(
-        input_artifacts={"classify": classify_file},
-        artifact_dir=artifact_dir,
-        output=None,
+    from translaterany.subtitles.classify import Classification, UnitClass
+    from translaterany.subtitles.normalize import Encoding, NormalizedDoc, Unit
+    from translaterany.subtitles.texts import UnitTexts
+
+    doc = NormalizedDoc(
+        encoding=Encoding(bom=False, newline="\n"),
+        format=[],
+        events=[],
+        units=[
+            Unit(id="u1", style="Default", text="Hello ⟦1⟧world⟦2⟧!", markers=2, events=[0]),
+            Unit(id="u2", style="Default", text="Normal text", markers=0, events=[1]),
+        ],
+    )
+    classification = Classification(
+        main_style="Default",
+        units={
+            "u1": UnitClass(type="dialogue", uncertain=False, rule="test"),
+            "u2": UnitClass(type="dialogue", uncertain=False, rule="test"),
+        },
+        counts={"dialogue": 2},
+        scenes=[],
     )
 
-    fake_llm = FakeLLM(responses={"Hello world!": "Olá mundo!"})
+    class MockInputs:
+        def json(self, name: str, model: type):
+            if name == "normalize":
+                return doc
+            if name == "classify":
+                return classification
+            raise ValueError(name)
+
+    captured_output: UnitTexts | None = None
+
+    class MockOutput:
+        def json(self, obj):
+            nonlocal captured_output
+            captured_output = obj
+
+    # FakeLLM devolve u1 sem os marcadores ⟦1⟧ e ⟦2⟧ (perdidos) e u2 traduzido normalmente
+    fake_llm = FakeLLM(responses={"Hello ⟦1⟧world⟦2⟧!": "Olá mundo!", "Normal text": "Texto normal"})
     stage = StageTranslateDialogue(client=fake_llm)
 
-    out_path = stage.run(ctx)  # type: ignore[arg-type]
-    assert out_path == artifact_dir / "translated_units.json"
-    assert out_path.exists()
-    saved = ClassifiedUnitCollection.model_validate_json(out_path.read_text(encoding="utf-8"))
-    assert saved.units[0].clean_text == "Olá mundo!"
+    ctx = SimpleNamespace(
+        inputs=MockInputs(),
+        output=MockOutput(),
+        llm=fake_llm,
+    )
+    stage.run(ctx)  # type: ignore[arg-type]
+
+    assert captured_output is not None
+    # u1 perdeu marcadores -> fallback para o texto original
+    assert captured_output.texts["u1"] == "Hello ⟦1⟧world⟦2⟧!"
+    # u2 não tinha marcadores -> traduzido com sucesso
+    assert captured_output.texts["u2"] == "Texto normal"
+
+
+@needs_mkvtoolnix
+def test_pipeline_integration_translate_dialogue(data_dir: Path, synthetic_series: Path) -> None:
+    from pipeline_helpers import artifact
+
+    from translaterany.library import discover
+    from translaterany.pipeline.artifacts import ArtifactStore
+    from translaterany.pipeline.runner import Runner
+    from translaterany.stages.classify import ClassifyStage
+    from translaterany.stages.extract import ExtractStage
+    from translaterany.stages.normalize import NormalizeStage
+    from translaterany.stages.select_track import SelectTrackStage
+    from translaterany.stages.write import WriteStage
+
+    fake_llm = FakeLLM(
+        responses={
+            "Where are we going, friend?": "Aonde vamos, amigo?",
+            "To the ⟦1⟧old⟦2⟧ station.": "Para a ⟦1⟧velha⟦2⟧ estação.",
+        }
+    )
+    stages = [
+        SelectTrackStage(),
+        ExtractStage(),
+        NormalizeStage(),
+        ClassifyStage(),
+        StageTranslateDialogue(),
+        WriteStage(),
+    ]
+    store = ArtifactStore(data_dir)
+    series, episodes = discover(synthetic_series)
+    summary = Runner(stages, store, fake_llm).run(series, episodes)
+    assert not summary.failed
+
+    written_ass = artifact(store, series, episodes[0], "write.ass").read_text(encoding="utf-8")
+    assert "; TranslaterAny" in written_ass
+    assert "Aonde vamos, amigo?" in written_ass
+    assert r"{\i1}velha{\i0}" in written_ass
+    assert "Estação Central" in written_ass  # Placa não traduzida por diálogo
