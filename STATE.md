@@ -10,8 +10,8 @@
 ## Onde estamos
 
 - **Fase:** design geral concluído → decomposto em marcos.
-- **Marco atual:** **M2 — Camada de IA e tradução básica** — spec escrito e em revisão.
-- **Próxima ação:** revisão do spec do M2 pelo usuário e início do plano de implementação.
+- **Marco atual:** **M2 — Camada de IA e tradução básica** — plano escrito e pronto para execução.
+- **Próxima ação:** execução do plano de implementação do M2.
 
 ## Progresso dos marcos
 
@@ -21,7 +21,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 |---|---|---|---|---|
 | M0 — Fundação | ✅ | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | concluído |
 | M1 — Mídia e legendas | ✅ | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | [plano](docs/superpowers/plans/2026-09-24-m1-midia-legendas.md) | concluído |
-| M2 — Camada de IA e tradução básica | 📝 | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | — | spec escrito |
+| M2 — Camada de IA e tradução básica | 📋 | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | plano pronto |
 | M3 — Memória da série | ⬜ | — | — | |
 | M4 — Tradução contextual | ⬜ | — | — | |
 | M5 — Verificações e métricas | ⬜ | — | — | |
