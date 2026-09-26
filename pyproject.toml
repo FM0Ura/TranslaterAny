@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.13.5",
     "pydantic-ai-slim[openai]>=0.0.1",
     "pysubs2>=1.9.0",
+    "ruamel-yaml>=0.18.0",
     "tenacity>=9.0.0",
     "typer>=0.27.2",
 ]
