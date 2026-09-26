@@ -1,7 +1,11 @@
+import asyncio
+
+import httpx
 import pytest
 from pydantic import BaseModel
+from pydantic_ai.exceptions import ContentFilterError, UnexpectedModelBehavior
 
-from translaterany.config.model import LLMConfig, ModelConfig
+from translaterany.config.model import LLMConfig, ModelConfig, ProviderConfig
 from translaterany.llm.client import (
     LLMClient,
     LLMConfigError,
@@ -12,11 +16,6 @@ from translaterany.llm.client import (
     LLMTransientError,
 )
 from translaterany.llm.pydantic_ai_client import PydanticAIClient
-
-try:
-    import httpx
-except ModuleNotFoundError:
-    import httpx2 as httpx
 
 
 class ItemOut(BaseModel):
@@ -101,7 +100,26 @@ def test_pydantic_ai_client_maps_timeout_error(monkeypatch):
         client.generate(req)
 
 
-def test_pydantic_ai_client_maps_refusal_error(monkeypatch):
+def test_pydantic_ai_client_maps_content_filter_error(monkeypatch):
+    config = LLMConfig()
+    client = PydanticAIClient(config)
+
+    async def mock_run_refusal(*args, **kwargs):
+        raise ContentFilterError("Content filter triggered")
+
+    monkeypatch.setattr("pydantic_ai.Agent.run", mock_run_refusal)
+
+    req = LLMRequest(
+        model="translategemma",
+        instructions="Instruções",
+        prompt="Texto",
+        output_type=BatchOut,
+    )
+    with pytest.raises(LLMRefusalError, match="Requisição recusada"):
+        client.generate(req)
+
+
+def test_pydantic_ai_client_maps_string_refusal_error(monkeypatch):
     config = LLMConfig()
     client = PydanticAIClient(config)
 
@@ -117,6 +135,25 @@ def test_pydantic_ai_client_maps_refusal_error(monkeypatch):
         output_type=BatchOut,
     )
     with pytest.raises(LLMRefusalError, match="Requisição recusada"):
+        client.generate(req)
+
+
+def test_pydantic_ai_client_maps_unexpected_model_behavior_error(monkeypatch):
+    config = LLMConfig()
+    client = PydanticAIClient(config)
+
+    async def mock_run_validation(*args, **kwargs):
+        raise UnexpectedModelBehavior("Malformed model output structure")
+
+    monkeypatch.setattr("pydantic_ai.Agent.run", mock_run_validation)
+
+    req = LLMRequest(
+        model="translategemma",
+        instructions="Instruções",
+        prompt="Texto",
+        output_type=BatchOut,
+    )
+    with pytest.raises(LLMOutputError, match="Falha de validação"):
         client.generate(req)
 
 
@@ -199,6 +236,71 @@ def test_pydantic_ai_client_resolves_profile_task_alias(monkeypatch):
     )
     res = client.generate(req)
     assert res.model_id == "translategemma:12b"
+
+
+def test_pydantic_ai_client_resolves_cloud_provider_and_env_vars(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test-key")
+    config = LLMConfig()
+    config.models["gpt-4o"] = ModelConfig(
+        provider="openai",
+        model="gpt-4o",
+    )
+    client = PydanticAIClient(config)
+
+    model_name, base_url, api_key, extra_args = client._resolve_model("gpt-4o")
+    assert model_name == "gpt-4o"
+    assert base_url is None  # standard OpenAI endpoint
+    assert api_key == "sk-openai-test-key"
+
+
+def test_pydantic_ai_client_resolves_custom_base_url_and_api_key():
+    config = LLMConfig()
+    config.providers["custom"] = ProviderConfig(
+        base_url="https://custom.llm.example/v1",
+        api_key="secret-key",
+    )
+    config.models["custom-model"] = ModelConfig(
+        provider="custom",
+        model="custom-model:v1",
+    )
+    client = PydanticAIClient(config)
+
+    model_name, base_url, api_key, extra_args = client._resolve_model("custom-model")
+    assert model_name == "custom-model:v1"
+    assert base_url == "https://custom.llm.example/v1"
+    assert api_key == "secret-key"
+
+
+def test_pydantic_ai_client_generate_inside_running_event_loop(monkeypatch):
+    config = LLMConfig()
+    client = PydanticAIClient(config)
+
+    async def mock_run(*args, **kwargs):
+        class MockRunResult:
+            data = BatchOut(items=[ItemOut(id="1", text="Em loop")])
+
+            def usage(self):
+                class MockUsage:
+                    request_tokens = 2
+                    response_tokens = 2
+
+                return MockUsage()
+
+        return MockRunResult()
+
+    monkeypatch.setattr("pydantic_ai.Agent.run", mock_run)
+
+    async def run_in_loop():
+        req = LLMRequest(
+            model="translategemma",
+            instructions="Instruções",
+            prompt="Texto",
+            output_type=BatchOut,
+        )
+        return client.generate(req)
+
+    res = asyncio.run(run_in_loop())
+    assert res.output.items[0].text == "Em loop"
 
 
 def test_pydantic_ai_client_implements_protocol():

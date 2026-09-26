@@ -1,9 +1,12 @@
 import asyncio
 import concurrent.futures
+import os
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel
+import httpx
+from pydantic import BaseModel, ValidationError
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import ContentFilterError, UnexpectedModelBehavior
 
 from translaterany.llm.client import (
     LLMClient,
@@ -19,19 +22,7 @@ from translaterany.llm.client import (
 if TYPE_CHECKING:
     from translaterany.config.model import LLMConfig
 
-try:
-    import httpx
-except ModuleNotFoundError:
-    import httpx2 as httpx
-
 network_errors = [httpx.ConnectError, httpx.TimeoutException]
-try:
-    import httpx2
-
-    network_errors.extend([httpx2.ConnectError, httpx2.TimeoutException])
-except ImportError:
-    pass
-
 try:
     import openai
 
@@ -55,7 +46,7 @@ except ImportError:
             api_key: str | None = None,
             **kwargs: Any,
         ) -> None:
-            provider = OpenAIProvider(base_url=base_url, api_key=api_key or "ollama")
+            provider = OpenAIProvider(base_url=base_url, api_key=api_key)
             super().__init__(model_name=model_name, provider=provider, **kwargs)
 
 
@@ -63,7 +54,7 @@ class PydanticAIClient(LLMClient):
     def __init__(self, config: LLMConfig):
         self.config = config
 
-    def _resolve_model(self, model_alias: str) -> tuple[str, str, dict[str, Any]]:
+    def _resolve_model(self, model_alias: str) -> tuple[str, str | None, str | None, dict[str, Any]]:
         # Resolve se model_alias for o nome direto ou tarefa do perfil ativo
         active_profile = self.config.profiles.get(self.config.profile)
         if active_profile and hasattr(active_profile, model_alias):
@@ -79,14 +70,32 @@ class PydanticAIClient(LLMClient):
         if not provider_cfg:
             raise LLMConfigError(f"Provedor '{model_cfg.provider}' não configurado em [llm.providers].")
 
+        # Base URL resolution
+        if provider_cfg.base_url:
+            base_url = provider_cfg.base_url
+        elif model_cfg.provider == "ollama":
+            base_url = "http://localhost:11434/v1"
+        else:
+            base_url = None
+
+        # API key resolution
+        api_key = provider_cfg.api_key
+        if not api_key:
+            if model_cfg.provider == "openai":
+                api_key = os.environ.get("OPENAI_API_KEY")
+            elif model_cfg.provider == "gemini":
+                api_key = os.environ.get("GEMINI_API_KEY")
+            elif model_cfg.provider == "ollama":
+                api_key = "ollama"
+
         extra_args: dict[str, Any] = {"temperature": model_cfg.temperature}
         if model_cfg.num_ctx:
             extra_args["extra_body"] = {"num_ctx": model_cfg.num_ctx}
 
-        return model_cfg.model, provider_cfg.base_url or "http://localhost:11434/v1", extra_args
+        return model_cfg.model, base_url, api_key, extra_args
 
     def generate[T: BaseModel](self, request: LLMRequest[T]) -> LLMResponse[T]:
-        model_name, base_url, extra_args = self._resolve_model(request.model)
+        model_name, base_url, api_key, extra_args = self._resolve_model(request.model)
 
         if request.temperature is not None:
             extra_args["temperature"] = request.temperature
@@ -94,7 +103,7 @@ class PydanticAIClient(LLMClient):
         model = OpenAIModel(
             model_name=model_name,
             base_url=base_url,
-            api_key="ollama",
+            api_key=api_key or "ollama",
         )
 
         try:
@@ -119,12 +128,17 @@ class PydanticAIClient(LLMClient):
 
             if loop and loop.is_running():
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                    result = executor.submit(asyncio.run, agent.run(request.prompt)).result()
+                    result = executor.submit(lambda: asyncio.run(agent.run(request.prompt))).result()
             else:
                 result = asyncio.run(agent.run(request.prompt))
         except NETWORK_ERRORS as exc:
             raise LLMTransientError(f"Erro de conexão com o modelo ({model_name}): {exc}") from exc
         except Exception as exc:
+            if isinstance(exc, ContentFilterError):
+                raise LLMRefusalError(f"Requisição recusada pelo modelo: {exc}") from exc
+            if isinstance(exc, (UnexpectedModelBehavior, ValidationError)):
+                raise LLMOutputError(f"Falha de validação da saída estruturada: {exc}") from exc
+
             msg = str(exc).lower()
             if "safety" in msg or "refus" in msg:
                 raise LLMRefusalError(f"Requisição recusada pelo modelo: {exc}") from exc
