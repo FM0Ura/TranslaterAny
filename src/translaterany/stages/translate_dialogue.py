@@ -128,7 +128,7 @@ class StageTranslateDialogue(Stage):
             store = ArtifactStore(default_data_dir())
 
         matched_glossary: list[GlossaryEntry] = []
-        characters: list[CharacterEntry] = []
+        matched_characters: list[CharacterEntry] = []
         used_terms_dict: dict[str, str] = {}
 
         series = getattr(ctx, "series", None)
@@ -136,7 +136,7 @@ class StageTranslateDialogue(Stage):
             mem_dir = store.series_dir(series.key) / "memory"
             if mem_dir.exists():
                 mem_store = MemoryStore(mem_dir)
-                characters = mem_store.load_characters()
+                all_characters = mem_store.load_characters()
                 glossary = mem_store.load_glossary()
                 full_text = "\n".join(u.text for u in dialogue_units)
                 for entry in glossary.values():
@@ -144,6 +144,11 @@ class StageTranslateDialogue(Stage):
                     if any(_matches_term(t, full_text) for t in terms_to_check):
                         matched_glossary.append(entry)
                         used_terms_dict[entry.term] = entry.content_hash()
+
+                for char in all_characters:
+                    names_to_check = [char.name, *char.aliases]
+                    if any(_matches_term(n, full_text) for n in names_to_check):
+                        matched_characters.append(char)
 
         lines = [DialogueLine(id=u.id, text=u.text) for u in dialogue_units]
         translator = DialogueBatchTranslator(
@@ -153,7 +158,7 @@ class StageTranslateDialogue(Stage):
             max_tokens_per_batch=self.options.max_tokens_per_batch,
             max_context_lines=self.options.max_context_lines,
             glossary=matched_glossary,
-            characters=characters,
+            characters=matched_characters,
         )
         translated_texts = translator.translate_lines(lines)
 

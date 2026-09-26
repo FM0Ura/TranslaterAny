@@ -28,6 +28,9 @@ def retry(
     if not stale and from_stage is None:
         console.print("[red]Opção --from é obrigatória quando --stale não for utilizado.[/red]")
         raise typer.Exit(EXIT_USAGE)
+    if stale and from_stage is not None:
+        console.print("[red]Não é permitido combinar --from com --stale.[/red]")
+        raise typer.Exit(EXIT_USAGE)
 
     state: AppState = ctx.obj
     cfg = load_or_exit(state)

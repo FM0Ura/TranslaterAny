@@ -76,6 +76,13 @@ def reset_stale(
 
     stale_episodes: list[Episode] = []
     for ep in episodes:
+        manifest = store.read_manifest(series.key, ep.key)
+        if manifest is None:
+            continue
+        rec = manifest.stages.get("translate_dialogue")
+        if not (rec and rec.status == "done"):
+            continue
+
         art_path = store.artifact_dir(series.key, ep.key) / "translate_dialogue.json"
         if not art_path.is_file():
             continue

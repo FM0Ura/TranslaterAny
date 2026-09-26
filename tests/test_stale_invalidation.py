@@ -48,6 +48,16 @@ def test_stale_detection_and_reset(tmp_path: Path):
     reloaded_manifest = store.load_manifest(series.key, ep.key)
     assert "translate_dialogue" not in reloaded_manifest.stages
 
+    # 7. Verifica idempotência: nova execução de reset_stale não faz nada pois já foi resetado
+    reset_again = reset_stale(store, series, [ep])
+    assert reset_again == 0
+
+    # 8. Verifica que series_status não marca mais o episódio como stale após o reset
+    rows_clean = series_status(store, series.key, ["translate_dialogue"])
+    ep_row_clean = next(r for r in rows_clean if r.unit == ep.key)
+    assert not ep_row_clean.stale
+    assert ep_row_clean.detail != "desatualizado (glossário modificado)"
+
 
 def test_series_status_detects_stale_episode(tmp_path: Path):
     store = ArtifactStore(tmp_path / "data")
@@ -131,3 +141,17 @@ def test_cli_retry_stale(tmp_path: Path):
 
     reloaded_manifest = store.load_manifest(series.key, ep.key)
     assert "translate_dialogue" not in reloaded_manifest.stages
+
+
+def test_cli_retry_stale_exclusive_with_from(tmp_path: Path):
+    from typer.testing import CliRunner
+
+    from translaterany.cli.app import app
+
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["--data-dir", str(tmp_path), "retry", str(tmp_path), "--stale", "--from", "translate_dialogue"],
+    )
+    assert res.exit_code != 0
+    assert "Não é permitido combinar --from com --stale" in res.output

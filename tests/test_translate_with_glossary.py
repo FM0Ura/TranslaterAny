@@ -35,7 +35,7 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
         encoding=Encoding(bom=False, newline="\n"),
         format=[],
         events=[],
-        units=[Unit(id="0", style="Default", text="Welcome to Hoshinoumi Academy!", markers=0, events=[0])],
+        units=[Unit(id="0", style="Default", text="Welcome to Hoshinoumi Academy, Yuu!", markers=0, events=[0])],
     )
     classification = Classification(
         main_style="Default",
@@ -52,7 +52,7 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
         story_hash="h3",
         glossary_terms=["Hoshinoumi Academy", "Plunder"],
     )
-    # Grava glossary.yaml
+    # Grava glossary.yaml e characters.yaml
     store = ArtifactStore(tmp_path / "data")
     series = Series(name="Charlotte (2015)", path=tmp_path)
     mem_dir = store.series_dir(series.key) / "memory"
@@ -60,7 +60,11 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
     g_entry = GlossaryEntry(term="Hoshinoumi Academy", translation="Academia Hoshinoumi")
     from translaterany.memory.store import MemoryStore
 
-    MemoryStore(mem_dir).save_glossary([g_entry, GlossaryEntry(term="Plunder", translation="Saque")])
+    mem_store = MemoryStore(mem_dir)
+    mem_store.save_glossary([g_entry, GlossaryEntry(term="Plunder", translation="Saque")])
+    c_yuu = CharacterEntry(name="Yuu", gender=Gender.MALE, role="main", speech_style="informal")
+    c_nao = CharacterEntry(name="Nao", gender=Gender.FEMALE, role="main", speech_style="direct")
+    mem_store.save_characters([c_yuu, c_nao])
 
     captured = None
 
@@ -79,7 +83,7 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
                 return cons_art
             raise ValueError(name)
 
-    fake_llm = FakeLLM(responses={"Welcome to Hoshinoumi Academy!": "Bem-vindo à Academia Hoshinoumi!"})
+    fake_llm = FakeLLM(responses={"Welcome to Hoshinoumi Academy, Yuu!": "Bem-vindo à Academia Hoshinoumi, Yuu!"})
     stage = StageTranslateDialogue(client=fake_llm)
     ep = Episode(key="S01E01", source=tmp_path / "S01E01.mkv", number=1, season=1)
     ctx = SimpleNamespace(
@@ -92,6 +96,12 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
     )
     stage.run(ctx)
     assert captured is not None
-    assert captured.texts["0"] == "Bem-vindo à Academia Hoshinoumi!"
+    assert captured.texts["0"] == "Bem-vindo à Academia Hoshinoumi, Yuu!"
     assert "Hoshinoumi Academy" in captured.used_terms
     assert "Plunder" not in captured.used_terms  # Plunder não foi mencionada no episódio
+
+    # Verifica que personagem mencionado está no prompt e personagem não mencionado é excluído
+    assert len(fake_llm.calls) > 0
+    prompt_sent = fake_llm.calls[0].prompt
+    assert "Yuu (male): informal" in prompt_sent
+    assert "Nao" not in prompt_sent  # Nao não foi mencionada no episódio

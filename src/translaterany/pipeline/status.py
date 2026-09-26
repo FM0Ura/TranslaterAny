@@ -42,17 +42,19 @@ def series_status(store: ArtifactStore, series_key: str, stage_order: Sequence[s
 
         stale = False
         if episode_key is not None:
-            art_path = store.artifact_dir(series_key, episode_key) / "translate_dialogue.json"
-            if art_path.is_file():
-                try:
-                    texts = UnitTexts.model_validate_json(art_path.read_text(encoding="utf-8"))
-                    if texts.used_terms:
-                        for term, used_hash in texts.used_terms.items():
-                            if term not in current_hashes or current_hashes[term] != used_hash:
-                                stale = True
-                                break
-                except Exception:
-                    pass
+            rec = manifest.stages.get("translate_dialogue")
+            if rec and rec.status == "done":
+                art_path = store.artifact_dir(series_key, episode_key) / "translate_dialogue.json"
+                if art_path.is_file():
+                    try:
+                        texts = UnitTexts.model_validate_json(art_path.read_text(encoding="utf-8"))
+                        if texts.used_terms:
+                            for term, used_hash in texts.used_terms.items():
+                                if term not in current_hashes or current_hashes[term] != used_hash:
+                                    stale = True
+                                    break
+                    except Exception:
+                        pass
 
         if stale:
             if detail:
