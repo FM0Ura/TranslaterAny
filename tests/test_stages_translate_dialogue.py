@@ -102,7 +102,7 @@ def test_translate_dialogue_stage_metadata() -> None:
     assert StageTranslateDialogue.name == "translate_dialogue"
     assert StageTranslateDialogue.translates is True
     assert StageTranslateDialogue.scope is StageScope.EPISODE
-    assert StageTranslateDialogue.inputs == ("normalize", "classify")
+    assert StageTranslateDialogue.inputs == ("normalize", "classify", "consolidate_memory")
     assert StageTranslateDialogue.enabled_by_default is True
     assert "translate_dialogue" in REGISTRY
 
@@ -282,7 +282,7 @@ def test_pipeline_integration_translate_dialogue(data_dir: Path, synthetic_serie
         ExtractStage(),
         NormalizeStage(),
         ClassifyStage(),
-        StageTranslateDialogue(),
+        StageTranslateDialogue(inputs=("normalize", "classify")),
         WriteStage(),
     ]
     store = ArtifactStore(data_dir)

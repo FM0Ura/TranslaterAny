@@ -62,9 +62,20 @@ def status(
         except ManifestError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(EXIT_FAILURE) from exc
+        has_stale = False
         for row in rows:
+            if row.stale:
+                has_stale = True
             color = _COLORS.get(row.status, "white")
             unit = row.unit + (" (arquivo ausente)" if row.missing else "")
             track = _track_name(store, key, None if row.unit == "(série)" else row.unit)
-            table.add_row(unit, f"[{color}]{row.status}[/{color}]", row.last_done or "—", track, row.detail or "")
+            detail = row.detail or ""
+            if row.stale and "glossário modificado" in detail:
+                detail = f"[yellow]{detail}[/yellow]"
+            table.add_row(unit, f"[{color}]{row.status}[/{color}]", row.last_done or "—", track, detail)
         console.print(table)
+        if has_stale:
+            console.print(
+                "[yellow]Aviso: há episódios desatualizados devido a alterações no glossário. "
+                "Use `translaterany retry <pasta> --stale` para reprocessá-los.[/yellow]"
+            )

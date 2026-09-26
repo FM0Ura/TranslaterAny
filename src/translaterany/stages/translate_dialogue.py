@@ -1,10 +1,15 @@
 import logging
+import re
 from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 
 from translaterany.config.model import ProviderConfig
 from translaterany.llm.client import LLMClient
+from translaterany.memory.artifacts import ConsolidatedMemoryArtifact
+from translaterany.memory.models import CharacterEntry, GlossaryEntry
+from translaterany.memory.store import MemoryStore
+from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.subtitles.chunking import DialogueLine
@@ -21,6 +26,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _matches_term(term: str, text: str) -> bool:
+    if not term:
+        return False
+    prefix = r"\b" if re.match(r"^\w", term) else ""
+    suffix = r"\b" if re.search(r"\w$", term) else ""
+    pattern = rf"{prefix}{re.escape(term)}{suffix}"
+    return bool(re.search(pattern, text, re.IGNORECASE))
+
+
 class TranslateDialogueOptions(BaseModel):
     model: str = "translate"
     fallback_model: str | None = "translategemma"
@@ -34,7 +48,7 @@ class StageTranslateDialogue(Stage):
     version: ClassVar[str] = "1"
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
-    inputs: ClassVar[tuple[str, ...]] = ("normalize", "classify")
+    inputs: ClassVar[tuple[str, ...]] = ("normalize", "classify", "consolidate_memory")
     enabled_by_default: ClassVar[bool] = True
     Options: ClassVar[type[BaseModel]] = TranslateDialogueOptions
 
@@ -42,6 +56,7 @@ class StageTranslateDialogue(Stage):
         self,
         client: LLMClient | BaseModel | None = None,
         options: BaseModel | None = None,
+        inputs: tuple[str, ...] | None = None,
     ) -> None:
         if isinstance(client, BaseModel) and options is None:
             options = client
@@ -53,6 +68,8 @@ class StageTranslateDialogue(Stage):
         super().__init__(options)
         self.options: TranslateDialogueOptions = options
         self.client = client
+        if inputs is not None:
+            self.inputs = inputs
 
     def translate_collection(self, collection: ClassifiedUnitCollection) -> ClassifiedUnitCollection:
         dialogue_units = [u for u in collection.units if u.line_type == "dialogue"]
@@ -92,8 +109,41 @@ class StageTranslateDialogue(Stage):
         ]
 
         if not dialogue_units or not client:
-            ctx.output.json(UnitTexts(texts={}))
+            ctx.output.json(UnitTexts(texts={}, used_terms={}))
             return
+
+        # Carrega artefato consolidate_memory se disponível
+        try:
+            _ = ctx.inputs.json("consolidate_memory", ConsolidatedMemoryArtifact)
+        except Exception:
+            pass
+
+        # Carrega glossário e personagens da memória da série
+        store = getattr(ctx, "store", None)
+        if store is None:
+            store = getattr(getattr(ctx, "inputs", None), "_store", None)
+        if store is None:
+            from translaterany.config.loader import default_data_dir
+
+            store = ArtifactStore(default_data_dir())
+
+        matched_glossary: list[GlossaryEntry] = []
+        characters: list[CharacterEntry] = []
+        used_terms_dict: dict[str, str] = {}
+
+        series = getattr(ctx, "series", None)
+        if series is not None and store is not None:
+            mem_dir = store.series_dir(series.key) / "memory"
+            if mem_dir.exists():
+                mem_store = MemoryStore(mem_dir)
+                characters = mem_store.load_characters()
+                glossary = mem_store.load_glossary()
+                full_text = "\n".join(u.text for u in dialogue_units)
+                for entry in glossary.values():
+                    terms_to_check = [entry.term, *entry.aliases]
+                    if any(_matches_term(t, full_text) for t in terms_to_check):
+                        matched_glossary.append(entry)
+                        used_terms_dict[entry.term] = entry.content_hash()
 
         lines = [DialogueLine(id=u.id, text=u.text) for u in dialogue_units]
         translator = DialogueBatchTranslator(
@@ -102,6 +152,8 @@ class StageTranslateDialogue(Stage):
             fallback_model=self.options.fallback_model,
             max_tokens_per_batch=self.options.max_tokens_per_batch,
             max_context_lines=self.options.max_context_lines,
+            glossary=matched_glossary,
+            characters=characters,
         )
         translated_texts = translator.translate_lines(lines)
 
@@ -120,7 +172,7 @@ class StageTranslateDialogue(Stage):
                     tr = u.text
             final_texts[u.id] = tr
 
-        ctx.output.json(UnitTexts(texts=final_texts))
+        ctx.output.json(UnitTexts(texts=final_texts, used_terms=used_terms_dict))
 
     def doctor_checks(self, cfg: ResolvedConfig | None = None) -> list[Check]:
         if cfg is None:

@@ -1,9 +1,12 @@
 """Agrupamento de falas de diálogo em lotes (chunking) com janela de contexto deslizante."""
 
 from collections import deque
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from pydantic import BaseModel
+
+from translaterany.memory.models import CharacterEntry, GlossaryEntry
 
 
 class DialogueLine(BaseModel):
@@ -57,8 +60,33 @@ def create_dialogue_batches(
     return batches
 
 
-def format_batch_prompt(lines: list[DialogueLine], context: list[ContextLine]) -> str:
+def format_batch_prompt(
+    lines: list[DialogueLine],
+    context: list[ContextLine],
+    glossary: Sequence[GlossaryEntry] = (),
+    characters: Sequence[CharacterEntry] = (),
+) -> str:
     sections: list[str] = []
+    if glossary:
+        sections.append("[GLOSSÁRIO OBRIGATÓRIO]:")
+        for g in glossary:
+            note = f" ({g.notes})" if g.notes else ""
+            sections.append(f"- {g.term} -> {g.translation}{note}")
+        sections.append("")
+
+    if characters:
+        sections.append("[PERSONAGENS]:")
+        for c in characters:
+            gender_val = c.gender.value if hasattr(c.gender, "value") else str(c.gender)
+            details: list[str] = []
+            if c.speech_style:
+                details.append(c.speech_style)
+            if c.notes:
+                details.append(c.notes)
+            detail_str = f": {'; '.join(details)}" if details else ""
+            sections.append(f"- {c.name} ({gender_val}){detail_str}")
+        sections.append("")
+
     if context:
         sections.append("[CONTEXTO RECENTE - APENAS LEITURA, NÃO TRADUZIR]:")
         for idx, ctx in enumerate(context, 1):

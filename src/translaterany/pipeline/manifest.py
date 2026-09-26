@@ -22,9 +22,9 @@ class StageRecord(BaseModel):
     key: str | None = None
     artifact: str | None = None
     artifact_hash: str | None = None
-    started_at: datetime
-    finished_at: datetime
-    duration_s: float
+    started_at: datetime = Field(default_factory=datetime.now)
+    finished_at: datetime = Field(default_factory=datetime.now)
+    duration_s: float = 0.0
     error: str | None = None
 
 
@@ -62,3 +62,14 @@ def load_manifest(path: Path, unit: UnitInfo) -> Manifest:
 
 def save_manifest(path: Path, manifest: Manifest) -> None:
     atomic_write_text(path, manifest.model_dump_json(by_alias=True, indent=2))
+
+
+EpisodeManifest = Manifest
+
+
+def __getattr__(name: str):
+    if name == "ManifestSet":
+        from translaterany.pipeline.artifacts import ManifestSet
+
+        return ManifestSet
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

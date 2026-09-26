@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -11,6 +12,7 @@ from translaterany.llm.client import (
     LLMTransientError,
     Usage,
 )
+from translaterany.memory.models import CharacterEntry, GlossaryEntry
 from translaterany.subtitles.chunking import (
     ContextLine,
     DialogueLine,
@@ -45,12 +47,16 @@ class DialogueBatchTranslator:
         fallback_model: str | None = "translategemma",
         max_tokens_per_batch: int = 800,
         max_context_lines: int = 5,
+        glossary: Sequence[GlossaryEntry] = (),
+        characters: Sequence[CharacterEntry] = (),
     ):
         self.client = client
         self.model_name = model_name
         self.fallback_model = fallback_model
         self.max_tokens_per_batch = max_tokens_per_batch
         self.max_context_lines = max_context_lines
+        self.glossary = list(glossary or ())
+        self.characters = list(characters or ())
         self.total_usage = Usage()
         self.fallback_count = 0
 
@@ -70,11 +76,17 @@ class DialogueBatchTranslator:
         res = self.client.generate(req)
         return res.output, res.usage
 
-    def _process_batch(self, lines: list[DialogueLine], context: list[ContextLine]) -> dict[str, str]:
+    def _process_batch(
+        self,
+        lines: list[DialogueLine],
+        context: list[ContextLine],
+        glossary: Sequence[GlossaryEntry] = (),
+        characters: Sequence[CharacterEntry] = (),
+    ) -> dict[str, str]:
         if not lines:
             return {}
 
-        prompt = format_batch_prompt(lines, context)
+        prompt = format_batch_prompt(lines, context, glossary=glossary, characters=characters)
         expected_ids = {line.id for line in lines}
         target_model = self.model_name
 
@@ -109,7 +121,7 @@ class DialogueBatchTranslator:
         missing_ids = expected_ids - set(translations.keys())
         if missing_ids and len(missing_ids) < len(lines):
             missing_lines = [line for line in lines if line.id in missing_ids]
-            sub_results = self._process_batch(missing_lines, context)
+            sub_results = self._process_batch(missing_lines, context, glossary=glossary, characters=characters)
             translations.update(sub_results)
             missing_ids = expected_ids - set(translations.keys())
 
@@ -117,8 +129,8 @@ class DialogueBatchTranslator:
         if missing_ids:
             if len(lines) > 1:
                 mid = len(lines) // 2
-                left = self._process_batch(lines[:mid], context)
-                right = self._process_batch(lines[mid:], context)
+                left = self._process_batch(lines[:mid], context, glossary=glossary, characters=characters)
+                right = self._process_batch(lines[mid:], context, glossary=glossary, characters=characters)
                 left.update(right)
                 return left
             else:
@@ -134,7 +146,14 @@ class DialogueBatchTranslator:
 
         return translations
 
-    def translate_lines(self, lines: list[DialogueLine]) -> dict[str, str]:
+    def translate_lines(
+        self,
+        lines: list[DialogueLine],
+        glossary: Sequence[GlossaryEntry] | None = None,
+        characters: Sequence[CharacterEntry] | None = None,
+    ) -> dict[str, str]:
+        glossary_to_use = self.glossary if glossary is None else list(glossary)
+        characters_to_use = self.characters if characters is None else list(characters)
         batches = create_dialogue_batches(
             lines,
             max_tokens_per_batch=self.max_tokens_per_batch,
@@ -144,7 +163,12 @@ class DialogueBatchTranslator:
         recent_context: list[ContextLine] = []
 
         for batch in batches:
-            batch_result = self._process_batch(batch.lines, recent_context)
+            batch_result = self._process_batch(
+                batch.lines,
+                recent_context,
+                glossary=glossary_to_use,
+                characters=characters_to_use,
+            )
             all_translations.update(batch_result)
             for line in batch.lines:
                 recent_context.append(ContextLine(text=batch_result.get(line.id, line.text)))

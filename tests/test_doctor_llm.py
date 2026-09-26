@@ -141,7 +141,10 @@ def test_doctor_command_integration(monkeypatch, tmp_path):
     monkeypatch.setattr(subprocess, "run", lambda *a, **kw: MockProcess())
     monkeypatch.setattr("translaterany.media.mkv.tool_available", lambda tool: f"/usr/bin/{tool}")
 
-    stages = '["inventory", "select_track", "extract", "normalize", "classify", "translate_dialogue"]'
+    stages = (
+        '["inventory", "metadata", "select_track", "extract", '
+        '"normalize", "classify", "extract_terms", "consolidate_memory", "translate_dialogue"]'
+    )
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text(
         f'[general]\ndata_dir = "{tmp_path}/data"\n[pipeline]\nstages = {stages}\n',

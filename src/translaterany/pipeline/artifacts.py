@@ -34,13 +34,20 @@ class ArtifactStore:
         base = self.series_dir(series_key)
         return base / "manifest.json" if episode_key is None else base / "episodes" / episode_key / "manifest.json"
 
-    def load_manifest(self, series: Series, episode: Episode | None) -> Manifest:
-        unit = UnitInfo(
-            series=series.key,
-            episode=episode.key if episode else None,
-            source=str(episode.source) if episode else str(series.root),
+    def load_manifest(self, series: Series | str, episode: Episode | str | None) -> Manifest:
+        series_key = series if isinstance(series, str) else series.key
+        ep_key = episode if isinstance(episode, str) else _key(episode)
+        source = (
+            str(episode.source)
+            if isinstance(episode, Episode)
+            else (str(series.root) if isinstance(series, Series) else "")
         )
-        return load_manifest(self.manifest_path(series.key, _key(episode)), unit)
+        unit = UnitInfo(
+            series=series_key,
+            episode=ep_key,
+            source=source,
+        )
+        return load_manifest(self.manifest_path(series_key, ep_key), unit)
 
     def save_manifest(self, series: Series, episode: Episode | None, manifest: Manifest) -> None:
         save_manifest(self.manifest_path(series.key, _key(episode)), manifest)
