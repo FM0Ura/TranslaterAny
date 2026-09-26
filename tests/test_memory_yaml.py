@@ -249,3 +249,106 @@ def test_character_merge_preserves_non_empty_fields_when_updated(tmp_path: Path)
     # aliases were merged without duplicates
     assert "Yuu-kun" in char.aliases
     assert "Grim Reaper" in char.aliases
+
+
+def test_yaml_preserves_comments_on_merge(tmp_path: Path):
+    yaml_content = """# Fichas de Personagens da Série
+- name: Yuu # Protagonista principal
+  gender: male
+  role: main
+  source: user
+
+- name: Nao # Presidente do conselho
+  gender: female
+  role: main
+  source: user
+"""
+    char_file = tmp_path / "characters.yaml"
+    char_file.write_text(yaml_content, encoding="utf-8")
+
+    store = MemoryStore(tmp_path)
+    # Incoming metadata character and new character
+    c_meta = CharacterEntry(name="Yuu", gender=Gender.MALE, role=CharacterRole.MAIN, source=EntrySource.METADATA)
+    c_new = CharacterEntry(
+        name="Ayumi", gender=Gender.FEMALE, role=CharacterRole.SUPPORTING, source=EntrySource.METADATA
+    )
+
+    store.merge_characters([c_meta, c_new])
+
+    saved_text = char_file.read_text(encoding="utf-8")
+    assert "# Fichas de Personagens da Série" in saved_text
+    assert "# Protagonista principal" in saved_text
+    assert "# Presidente do conselho" in saved_text
+    assert "Ayumi" in saved_text
+
+
+def test_yaml_preserves_comments_on_save(tmp_path: Path):
+    glossary_content = """# Glossário Oficial Charlotte
+- term: Academy # Termo oficial da escola
+  translation: Academia
+  category: place
+  source: user
+
+- term: Power # Conceito de poderes
+  translation: Poder
+  category: general
+  source: extracted
+"""
+    gloss_file = tmp_path / "glossary.yaml"
+    gloss_file.write_text(glossary_content, encoding="utf-8")
+
+    store = MemoryStore(tmp_path)
+    updated_entries = [
+        GlossaryEntry(
+            term="Academy",
+            translation="Colégio Especial Hoshinoumi",
+            category=GlossaryCategory.PLACE,
+            source=EntrySource.USER,
+            notes="Decisão do fansub",
+        ),
+        GlossaryEntry(
+            term="Power",
+            translation="Habilidade Especial",
+            category=GlossaryCategory.GENERAL,
+            source=EntrySource.EXTRACTED,
+        ),
+    ]
+
+    store.save_glossary(updated_entries)
+
+    saved_text = gloss_file.read_text(encoding="utf-8")
+    assert "# Glossário Oficial Charlotte" in saved_text
+    assert "# Termo oficial da escola" in saved_text
+    assert "# Conceito de poderes" in saved_text
+    assert "Colégio Especial Hoshinoumi" in saved_text
+    assert "Habilidade Especial" in saved_text
+
+
+def test_story_yaml_preserves_comments(tmp_path: Path):
+    story_content = """# Memória Narrativa da Série
+title: Charlotte # Título original
+year: 2015
+genres:
+- Drama
+episodes:
+  S01E01: # Episódio Piloto
+    episode_key: S01E01
+    number: 1
+    title: I Think About Others
+"""
+    story_file = tmp_path / "story.yaml"
+    story_file.write_text(story_content, encoding="utf-8")
+
+    store = MemoryStore(tmp_path)
+    story = store.load_story()
+    assert story is not None
+    story.synopsis = "Jovens desenvolvem habilidades na puberdade."
+    story.episodes["S01E01"].synopsis = "Yuu usa sua habilidade para trapacear."
+
+    store.save_story(story)
+
+    saved_text = story_file.read_text(encoding="utf-8")
+    assert "# Memória Narrativa da Série" in saved_text
+    assert "# Título original" in saved_text
+    assert "# Episódio Piloto" in saved_text
+    assert "Jovens desenvolvem habilidades" in saved_text

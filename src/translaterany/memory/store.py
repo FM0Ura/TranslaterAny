@@ -6,6 +6,7 @@ import hashlib
 import io
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from ruamel.yaml import YAML
 
@@ -96,6 +97,93 @@ class MemoryStore:
         self.glossary_path = self.dir / "glossary.yaml"
         self.story_path = self.dir / "story.yaml"
 
+    def _write_yaml(self, path: Path, data: Any) -> str:
+        """Serializa dados para o arquivo de forma atômica e retorna o hash sha256."""
+        self.dir.mkdir(parents=True, exist_ok=True)
+        buf = io.StringIO()
+        self._yaml.dump(data, buf)
+        yaml_text = buf.getvalue()
+
+        # Gravação atômica via arquivo temporário no mesmo diretório
+        tmp_path = path.with_suffix(f"{path.suffix}.tmp")
+        tmp_path.write_text(yaml_text, encoding="utf-8")
+        tmp_path.replace(path)
+
+        return hashlib.sha256(yaml_text.encode("utf-8")).hexdigest()
+
+    def _sync_and_save_seq(self, path: Path, entries_dicts: list[dict], key_field: str) -> str:
+        """Salva sequência preservando nós existentes e comentários de ruamel.yaml."""
+        self.dir.mkdir(parents=True, exist_ok=True)
+        doc = None
+        if path.is_file():
+            content = path.read_text(encoding="utf-8").strip()
+            if content:
+                try:
+                    loaded = self._yaml.load(content)
+                    if isinstance(loaded, list):
+                        doc = loaded
+                except Exception:
+                    doc = None
+
+        if doc is None:
+            data_to_dump = entries_dicts
+        else:
+            existing_by_key = {}
+            for item in doc:
+                if isinstance(item, dict) and key_field in item and item[key_field] is not None:
+                    existing_by_key[str(item[key_field]).strip().lower()] = item
+
+            updated_items = []
+            for entry in entries_dicts:
+                k = str(entry[key_field]).strip().lower()
+                if k in existing_by_key:
+                    node = existing_by_key[k]
+                    for field_k, field_v in entry.items():
+                        node[field_k] = field_v
+                    updated_items.append(node)
+                else:
+                    updated_items.append(entry)
+
+            doc[:] = updated_items
+            data_to_dump = doc
+
+        return self._write_yaml(path, data_to_dump)
+
+    def _sync_and_save_story(self, path: Path, story_dict: dict) -> str:
+        """Salva a história preservando comentários de ruamel.yaml se o arquivo já existir."""
+        self.dir.mkdir(parents=True, exist_ok=True)
+        doc = None
+        if path.is_file():
+            content = path.read_text(encoding="utf-8").strip()
+            if content:
+                try:
+                    loaded = self._yaml.load(content)
+                    if isinstance(loaded, dict):
+                        doc = loaded
+                except Exception:
+                    doc = None
+
+        if doc is None:
+            data_to_dump = story_dict
+        else:
+            for k, v in story_dict.items():
+                if k == "episodes" and isinstance(v, dict) and isinstance(doc.get("episodes"), dict):
+                    ep_doc = doc["episodes"]
+                    for ep_k, ep_v in v.items():
+                        if ep_k in ep_doc and isinstance(ep_doc[ep_k], dict) and isinstance(ep_v, dict):
+                            for sub_k, sub_v in ep_v.items():
+                                ep_doc[ep_k][sub_k] = sub_v
+                        else:
+                            ep_doc[ep_k] = ep_v
+                    for ep_k in list(ep_doc.keys()):
+                        if ep_k not in v:
+                            del ep_doc[ep_k]
+                else:
+                    doc[k] = v
+            data_to_dump = doc
+
+        return self._write_yaml(path, data_to_dump)
+
     def load_characters(self) -> list[CharacterEntry]:
         """Carrega a lista de personagens salvos em characters.yaml."""
         if not self.characters_path.is_file():
@@ -115,15 +203,10 @@ class MemoryStore:
         return []
 
     def save_characters(self, characters: Iterable[CharacterEntry]) -> str:
-        """Salva a lista de personagens em characters.yaml e retorna o sha256 do arquivo."""
-        self.dir.mkdir(parents=True, exist_ok=True)
+        """Salva a lista de personagens em characters.yaml preservando comentários e formatação."""
         char_list = list(characters)
         data = [c.model_dump(mode="json") for c in char_list]
-        buf = io.StringIO()
-        self._yaml.dump(data, buf)
-        yaml_text = buf.getvalue()
-        self.characters_path.write_text(yaml_text, encoding="utf-8")
-        return hashlib.sha256(yaml_text.encode("utf-8")).hexdigest()
+        return self._sync_and_save_seq(self.characters_path, data, "name")
 
     def merge_characters(self, incoming: list[CharacterEntry]) -> list[CharacterEntry]:
         """Mescla novos personagens com os existentes preservando precedência estrita."""
@@ -175,18 +258,13 @@ class MemoryStore:
         return res
 
     def save_glossary(self, entries: Iterable[GlossaryEntry] | dict[str, GlossaryEntry]) -> str:
-        """Salva entradas no glossary.yaml e retorna o sha256 do arquivo."""
-        self.dir.mkdir(parents=True, exist_ok=True)
+        """Salva entradas no glossary.yaml preservando comentários e formatação."""
         if isinstance(entries, dict):
             entries_list = list(entries.values())
         else:
             entries_list = list(entries)
         data = [e.model_dump(mode="json") for e in entries_list]
-        buf = io.StringIO()
-        self._yaml.dump(data, buf)
-        yaml_text = buf.getvalue()
-        self.glossary_path.write_text(yaml_text, encoding="utf-8")
-        return hashlib.sha256(yaml_text.encode("utf-8")).hexdigest()
+        return self._sync_and_save_seq(self.glossary_path, data, "term")
 
     def merge_glossary(self, incoming: list[GlossaryEntry]) -> list[GlossaryEntry]:
         """Mescla novos termos com os existentes preservando precedência estrita."""
@@ -219,11 +297,6 @@ class MemoryStore:
         return StoryMemory.model_validate(data)
 
     def save_story(self, story: StoryMemory) -> str:
-        """Salva os dados da história em story.yaml e retorna o sha256 do arquivo."""
-        self.dir.mkdir(parents=True, exist_ok=True)
+        """Salva os dados da história em story.yaml preservando comentários se existentes."""
         data = story.model_dump(mode="json")
-        buf = io.StringIO()
-        self._yaml.dump(data, buf)
-        yaml_text = buf.getvalue()
-        self.story_path.write_text(yaml_text, encoding="utf-8")
-        return hashlib.sha256(yaml_text.encode("utf-8")).hexdigest()
+        return self._sync_and_save_story(self.story_path, data)
