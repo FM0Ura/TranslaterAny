@@ -26,6 +26,9 @@ query ($search: String) {
       native
     }
     seasonYear
+    startDate {
+      year
+    }
     episodes
     genres
     characters (sort: [ROLE, RELEVANCE]) {
@@ -55,6 +58,9 @@ query ($search: String, $year: Int) {
       native
     }
     seasonYear
+    startDate {
+      year
+    }
     episodes
     genres
     characters (sort: [ROLE, RELEVANCE]) {
@@ -156,7 +162,15 @@ class AniListClient:
             logger.warning("Falha ao decodificar JSON do AniList para '%s': %s", title, exc)
             return None
 
-        media = body.get("data", {}).get("Media")
+        if not isinstance(body, dict):
+            logger.warning("Resposta inválida do AniList (não-dicionário) para '%s'", title)
+            return None
+
+        data = body.get("data")
+        if not isinstance(data, dict):
+            return None
+
+        media = data.get("Media")
         if not media or not isinstance(media, dict):
             return None
 
@@ -206,12 +220,22 @@ class AniListClient:
                 )
             )
 
+        mal_id_raw = media.get("idMal")
+        try:
+            mal_id = int(mal_id_raw) if mal_id_raw is not None else None
+        except (ValueError, TypeError):
+            mal_id = None
+
+        start_date = media.get("startDate")
+        start_year = start_date.get("year") if isinstance(start_date, dict) else None
+        year_val = media.get("seasonYear") or start_year
+
         match = AniListMatch(
-            anilist_id=media["id"],
-            mal_id=media.get("idMal"),
+            anilist_id=int(media["id"]),
+            mal_id=mal_id,
             title=anime_title,
             romaji=romaji,
-            year=media.get("seasonYear") or media.get("startDate", {}).get("year"),
+            year=year_val,
             genres=media.get("genres") or [],
             characters=characters,
         )

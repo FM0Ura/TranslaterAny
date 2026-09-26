@@ -150,3 +150,70 @@ def test_anilist_custom_client(tmp_path: Path):
     assert res is not None
     assert res.anilist_id == 100
     assert res.title == "Custom Client Anime"
+
+
+def test_anilist_fallback_to_start_date_year(tmp_path: Path, monkeypatch):
+    client = AniListClient(cache_dir=tmp_path / "cache")
+
+    captured_payload = {}
+
+    def mock_post(url, **kw):
+        nonlocal captured_payload
+        captured_payload = kw.get("json", {})
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "Media": {
+                        "id": 500,
+                        "idMal": 600,
+                        "title": {"romaji": "K-On! Movie"},
+                        "seasonYear": None,
+                        "startDate": {"year": 2011},
+                        "genres": ["Music", "Comedy"],
+                        "characters": {"edges": []},
+                    }
+                }
+            },
+        )
+
+    monkeypatch.setattr(httpx, "post", mock_post)
+    res = client.search_anime("K-On! Movie")
+    assert res is not None
+    assert res.year == 2011
+    query_str = captured_payload.get("query", "")
+    assert "startDate" in query_str
+    assert "year" in query_str
+
+
+def test_anilist_search_with_year_query_includes_start_date(tmp_path: Path, monkeypatch):
+    client = AniListClient(cache_dir=tmp_path / "cache")
+    captured_payload = {}
+
+    def mock_post(url, **kw):
+        nonlocal captured_payload
+        captured_payload = kw.get("json", {})
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "Media": {
+                        "id": 501,
+                        "idMal": 601,
+                        "title": {"romaji": "K-On! Movie"},
+                        "seasonYear": 2011,
+                        "startDate": {"year": 2011},
+                        "genres": ["Music"],
+                        "characters": {"edges": []},
+                    }
+                }
+            },
+        )
+
+    monkeypatch.setattr(httpx, "post", mock_post)
+    res = client.search_anime("K-On! Movie", 2011)
+    assert res is not None
+    query_str = captured_payload.get("query", "")
+    assert "startDate" in query_str
+
+
