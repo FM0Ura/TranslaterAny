@@ -4,6 +4,7 @@ from translaterany.stages import (  # noqa: F401
     classify,
     extract,
     inventory,
+    metadata,
     normalize,
     publish,
     remux,

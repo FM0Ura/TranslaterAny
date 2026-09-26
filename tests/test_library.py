@@ -159,7 +159,7 @@ def test_series_config_absent(tmp_path: Path) -> None:
     ("text", "match"),
     [
         ("[subtitles\n", "arquivo inválido"),
-        ("[metadata]\nx = 1\n", "seção desconhecida"),
+        ("[outra]\nx = 1\n", "seção desconhecida"),
         ('[subtitles]\nlang = "en"\n', "apenas 'track'"),
         ('[styles]\n"Mirror" = "placa"\n', "use um de"),
     ],
