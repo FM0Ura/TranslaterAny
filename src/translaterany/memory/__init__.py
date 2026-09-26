@@ -15,6 +15,7 @@ from translaterany.memory.models import (
     GlossaryEntry,
     StoryMemory,
 )
+from translaterany.memory.store import MemoryStore
 
 __all__ = [
     "CharacterEntry",
@@ -26,6 +27,7 @@ __all__ = [
     "Gender",
     "GlossaryCategory",
     "GlossaryEntry",
+    "MemoryStore",
     "MetadataArtifact",
     "StoryMemory",
 ]
