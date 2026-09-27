@@ -25,16 +25,22 @@ class FakeLLM:
         self,
         script: Iterable[Scripted] | ScriptFn | None = None,
         *,
-        responses: dict[str, str] | None = None,
+        responses: dict[str, str] | Sequence[str] | None = None,
     ) -> None:
         self.calls: list[LLMRequest[Any]] = []
         self._fn: ScriptFn | None = None
         self._queue: deque[Scripted] | None = None
-        self._responses: dict[str, str] | None = responses
+        self._responses: dict[str, str] | Sequence[str] | None = responses
         if callable(script):
             self._fn = script
         elif script is not None:
             self._queue = deque(script)
+
+    @property
+    def last_prompt(self) -> str:
+        if not self.calls:
+            return ""
+        return f"{self.calls[-1].instructions}\n{self.calls[-1].prompt}"
 
     def generate[T: BaseModel](self, request: LLMRequest[T]) -> LLMResponse[T]:
         self.calls.append(request)
@@ -43,9 +49,19 @@ class FakeLLM:
         elif self._queue:
             item = self._queue.popleft()
         elif self._responses is not None:
+            import json
             from translaterany.subtitles.translator import TranslationBatch, TranslationItem
 
-            if issubclass(request.output_type, TranslationBatch) or request.output_type is TranslationBatch:
+            if isinstance(self._responses, (list, tuple)):
+                raw_json = self._responses[0]
+                try:
+                    data = json.loads(raw_json)
+                    items_data = data.get("translations") or data.get("items") or []
+                    items = [TranslationItem(id=it["id"], text=it["text"]) for it in items_data]
+                    item = TranslationBatch(items=items)
+                except Exception:
+                    item = request.output_type.model_validate_json(raw_json)
+            elif issubclass(request.output_type, TranslationBatch) or request.output_type is TranslationBatch:
                 items: list[TranslationItem] = []
                 for line in request.prompt.splitlines():
                     m = re.match(r"^\[([^\]]+)\]\s*(.*)$", line.strip())

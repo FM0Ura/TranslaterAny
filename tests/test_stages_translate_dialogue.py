@@ -102,7 +102,14 @@ def test_translate_dialogue_stage_metadata() -> None:
     assert StageTranslateDialogue.name == "translate_dialogue"
     assert StageTranslateDialogue.translates is True
     assert StageTranslateDialogue.scope is StageScope.EPISODE
-    assert StageTranslateDialogue.inputs == ("normalize", "classify", "consolidate_memory")
+    assert StageTranslateDialogue.inputs == (
+        "normalize",
+        "classify",
+        "consolidate_memory",
+        "translation_memory",
+        "merge_sentences",
+        "scene_analysis",
+    )
     assert StageTranslateDialogue.enabled_by_default is True
     assert "translate_dialogue" in REGISTRY
 

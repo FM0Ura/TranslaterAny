@@ -12,9 +12,12 @@ from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
+from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.chunking import DialogueLine
 from translaterany.subtitles.classify import Classification, ClassifiedUnit, ClassifiedUnitCollection
+from translaterany.subtitles.merge import MergedUnitsDoc
 from translaterany.subtitles.normalize import NormalizedDoc
+from translaterany.subtitles.scene_analysis import SceneAnalysisDoc
 from translaterany.subtitles.segments import marker_ids
 from translaterany.subtitles.texts import UnitTexts
 from translaterany.subtitles.translator import DialogueBatchTranslator
@@ -40,6 +43,8 @@ class TranslateDialogueOptions(BaseModel):
     fallback_model: str | None = "translategemma"
     max_tokens_per_batch: int = 800
     max_context_lines: int = 5
+    honorifics: str = "keep"
+    profanity: str = "faithful"
 
 
 @register_stage
@@ -48,7 +53,14 @@ class StageTranslateDialogue(Stage):
     version: ClassVar[str] = "1"
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
-    inputs: ClassVar[tuple[str, ...]] = ("normalize", "classify", "consolidate_memory")
+    inputs: ClassVar[tuple[str, ...]] = (
+        "normalize",
+        "classify",
+        "consolidate_memory",
+        "translation_memory",
+        "merge_sentences",
+        "scene_analysis",
+    )
     enabled_by_default: ClassVar[bool] = True
     Options: ClassVar[type[BaseModel]] = TranslateDialogueOptions
 
@@ -83,6 +95,8 @@ class StageTranslateDialogue(Stage):
             fallback_model=self.options.fallback_model,
             max_tokens_per_batch=self.options.max_tokens_per_batch,
             max_context_lines=self.options.max_context_lines,
+            honorifics_policy=self.options.honorifics,
+            profanity_policy=self.options.profanity,
         )
         translations = translator.translate_lines(lines)
 
@@ -112,6 +126,40 @@ class StageTranslateDialogue(Stage):
             ctx.output.json(UnitTexts(texts={}, used_terms={}))
             return
 
+        # Carrega artefatos opcionais do M4
+        tm_resolved: dict[str, str] = {}
+        try:
+            tm_artifact = ctx.inputs.json("translation_memory", TranslationMemoryArtifact)
+            tm_resolved = tm_artifact.matched_units
+        except Exception:
+            pass
+
+        merged_doc: MergedUnitsDoc | None = None
+        try:
+            merged_doc = ctx.inputs.json("merge_sentences", MergedUnitsDoc)
+        except Exception:
+            pass
+
+        scene_doc: SceneAnalysisDoc | None = None
+        try:
+            scene_doc = ctx.inputs.json("scene_analysis", SceneAnalysisDoc)
+        except Exception:
+            pass
+
+        line_contexts = scene_doc.lines if scene_doc else {}
+
+        # Políticas de tradução
+        honorifics = self.options.honorifics
+        profanity = self.options.profanity
+        app_cfg = getattr(ctx, "config", None)
+        if app_cfg and hasattr(app_cfg, "translation"):
+            honorifics = app_cfg.translation.honorifics
+            profanity = app_cfg.translation.profanity
+        series = getattr(ctx, "series", None)
+        if series and hasattr(series, "config") and series.config and hasattr(series.config, "translation"):
+            honorifics = series.config.translation.honorifics
+            profanity = series.config.translation.profanity
+
         # Carrega artefato consolidate_memory se disponível
         try:
             _ = ctx.inputs.json("consolidate_memory", ConsolidatedMemoryArtifact)
@@ -131,7 +179,6 @@ class StageTranslateDialogue(Stage):
         matched_characters: list[CharacterEntry] = []
         used_terms_dict: dict[str, str] = {}
 
-        series = getattr(ctx, "series", None)
         if series is not None and store is not None:
             mem_dir = store.series_dir(series.key) / "memory"
             if mem_dir.exists():
@@ -150,32 +197,54 @@ class StageTranslateDialogue(Stage):
                     if any(_matches_term(n, full_text) for n in names_to_check):
                         matched_characters.append(char)
 
-        lines = [DialogueLine(id=u.id, text=u.text) for u in dialogue_units]
-        translator = DialogueBatchTranslator(
-            client=client,
-            model_name=self.options.model,
-            fallback_model=self.options.fallback_model,
-            max_tokens_per_batch=self.options.max_tokens_per_batch,
-            max_context_lines=self.options.max_context_lines,
-            glossary=matched_glossary,
-            characters=matched_characters,
-        )
-        translated_texts = translator.translate_lines(lines)
-
+        # Monta linhas a traduzir (respeitando merge_sentences e TM)
+        lines: list[DialogueLine] = []
         final_texts: dict[str, str] = {}
-        for u in dialogue_units:
-            tr = translated_texts.get(u.id, u.text)
-            if u.markers > 0:
-                expected = list(range(1, u.markers + 1))
-                if sorted(marker_ids(tr)) != expected:
-                    logger.warning(
-                        "Unidade %s: tradução perdeu marcadores %s (obtido %s). Fazendo fallback para texto original.",
-                        u.id,
-                        expected,
-                        marker_ids(tr),
-                    )
-                    tr = u.text
-            final_texts[u.id] = tr
+        units_to_verify: dict[str, str] = {}
+
+        if merged_doc and merged_doc.units:
+            for comp in merged_doc.units:
+                if len(comp.unit_ids) == 1 and comp.composite_id in tm_resolved:
+                    final_texts[comp.composite_id] = tm_resolved[comp.composite_id]
+                else:
+                    lines.append(DialogueLine(id=comp.composite_id, text=comp.text_with_markers))
+                    units_to_verify[comp.composite_id] = comp.text_with_markers
+        else:
+            for u in dialogue_units:
+                if u.id in tm_resolved:
+                    final_texts[u.id] = tm_resolved[u.id]
+                else:
+                    lines.append(DialogueLine(id=u.id, text=u.text))
+                    units_to_verify[u.id] = u.text
+
+        if lines:
+            translator = DialogueBatchTranslator(
+                client=client,
+                model_name=self.options.model,
+                fallback_model=self.options.fallback_model,
+                max_tokens_per_batch=self.options.max_tokens_per_batch,
+                max_context_lines=self.options.max_context_lines,
+                glossary=matched_glossary,
+                characters=matched_characters,
+                honorifics_policy=honorifics,
+                profanity_policy=profanity,
+                line_contexts=line_contexts,
+            )
+            translated_texts = translator.translate_lines(lines)
+
+            for line_id, orig_text in units_to_verify.items():
+                tr = translated_texts.get(line_id, orig_text)
+                expected = marker_ids(orig_text)
+                if expected:
+                    if sorted(marker_ids(tr)) != sorted(expected):
+                        logger.warning(
+                            "Unidade %s: tradução perdeu marcadores %s (obtido %s). Fazendo fallback para texto original.",
+                            line_id,
+                            expected,
+                            marker_ids(tr),
+                        )
+                        tr = orig_text
+                final_texts[line_id] = tr
 
         ctx.output.json(UnitTexts(texts=final_texts, used_terms=used_terms_dict))
 

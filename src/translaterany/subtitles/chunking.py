@@ -1,7 +1,8 @@
 """Agrupamento de falas de diálogo em lotes (chunking) com janela de contexto deslizante."""
 
 from collections import deque
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -65,6 +66,7 @@ def format_batch_prompt(
     context: list[ContextLine],
     glossary: Sequence[GlossaryEntry] = (),
     characters: Sequence[CharacterEntry] = (),
+    line_contexts: Mapping[str, Any] | None = None,
 ) -> str:
     sections: list[str] = []
     if glossary:
@@ -86,6 +88,32 @@ def format_batch_prompt(
             detail_str = f": {'; '.join(details)}" if details else ""
             sections.append(f"- {c.name} ({gender_val}){detail_str}")
         sections.append("")
+
+    if line_contexts:
+        has_any = any(line.id in line_contexts for line in lines)
+        if has_any:
+            sections.append("[CONTEXTO DA CENA E FALANTES]:")
+            for line in lines:
+                lctx = line_contexts.get(line.id)
+                if lctx:
+                    notes = []
+                    speaker = getattr(lctx, "speaker", None)
+                    if speaker and speaker != "Unknown":
+                        notes.append(f"falante: {speaker}")
+                    listener = getattr(lctx, "listener", None)
+                    if listener and listener != "Unknown":
+                        notes.append(f"ouvinte: {listener}")
+                    tone = getattr(lctx, "tone", None)
+                    if tone and tone != "neutral":
+                        notes.append(f"tom: {tone}")
+                    conf = getattr(lctx, "confidence", None)
+                    if conf:
+                        notes.append(f"confiança: {conf}")
+                    if conf == "low":
+                        notes.append("adote formulação neutra / neutral gender")
+                    if notes:
+                        sections.append(f"- [{line.id}] {', '.join(notes)}")
+            sections.append("")
 
     if context:
         sections.append("[CONTEXTO RECENTE - APENAS LEITURA, NÃO TRADUZIR]:")
