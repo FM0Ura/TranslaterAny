@@ -11,6 +11,7 @@ from translaterany.stages import (  # noqa: F401
     normalize,
     publish,
     remux,
+    scene_analysis,
     select_track,
     translate_dialogue,
     translation_memory,
