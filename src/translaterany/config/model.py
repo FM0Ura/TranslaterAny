@@ -71,9 +71,16 @@ class StageConfig(_Strict):
     options: dict[str, Any] = Field(default_factory=dict)
 
 
+class TranslationConfig(_Strict):
+    honorifics: Literal["keep", "adapt", "remove"] = "keep"
+    profanity: Literal["faithful", "soften", "raw"] = "faithful"
+
+
 class AppConfig(_Strict):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
+    translation: TranslationConfig = Field(default_factory=TranslationConfig)
     pipeline: PipelineConfig | None = None
     stages: dict[str, StageConfig] = Field(default_factory=dict)
+

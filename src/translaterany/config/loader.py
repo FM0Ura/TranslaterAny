@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from translaterany.config.model import AppConfig, LLMConfig, PipelineConfig
+from translaterany.config.model import AppConfig, LLMConfig, PipelineConfig, TranslationConfig
 from translaterany.pipeline.registry import REGISTRY, StageRegistry
 from translaterany.pipeline.stage import Stage, StageScope
 
@@ -28,6 +28,8 @@ class ResolvedConfig:
     stages: tuple[Stage, ...]  # habilitadas, na ordem, já instanciadas
     min_file_age: float = 120
     llm: LLMConfig = field(default_factory=LLMConfig)
+    translation: TranslationConfig = field(default_factory=TranslationConfig)
+    app: AppConfig | None = None
 
 
 def default_config_path(env: Mapping[str, str] = os.environ) -> Path:
@@ -106,7 +108,10 @@ def load_config(
         stages=tuple(stages),
         min_file_age=config.discovery.min_file_age,
         llm=config.llm,
+        translation=config.translation,
+        app=config,
     )
+
 
 
 def _build_stages(config: AppConfig, registry: StageRegistry, where: str) -> list[Stage]:
