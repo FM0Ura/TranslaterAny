@@ -14,6 +14,8 @@ from translaterany.stages import (  # noqa: F401
     scene_analysis,
     select_track,
     translate_dialogue,
+    translate_signs,
+    translate_songs,
     translation_memory,
     write,
 )

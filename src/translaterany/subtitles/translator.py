@@ -49,6 +49,7 @@ class DialogueBatchTranslator:
         max_context_lines: int = 5,
         glossary: Sequence[GlossaryEntry] = (),
         characters: Sequence[CharacterEntry] = (),
+        system_instructions: str | None = None,
     ):
         self.client = client
         self.model_name = model_name
@@ -57,6 +58,7 @@ class DialogueBatchTranslator:
         self.max_context_lines = max_context_lines
         self.glossary = list(glossary or ())
         self.characters = list(characters or ())
+        self.system_instructions = system_instructions or SYSTEM_INSTRUCTIONS
         self.total_usage = Usage()
         self.fallback_count = 0
 
@@ -69,7 +71,7 @@ class DialogueBatchTranslator:
     def _call_model(self, prompt: str, target_model: str) -> tuple[TranslationBatch, Usage]:
         req = LLMRequest(
             model=target_model,
-            instructions=SYSTEM_INSTRUCTIONS,
+            instructions=self.system_instructions,
             prompt=prompt,
             output_type=TranslationBatch,
         )
