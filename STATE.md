@@ -3,14 +3,14 @@
 > Fotografia atual do desenvolvimento. O plano completo está em [`ROADMAP.md`](ROADMAP.md).
 > Atualize este arquivo ao concluir cada etapa de um marco (spec, plano, implementação) e sempre que uma decisão for tomada.
 
-**Última atualização:** 2026-09-26
+**Última atualização:** 2026-09-27
 
 ---
 
 ## Onde estamos
 
-- **Fase:** M3 concluído com sucesso.
-- **Marco atual:** **M3 — Memória da série** — concluído (✅), suíte completa com 364 testes automatizados passando.
+- **Fase:** M3 concluído com sucesso e integrado ao master.
+- **Marco atual:** **M3 — Memória da série** — concluído (✅), suíte completa com 374 testes automatizados passando.
 - **Próxima ação:** elaboração da spec e planejamento do **M4 — Tradução contextual**.
 
 ## Progresso dos marcos
@@ -22,7 +22,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M0 — Fundação | ✅ | [spec](docs/superpowers/specs/2026-09-24-m0-fundacao-design.md) | [plano](docs/superpowers/plans/2026-09-24-m0-fundacao.md) | concluído (101 testes) |
 | M1 — Mídia e legendas | ✅ | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | [plano](docs/superpowers/plans/2026-09-24-m1-midia-legendas.md) | concluído (237 testes) |
 | M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
-| M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (364 testes) |
+| M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
 | M4 — Tradução contextual | ⬜ | — | — | |
 | M5 — Verificações e métricas | ⬜ | — | — | |
 | M6 — Refinamento I | ⬜ | — | — | |
