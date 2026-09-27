@@ -179,7 +179,7 @@ def _parse_media_to_match(media: dict, fallback_title: str) -> AniListMatch:
     mal_id_raw = media.get("idMal")
     try:
         mal_id = int(mal_id_raw) if mal_id_raw is not None else None
-    except ValueError, TypeError:
+    except (ValueError, TypeError):  # fmt: skip
         mal_id = None
 
     start_date = media.get("startDate")

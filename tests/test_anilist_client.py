@@ -300,3 +300,29 @@ def test_anilist_get_anime_by_id_offline(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(httpx, "post", mock_post)
     res = client.get_anime_by_id(20954)
     assert res is None
+
+
+def test_anilist_parse_invalid_id_mal(tmp_path: Path, monkeypatch):
+    client = AniListClient(cache_dir=tmp_path / "cache")
+
+    def mock_post(*a, **kw):
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "Media": {
+                        "id": 12345,
+                        "idMal": "not-an-int",
+                        "title": {"romaji": "Invalid Mal ID Anime"},
+                        "genres": [],
+                        "characters": {"edges": []},
+                    }
+                }
+            },
+        )
+
+    monkeypatch.setattr(httpx, "post", mock_post)
+    match = client.get_anime_by_id(12345)
+    assert match is not None
+    assert match.anilist_id == 12345
+    assert match.mal_id is None
