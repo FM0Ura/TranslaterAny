@@ -10,7 +10,7 @@ from translaterany.subtitles.segments import fill, marker_ids
 from translaterany.subtitles.texts import UnitTexts
 
 ORIGINAL = "normalize"
-DEFAULT_SOURCE = "translate_dialogue"
+DEFAULT_SOURCE = "redistribute_sentences"
 
 
 class WriteOptions(BaseModel):
