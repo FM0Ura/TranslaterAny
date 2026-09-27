@@ -122,6 +122,90 @@ def classify(doc: NormalizedDoc, overrides: Mapping[str, str], scene_gap_ms: int
     )
 
 
+class DisambiguatedUnit(BaseModel):
+    id: str
+    line_type: str
+    reason: str = ""
+
+
+class DisambiguateOutput(BaseModel):
+    units: list[DisambiguatedUnit]
+
+
+def disambiguate_uncertain_units(
+    doc: NormalizedDoc,
+    cls: Classification,
+    client: Any | None,
+    model: str = "review",
+    scene_gap_ms: int = 5000,
+) -> Classification:
+    import json
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    uncertain_ids = [uid for uid, ucls in cls.units.items() if ucls.uncertain]
+    if not uncertain_ids or client is None:
+        return cls
+
+    by_id = {u.id: u for u in doc.units}
+    items = [{"id": uid, "style": by_id[uid].style, "text": by_id[uid].text} for uid in uncertain_ids if uid in by_id]
+
+    prompt = (
+        "Classify the following ambiguous subtitle units into one of: 'dialogue', 'sign', 'song'.\n"
+        "Return valid JSON with the schema: {\"units\": [{\"id\": \"...\", \"line_type\": \"dialogue\"|\"sign\"|\"song\", \"reason\": \"...\"}]}\n\n"
+        f"Units to classify:\n{json.dumps(items, ensure_ascii=False)}"
+    )
+
+    try:
+        if hasattr(client, "generate"):
+            from translaterany.llm.client import LLMRequest
+
+            req = LLMRequest(
+                model=model,
+                instructions="You are an expert anime subtitle classifier. Output valid JSON.",
+                prompt=prompt,
+                output_type=DisambiguateOutput,
+                tag="classify",
+            )
+            resp = client.generate(req)
+            parsed = resp.output
+        elif hasattr(client, "complete"):
+            content = client.complete(prompt)
+            m = re.search(r"\{.*\}", content, re.DOTALL)
+            if not m:
+                return cls
+            parsed = DisambiguateOutput.model_validate(json.loads(m.group(0)))
+        elif callable(client):
+            content = client(prompt)
+            m = re.search(r"\{.*\}", content, re.DOTALL)
+            if not m:
+                return cls
+            parsed = DisambiguateOutput.model_validate(json.loads(m.group(0)))
+        else:
+            return cls
+
+        updated_units = dict(cls.units)
+        for item in parsed.units:
+            if item.id in updated_units:
+                updated_units[item.id] = UnitClass(
+                    type=item.line_type,
+                    uncertain=False,
+                    rule="ai_disambiguate",
+                )
+        counts = Counter(c.type for c in updated_units.values())
+        return Classification(
+            main_style=cls.main_style,
+            units=updated_units,
+            counts=dict(sorted(counts.items())),
+            scenes=_scenes(doc, updated_units, scene_gap_ms),
+        )
+    except Exception as exc:
+        logger.warning("Falha na desambiguação de unidades por IA: %s. Mantendo classificação determinística.", exc)
+        return cls
+
+
+
 def _raw(ev: EventInfo) -> str:
     return ev.prefix + "".join(ev.markers) + ev.suffix
 
@@ -139,3 +223,4 @@ def _scenes(doc: NormalizedDoc, classes: Mapping[str, UnitClass], gap_ms: int) -
         else:
             scenes.append(Scene(id=f"s{len(scenes) + 1}", start_ms=ev.start_ms, end_ms=ev.end_ms, events=[ev.index]))
     return scenes
+
