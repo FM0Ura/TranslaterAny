@@ -12,6 +12,7 @@ from translaterany.stages import (  # noqa: F401
     remux,
     select_track,
     translate_dialogue,
+    translation_memory,
     write,
 )
 
