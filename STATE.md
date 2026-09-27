@@ -23,7 +23,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M1 — Mídia e legendas | ✅ | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | [plano](docs/superpowers/plans/2026-09-24-m1-midia-legendas.md) | concluído (237 testes) |
 | M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
-| M4 — Tradução contextual | ⬜ | — | — | |
+| M4 — Tradução contextual | 📝 | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | — | spec em revisão |
 | M5 — Verificações e métricas | ⬜ | — | — | |
 | M6 — Refinamento I | ⬜ | — | — | |
 | M7 — Refinamento II | ⬜ | — | — | |
