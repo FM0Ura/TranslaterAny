@@ -6,6 +6,7 @@ from translaterany.stages import (  # noqa: F401
     extract,
     extract_terms,
     inventory,
+    merge_sentences,
     metadata,
     normalize,
     publish,
