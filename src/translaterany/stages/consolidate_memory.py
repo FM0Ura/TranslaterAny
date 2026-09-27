@@ -14,6 +14,40 @@ from translaterany.pipeline.stage import Stage, StageContext, StageScope
 logger = logging.getLogger(__name__)
 
 
+_COMMON_HONORIFICS: frozenset[str] = frozenset(
+    {
+        "san",
+        "kun",
+        "chan",
+        "sama",
+        "sensei",
+        "senpai",
+        "dono",
+        "shi",
+        "tan",
+        "mr",
+        "mrs",
+        "ms",
+        "miss",
+        "dr",
+        "lord",
+        "lady",
+    }
+)
+
+
+def _is_valid_character_token(token: str) -> bool:
+    """Verifica se um token é válido para correspondência heurística (ignora <= 2 chars e honoríficos)."""
+    clean = token.strip(".,!?:;\"'").lower()
+    return len(clean) > 2 and clean not in _COMMON_HONORIFICS
+
+
+def _character_tokens(name: str) -> list[str]:
+    """Extrai tokens válidos de um nome de personagem para correspondência heurística."""
+    tokens = [t.strip(".,!?:;\"'").lower() for t in name.split()]
+    return [t for t in tokens if len(t) > 2 and t not in _COMMON_HONORIFICS]
+
+
 @register_stage
 class ConsolidateMemoryStage(Stage):
     """Etapa de série que consolida termos e personagens em arquivos YAML e gera consolidate_memory.json."""
@@ -72,15 +106,17 @@ class ConsolidateMemoryStage(Stage):
                 continue
 
             matched = False
+            m_norm = m_clean.strip(".,!?:;\"'").lower()
+            is_valid_mention_token = _is_valid_character_token(m_clean)
+
             # Verifica nos personagens de metadados recebidos
             for c in incoming_chars:
-                name_tokens = [t.lower() for t in c.name.split()]
                 aliases_lower = [a.lower() for a in c.aliases]
-                if (
-                    m_clean.lower() == c.name.lower()
-                    or m_clean.lower() in name_tokens
-                    or m_clean.lower() in aliases_lower
-                ):
+                is_exact_match = m_clean.lower() == c.name.lower() or m_clean.lower() in aliases_lower
+                valid_tokens = _character_tokens(c.name)
+                is_token_match = is_valid_mention_token and m_norm in valid_tokens
+
+                if is_exact_match or is_token_match:
                     matched = True
                     if m_clean.lower() != c.name.lower() and m_clean not in c.aliases:
                         c.aliases.append(m_clean)
@@ -89,21 +125,20 @@ class ConsolidateMemoryStage(Stage):
             if not matched:
                 # Verifica nos personagens pré-existentes em disco
                 for ec in existing_chars:
-                    name_tokens = [t.lower() for t in ec.name.split()]
                     aliases_lower = [a.lower() for a in ec.aliases]
-                    if (
-                        m_clean.lower() == ec.name.lower()
-                        or m_clean.lower() in name_tokens
-                        or m_clean.lower() in aliases_lower
-                    ):
+                    is_exact_match = m_clean.lower() == ec.name.lower() or m_clean.lower() in aliases_lower
+                    valid_tokens = _character_tokens(ec.name)
+                    is_token_match = is_valid_mention_token and m_norm in valid_tokens
+
+                    if is_exact_match or is_token_match:
                         matched = True
                         if m_clean.lower() != ec.name.lower() and m_clean not in ec.aliases:
                             ec.aliases.append(m_clean)
                             incoming_chars.append(ec)
                         break
 
-            if not matched:
-                # Novo personagem detectado apenas nas falas
+            if not matched and is_valid_mention_token:
+                # Novo personagem detectado apenas nas falas (ignora tokens curtos ou honoríficos isolados)
                 incoming_chars.append(CharacterEntry(name=m_clean, source=EntrySource.EXTRACTED))
 
         merged_chars = mem_store.merge_characters(incoming_chars)

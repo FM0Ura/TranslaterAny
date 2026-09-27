@@ -1,5 +1,7 @@
 """Comando memory: inspeciona e gerencia a memória da série."""
 
+import hashlib
+import json
 import re
 import shutil
 from pathlib import Path
@@ -150,17 +152,32 @@ def memory(
 
     if refresh:
         cache_dir = cfg.data_dir / "cache"
-        if (cache_dir / "anilist").exists():
-            for f in (cache_dir / "anilist").glob("*.json"):
-                f.unlink(missing_ok=True)
-        if (cache_dir / "jikan").exists():
-            for f in (cache_dir / "jikan").glob("*.json"):
-                f.unlink(missing_ok=True)
 
         raw_name = series.name.strip()
         match_re = re.match(r"^(.*?)(?:\s*\((\d{4})\))?$", raw_name)
         title = match_re.group(1).strip() if match_re else raw_name
         year = int(match_re.group(2)) if match_re and match_re.group(2) else None
+
+        metadata_cfg = getattr(getattr(series, "config", None), "metadata", None)
+        override_id: int | None = getattr(metadata_cfg, "anilist_id", None)
+
+        norm_key = f"{title.strip().lower()}::{year or ''}"
+        cache_hash = hashlib.sha256(norm_key.encode("utf-8")).hexdigest()[:16]
+        hash_file = cache_dir / "anilist" / f"{cache_hash}.json"
+        id_file = (cache_dir / "anilist" / f"id_{override_id}.json") if override_id is not None else None
+
+        # Tenta descobrir mal_id pré-existente no cache antes de invalidar
+        known_mal_id: int | None = None
+        for cand in (id_file, hash_file):
+            if cand and cand.is_file():
+                try:
+                    cdata = json.loads(cand.read_text(encoding="utf-8"))
+                    mid = cdata.get("mal_id") or cdata.get("idMal")
+                    if mid:
+                        known_mal_id = int(mid)
+                        break
+                except Exception:
+                    pass
 
         from translaterany.memory.anilist import AniListClient
         from translaterany.memory.jikan import JikanClient
@@ -168,17 +185,32 @@ def memory(
         anilist = AniListClient(cache_dir)
         jikan = JikanClient(cache_dir)
 
-        metadata_cfg = getattr(getattr(series, "config", None), "metadata", None)
-        override_id: int | None = getattr(metadata_cfg, "anilist_id", None)
+        # Invalida apenas o cache AniList da série atual
+        if hasattr(anilist, "clear_cache"):
+            anilist.clear_cache(title=title, year=year, anilist_id=override_id)
+        else:
+            hash_file.unlink(missing_ok=True)
+            if id_file:
+                id_file.unlink(missing_ok=True)
+
+        # Invalida o cache Jikan correspondente se o mal_id for conhecido
+        if known_mal_id is not None:
+            if hasattr(jikan, "clear_cache"):
+                jikan.clear_cache(known_mal_id)
+            else:
+                (cache_dir / "jikan" / f"{known_mal_id}_episodes.json").unlink(missing_ok=True)
 
         match = None
-        if override_id is not None and hasattr(anilist, "get_anime_by_id"):
-            try:
-                match = anilist.get_anime_by_id(override_id)
-            except Exception as exc:
-                console.print(f"[yellow]Aviso ao consultar AniList por ID {override_id}: {exc}[/yellow]")
-
-        if match is None:
+        if override_id is not None:
+            if hasattr(anilist, "get_anime_by_id"):
+                try:
+                    match = anilist.get_anime_by_id(override_id)
+                except Exception as exc:
+                    console.print(f"[yellow]Aviso ao consultar AniList por ID {override_id}: {exc}[/yellow]")
+            if match is None:
+                console.print(f"[yellow]Nenhum metadado encontrado no AniList para o ID {override_id}.[/yellow]")
+                return
+        else:
             try:
                 match = anilist.search_anime(title, year)
             except Exception as exc:
@@ -190,13 +222,16 @@ def memory(
 
         synopses: dict[int, EpisodeSynopsis] = {}
         if match.mal_id:
+            if hasattr(jikan, "clear_cache"):
+                jikan.clear_cache(match.mal_id)
+            else:
+                (cache_dir / "jikan" / f"{match.mal_id}_episodes.json").unlink(missing_ok=True)
             try:
                 synopses = jikan.get_episode_synopses(match.mal_id) or {}
             except Exception:
                 synopses = {}
         episodes_map = {
-            (syn.episode_key if getattr(syn, "episode_key", None) else f"EP{num}"): syn
-            for num, syn in synopses.items()
+            (syn.episode_key if getattr(syn, "episode_key", None) else f"EP{num}"): syn for num, syn in synopses.items()
         }
 
         existing_story = mem_store.load_story()

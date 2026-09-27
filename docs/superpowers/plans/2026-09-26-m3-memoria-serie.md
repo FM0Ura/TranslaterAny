@@ -65,6 +65,7 @@ from translaterany.memory.artifacts import (
     ConsolidatedMemoryArtifact,
 )
 
+
 def test_glossary_entry_content_hash():
     entry1 = GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)
     entry2 = GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)
@@ -73,16 +74,19 @@ def test_glossary_entry_content_hash():
     entry3 = GlossaryEntry(term="Plunder", translation="Pilhar", category=GlossaryCategory.TECHNIQUE)
     assert entry1.content_hash() != entry3.content_hash()
 
+
 def test_character_entry_defaults():
     char = CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE, role=CharacterRole.MAIN)
     assert char.source == EntrySource.EXTRACTED
     assert char.aliases == []
+
 
 def test_story_memory_episode_key():
     story = StoryMemory(title="Charlotte", year=2015)
     story.episodes["S01E01"] = EpisodeSynopsis(episode_key="S01E01", number=1, synopsis="Primeiro ep")
     assert "S01E01" in story.episodes
     assert story.episodes["S01E01"].number == 1
+
 
 def test_artifacts_serialization():
     meta = MetadataArtifact(matched=True, anilist_id=20954, title="Charlotte")
@@ -150,8 +154,17 @@ git commit -m "feat(memory): modelos de dados e artefatos da memória da série"
 ```python
 # tests/test_memory_yaml.py
 from pathlib import Path
-from translaterany.memory.models import CharacterEntry, CharacterRole, EntrySource, Gender, GlossaryCategory, GlossaryEntry, StoryMemory
+from translaterany.memory.models import (
+    CharacterEntry,
+    CharacterRole,
+    EntrySource,
+    Gender,
+    GlossaryCategory,
+    GlossaryEntry,
+    StoryMemory,
+)
 from translaterany.memory.store import MemoryStore
+
 
 def test_yaml_roundtrip_glossary(tmp_path: Path):
     store = MemoryStore(tmp_path)
@@ -164,6 +177,7 @@ def test_yaml_roundtrip_glossary(tmp_path: Path):
     loaded = store.load_glossary()
     assert len(loaded) == 2
     assert loaded["Academy"].translation == "Academia"
+
 
 def test_user_precedence_is_preserved_on_merge(tmp_path: Path):
     store = MemoryStore(tmp_path)
@@ -189,12 +203,15 @@ def test_user_precedence_is_preserved_on_merge(tmp_path: Path):
     assert reloaded["Academy"].source == EntrySource.USER
     assert reloaded["Academy"].notes == "Decisão do fansub"
 
+
 def test_character_merge_preserves_user_fields(tmp_path: Path):
     store = MemoryStore(tmp_path)
     c_user = CharacterEntry(name="Yuu", gender=Gender.MALE, role=CharacterRole.MAIN, source=EntrySource.USER)
     store.save_characters([c_user])
 
-    c_meta = CharacterEntry(name="Yuu", gender=Gender.UNKNOWN, role=CharacterRole.SUPPORTING, source=EntrySource.METADATA)
+    c_meta = CharacterEntry(
+        name="Yuu", gender=Gender.UNKNOWN, role=CharacterRole.SUPPORTING, source=EntrySource.METADATA
+    )
     merged = store.merge_characters([c_meta])
     assert len(merged) == 1
     assert merged[0].role == CharacterRole.MAIN
@@ -245,9 +262,10 @@ from pathlib import Path
 import httpx
 from translaterany.memory.anilist import AniListClient
 
+
 def test_anilist_search_anime_success(tmp_path: Path, monkeypatch):
     client = AniListClient(cache_dir=tmp_path / "cache")
-    
+
     mock_payload = {
         "data": {
             "Media": {
@@ -264,10 +282,10 @@ def test_anilist_search_anime_success(tmp_path: Path, monkeypatch):
                             "node": {
                                 "name": {"full": "Yuu Otosaka", "native": "乙坂 有宇"},
                                 "gender": "Male",
-                            }
+                            },
                         }
                     ]
-                }
+                },
             }
         }
     }
@@ -280,10 +298,13 @@ def test_anilist_search_anime_success(tmp_path: Path, monkeypatch):
     assert res.characters[0].name == "Yuu Otosaka"
     assert (tmp_path / "cache" / "anilist").exists()
 
+
 def test_anilist_offline_returns_none(tmp_path: Path, monkeypatch):
     client = AniListClient(cache_dir=tmp_path / "cache")
+
     def mock_post(*a, **kw):
         raise httpx.ConnectError("Offline")
+
     monkeypatch.setattr(httpx, "post", mock_post)
     res = client.search_anime("Charlotte", 2015)
     assert res is None
@@ -294,6 +315,7 @@ def test_anilist_offline_returns_none(tmp_path: Path, monkeypatch):
 from pathlib import Path
 import httpx
 from translaterany.memory.jikan import JikanClient
+
 
 def test_jikan_get_episode_synopses_success(tmp_path: Path, monkeypatch):
     client = JikanClient(cache_dir=tmp_path / "cache")
@@ -312,10 +334,13 @@ def test_jikan_get_episode_synopses_success(tmp_path: Path, monkeypatch):
     assert "cheat" in eps[1].synopsis
     assert eps[1].title == "I Think About Others"
 
+
 def test_jikan_offline_returns_empty_dict(tmp_path: Path, monkeypatch):
     client = JikanClient(cache_dir=tmp_path / "cache")
+
     def mock_get(*a, **kw):
         raise httpx.ConnectError("Offline")
+
     monkeypatch.setattr(httpx, "get", mock_get)
     eps = client.get_episode_synopses(28999)
     assert eps == {}
@@ -371,14 +396,17 @@ from translaterany.memory.artifacts import MetadataArtifact
 from translaterany.memory.anilist import AniListMatch
 from translaterany.memory.models import CharacterEntry, Gender
 
+
 def test_series_toml_with_metadata(tmp_path: Path):
     toml_file = tmp_path / "series.toml"
-    toml_file.write_text('[metadata]\nanilist_id = 20954\n', encoding="utf-8")
+    toml_file.write_text("[metadata]\nanilist_id = 20954\n", encoding="utf-8")
     cfg = load_series_config(tmp_path)
     assert cfg.metadata.anilist_id == 20954
 
+
 def test_metadata_stage_runs_and_writes_artifact(tmp_path: Path):
     captured: MetadataArtifact | None = None
+
     class MockOutput:
         def json(self, obj):
             nonlocal captured
@@ -414,8 +442,10 @@ def test_metadata_stage_runs_and_writes_artifact(tmp_path: Path):
     assert captured.anilist_id == 20954
     assert len(captured.characters) == 1
 
+
 def test_metadata_stage_offline_fallback(tmp_path: Path):
     captured: MetadataArtifact | None = None
+
     class MockOutput:
         def json(self, obj):
             nonlocal captured
@@ -494,6 +524,7 @@ from translaterany.memory.artifacts import ExtractTermsArtifact, MetadataArtifac
 from translaterany.subtitles.normalize import NormalizedDoc, Unit, Encoding
 from translaterany.pipeline.units import Episode
 
+
 def test_extract_terms_stage_executes_and_outputs_artifact(tmp_path: Path):
     doc = NormalizedDoc(
         encoding=Encoding(bom=False, newline="\n"),
@@ -505,8 +536,9 @@ def test_extract_terms_stage_executes_and_outputs_artifact(tmp_path: Path):
         ],
     )
     meta = MetadataArtifact(matched=True, anilist_id=20954, title="Charlotte")
-    
+
     captured: ExtractTermsArtifact | None = None
+
     class MockOutput:
         def json(self, obj):
             nonlocal captured
@@ -521,9 +553,11 @@ def test_extract_terms_stage_executes_and_outputs_artifact(tmp_path: Path):
             raise ValueError(name)
 
     fake_response = ExtractTermsResponse(
-        terms=[{"term": "Hoshinoumi Academy", "translation": "Academia Hoshinoumi", "category": "place"},
-               {"term": "Plunder", "translation": "Saque", "category": "technique"}],
-        character_mentions=["Yuu"]
+        terms=[
+            {"term": "Hoshinoumi Academy", "translation": "Academia Hoshinoumi", "category": "place"},
+            {"term": "Plunder", "translation": "Saque", "category": "technique"},
+        ],
+        character_mentions=["Yuu"],
     )
     fake_llm = FakeLLM([fake_response])
     stage = ExtractTermsStage(client=fake_llm)
@@ -551,20 +585,22 @@ from translaterany.memory.models import GlossaryCategory, GlossaryEntry, Charact
 from translaterany.pipeline.units import Series, Episode
 from translaterany.pipeline.artifacts import ArtifactStore
 
+
 def test_consolidate_memory_stage_produces_yamls_and_artifact(tmp_path: Path):
     meta = MetadataArtifact(
         matched=True,
         anilist_id=20954,
         title="Charlotte",
-        characters=[CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE)]
+        characters=[CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE)],
     )
     ep1_terms = ExtractTermsArtifact(
         episode_key="S01E01",
         terms=[GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)],
-        character_mentions=["Yuu"]
+        character_mentions=["Yuu"],
     )
-    
+
     captured: ConsolidatedMemoryArtifact | None = None
+
     class MockOutput:
         def json(self, obj):
             nonlocal captured
@@ -575,6 +611,7 @@ def test_consolidate_memory_stage_produces_yamls_and_artifact(tmp_path: Path):
             if name == "metadata":
                 return meta
             raise ValueError(name)
+
         def json_all(self, name, model):
             if name == "extract_terms":
                 return {"S01E01": ep1_terms}
@@ -664,16 +701,20 @@ from translaterany.pipeline.units import Series, Episode
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.llm.fake import FakeLLM
 
+
 def test_format_batch_prompt_includes_glossary_and_characters():
     lines = [DialogueLine(id="1", text="Hello from Hoshinoumi Academy!")]
-    glossary = [GlossaryEntry(term="Hoshinoumi Academy", translation="Academia Hoshinoumi", category=GlossaryCategory.PLACE)]
+    glossary = [
+        GlossaryEntry(term="Hoshinoumi Academy", translation="Academia Hoshinoumi", category=GlossaryCategory.PLACE)
+    ]
     characters = [CharacterEntry(name="Yuu", gender=Gender.MALE, role="main", speech_style="informal")]
-    
+
     prompt = format_batch_prompt(lines, [], glossary=glossary, characters=characters)
     assert "[GLOSSÁRIO OBRIGATÓRIO]" in prompt
     assert "Hoshinoumi Academy -> Academia Hoshinoumi" in prompt
     assert "[PERSONAGENS]" in prompt
     assert "Yuu (male): informal" in prompt
+
 
 def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Path):
     doc = NormalizedDoc(
@@ -695,7 +736,7 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
         characters_hash="h1",
         glossary_hash="h2",
         story_hash="h3",
-        glossary_terms=["Hoshinoumi Academy", "Plunder"]
+        glossary_terms=["Hoshinoumi Academy", "Plunder"],
     )
     # Grava glossary.yaml
     store = ArtifactStore(tmp_path / "data")
@@ -704,9 +745,11 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
     mem_dir.mkdir(parents=True, exist_ok=True)
     g_entry = GlossaryEntry(term="Hoshinoumi Academy", translation="Academia Hoshinoumi")
     from translaterany.memory.store import MemoryStore
+
     MemoryStore(mem_dir).save_glossary([g_entry, GlossaryEntry(term="Plunder", translation="Saque")])
 
     captured = None
+
     class MockOutput:
         def json(self, obj):
             nonlocal captured
@@ -714,9 +757,12 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
 
     class MockInputs:
         def json(self, name, model):
-            if name == "normalize": return doc
-            if name == "classify": return classification
-            if name == "consolidate_memory": return cons_art
+            if name == "normalize":
+                return doc
+            if name == "classify":
+                return classification
+            if name == "consolidate_memory":
+                return cons_art
             raise ValueError(name)
 
     fake_llm = FakeLLM(responses={"Welcome to Hoshinoumi Academy!": "Bem-vindo à Academia Hoshinoumi!"})
@@ -748,11 +794,12 @@ from translaterany.memory.models import GlossaryEntry
 from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.reset import reset_stale
 
+
 def test_stale_detection_and_reset(tmp_path: Path):
     store = ArtifactStore(tmp_path / "data")
     series = Series(name="Charlotte (2015)", path=tmp_path)
     ep = Episode(key="S01E01", source=tmp_path / "S01E01.mkv", number=1, season=1)
-    
+
     # 1. Salva glossary inicial
     mem_dir = store.series_dir(series.key) / "memory"
     mem_store = MemoryStore(mem_dir)
@@ -768,7 +815,9 @@ def test_stale_detection_and_reset(tmp_path: Path):
 
     # 3. Cria manifest com status done
     manifests = ManifestSet(store, series, [ep])
-    manifests.episodes[ep.key].stages["translate_dialogue"] = SimpleNamespace(status="done", key="k", artifact="translate_dialogue.json", artifact_hash="h")
+    manifests.episodes[ep.key].stages["translate_dialogue"] = SimpleNamespace(
+        status="done", key="k", artifact="translate_dialogue.json", artifact_hash="h"
+    )
     manifests.save(ep)
 
     # 4. Modifica termo no glossary.yaml
@@ -778,7 +827,7 @@ def test_stale_detection_and_reset(tmp_path: Path):
     # 5. Executa reset_stale
     reset_count = reset_stale(store, series, [ep])
     assert reset_count == 1
-    
+
     # 6. Verifica que manifest teve translate_dialogue removido/resetado
     reloaded_manifest = store.load_manifest(series.key, ep.key)
     assert "translate_dialogue" not in reloaded_manifest.stages
@@ -840,10 +889,12 @@ from translaterany.pipeline.units import Series
 
 runner = CliRunner()
 
+
 def test_memory_command_help():
     result = runner.invoke(app, ["memory", "--help"])
     assert result.exit_code == 0
     assert "memória da série" in result.output.lower()
+
 
 def test_memory_command_displays_glossary_table(tmp_path: Path):
     series_dir = tmp_path / "Charlotte (2015)"
@@ -853,9 +904,9 @@ def test_memory_command_displays_glossary_table(tmp_path: Path):
     series = Series(name="Charlotte (2015)", path=series_dir)
     mem_dir = store.series_dir(series.key) / "memory"
     mem_dir.mkdir(parents=True, exist_ok=True)
-    MemoryStore(mem_dir).save_glossary([
-        GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)
-    ])
+    MemoryStore(mem_dir).save_glossary(
+        [GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)]
+    )
 
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text(f'[general]\ndata_dir = "{data_dir}"\n', encoding="utf-8")
@@ -877,6 +928,7 @@ from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.stages.extract_terms import ExtractTermsResponse
 from tests.mkvtools import create_synthetic_mkv, make_mkv, Sub, FULL_ASS
 
+
 def test_m3_pipeline_end_to_end_with_memory(tmp_path: Path, monkeypatch):
     # 1. Mock de APIs externas
     mock_anilist = {
@@ -888,7 +940,7 @@ def test_m3_pipeline_end_to_end_with_memory(tmp_path: Path, monkeypatch):
                 "seasonYear": 2015,
                 "episodes": 1,
                 "genres": ["Supernatural"],
-                "characters": {"edges": []}
+                "characters": {"edges": []},
             }
         }
     }
@@ -898,22 +950,27 @@ def test_m3_pipeline_end_to_end_with_memory(tmp_path: Path, monkeypatch):
     # 2. Criação do MKV sintético com termo especial
     series_dir = tmp_path / "Charlotte (2015)"
     video_path = series_dir / "Season 1" / "S01E01.mkv"
-    create_synthetic_mkv(video_path, dialogues=[
-        ("00:00:01.000", "00:00:03.000", "Welcome to Hoshinoumi Academy!"),
-        ("00:00:04.000", "00:00:06.000", "He has the Plunder ability.")
-    ])
+    create_synthetic_mkv(
+        video_path,
+        dialogues=[
+            ("00:00:01.000", "00:00:03.000", "Welcome to Hoshinoumi Academy!"),
+            ("00:00:04.000", "00:00:06.000", "He has the Plunder ability."),
+        ],
+    )
 
     # 3. FakeLLM respondendo à extração e à tradução com o termo do glossário
     fake_extract = ExtractTermsResponse(
-        terms=[{"term": "Hoshinoumi Academy", "translation": "Academia Hoshinoumi", "category": "place"},
-               {"term": "Plunder", "translation": "Saque", "category": "technique"}]
+        terms=[
+            {"term": "Hoshinoumi Academy", "translation": "Academia Hoshinoumi", "category": "place"},
+            {"term": "Plunder", "translation": "Saque", "category": "technique"},
+        ]
     )
     fake_llm = FakeLLM(
         script=[fake_extract],
         responses={
             "Welcome to Hoshinoumi Academy!": "Bem-vindo à Academia Hoshinoumi!",
-            "He has the Plunder ability.": "Ele tem a habilidade Saque."
-        }
+            "He has the Plunder ability.": "Ele tem a habilidade Saque.",
+        },
     )
 
     data_dir = tmp_path / "data"

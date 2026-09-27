@@ -226,6 +226,18 @@ class AniListClient:
         cache_hash = hashlib.sha256(norm_key.encode("utf-8")).hexdigest()[:16]
         return self.anilist_dir / f"{cache_hash}.json"
 
+    def clear_cache(
+        self,
+        title: str | None = None,
+        year: int | None = None,
+        anilist_id: int | None = None,
+    ) -> None:
+        """Remove arquivos de cache em disco para uma série específica."""
+        if title:
+            self._get_cache_path(title, year).unlink(missing_ok=True)
+        if anilist_id is not None:
+            (self.anilist_dir / f"id_{anilist_id}.json").unlink(missing_ok=True)
+
     def search_anime(self, title: str, year: int | None = None) -> AniListMatch | None:
         """Busca metadados de anime no AniList com fallback para cache em disco."""
         cache_file = self._get_cache_path(title, year)

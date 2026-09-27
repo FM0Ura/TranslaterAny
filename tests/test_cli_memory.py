@@ -35,9 +35,9 @@ def test_memory_command_displays_glossary_table(tmp_path: Path):
     series = Series(name="Charlotte (2015)", path=series_dir)
     mem_dir = store.series_dir(series.key) / "memory"
     mem_dir.mkdir(parents=True, exist_ok=True)
-    MemoryStore(mem_dir).save_glossary([
-        GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)
-    ])
+    MemoryStore(mem_dir).save_glossary(
+        [GlossaryEntry(term="Plunder", translation="Saque", category=GlossaryCategory.TECHNIQUE)]
+    )
 
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text(f'[general]\ndata_dir = "{data_dir}"\n', encoding="utf-8")
@@ -57,9 +57,9 @@ def test_memory_command_displays_characters_and_story(tmp_path: Path):
     mem_dir = store.series_dir(series.key) / "memory"
     mem_dir.mkdir(parents=True, exist_ok=True)
     mem_store = MemoryStore(mem_dir)
-    mem_store.save_characters([
-        CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE, role=CharacterRole.MAIN, speech_style="informal")
-    ])
+    mem_store.save_characters(
+        [CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE, role=CharacterRole.MAIN, speech_style="informal")]
+    )
     mem_store.save_story(StoryMemory(title="Charlotte", synopsis="Adolescentes com habilidades especiais."))
 
     cfg_file = tmp_path / "config.toml"
@@ -156,6 +156,61 @@ def test_memory_command_refresh(tmp_path: Path, monkeypatch):
     assert "atualizados com sucesso" in result.output.lower()
 
 
+def test_memory_command_refresh_preserves_other_series_cache(tmp_path: Path, monkeypatch):
+    import hashlib
+
+    import httpx
+
+    mock_anilist = {
+        "data": {
+            "Media": {
+                "id": 20954,
+                "idMal": 28999,
+                "title": {"romaji": "Charlotte", "english": "Charlotte", "native": "シャーロット"},
+                "seasonYear": 2015,
+                "episodes": 1,
+                "genres": ["Supernatural"],
+                "characters": {"edges": []},
+            }
+        }
+    }
+    monkeypatch.setattr(httpx, "post", lambda *a, **kw: httpx.Response(200, json=mock_anilist))
+    monkeypatch.setattr(httpx, "get", lambda *a, **kw: httpx.Response(200, json={"data": []}))
+
+    data_dir = tmp_path / "data"
+    cache_anilist = data_dir / "cache" / "anilist"
+    cache_jikan = data_dir / "cache" / "jikan"
+    cache_anilist.mkdir(parents=True, exist_ok=True)
+    cache_jikan.mkdir(parents=True, exist_ok=True)
+
+    # Cache de OUTRA série que NÃO deve ser apagado
+    other_anilist = cache_anilist / "other_series_hash.json"
+    other_anilist.write_text('{"title": "Other Series"}', encoding="utf-8")
+    other_jikan = cache_jikan / "99999_episodes.json"
+    other_jikan.write_text('[{"number": 1}]', encoding="utf-8")
+
+    # Cache da série atual
+    norm_key = "charlotte::2015"
+    charlotte_hash = hashlib.sha256(norm_key.encode("utf-8")).hexdigest()[:16]
+    charlotte_anilist = cache_anilist / f"{charlotte_hash}.json"
+    charlotte_anilist.write_text('{"idMal": 28999}', encoding="utf-8")
+    charlotte_jikan = cache_jikan / "28999_episodes.json"
+    charlotte_jikan.write_text('[{"number": 1, "synopsis": "Old"}]', encoding="utf-8")
+
+    series_dir = tmp_path / "Charlotte (2015)"
+    series_dir.mkdir()
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(f'[general]\ndata_dir = "{data_dir}"\n', encoding="utf-8")
+
+    result = runner.invoke(app, ["--config", str(cfg_file), "memory", str(series_dir), "--refresh"])
+    assert result.exit_code == 0
+    assert "atualizados com sucesso" in result.output.lower()
+
+    # Verifica que o cache da outra série permanece intacto
+    assert other_anilist.exists()
+    assert other_jikan.exists()
+
+
 def test_memory_command_import_compound_yaml(tmp_path: Path):
     series_dir = tmp_path / "Charlotte (2015)"
     series_dir.mkdir()
@@ -209,6 +264,7 @@ def test_memory_command_refresh_with_override_id(tmp_path: Path, monkeypatch):
             nonlocal called_with_id
             called_with_id = anilist_id
             from translaterany.memory.anilist import AniListMatch
+
             return AniListMatch(anilist_id=anilist_id, title="Overridden Anime", romaji="Overridden")
 
         def search_anime(self, title: str, year: int | None = None):
@@ -264,6 +320,7 @@ def test_memory_command_refresh_preserves_existing_synopsis(tmp_path: Path, monk
 
         def search_anime(self, title: str, year: int | None = None):
             from translaterany.memory.anilist import AniListMatch
+
             return AniListMatch(anilist_id=20954, title="Charlotte", romaji="Charlotte")
 
     monkeypatch.setattr("translaterany.memory.anilist.AniListClient", MockAniListClient)
@@ -277,3 +334,29 @@ def test_memory_command_refresh_preserves_existing_synopsis(tmp_path: Path, monk
     reloaded_story = mem_store.load_story()
     assert reloaded_story is not None
     assert reloaded_story.synopsis == "Sinopse existente de teste."
+
+
+def test_memory_command_refresh_with_override_id_not_found_does_not_fallback(tmp_path: Path, monkeypatch):
+    class MockAniListClient:
+        def __init__(self, cache_dir):
+            pass
+
+        def get_anime_by_id(self, anilist_id: int):
+            return None
+
+        def search_anime(self, title: str, year: int | None = None):
+            raise AssertionError("search_anime não deveria ser chamado quando override_id está configurado!")
+
+    monkeypatch.setattr("translaterany.memory.anilist.AniListClient", MockAniListClient)
+
+    series_dir = tmp_path / "Charlotte (2015)"
+    series_dir.mkdir()
+    (series_dir / "series.toml").write_text("[metadata]\nanilist_id = 12345\n", encoding="utf-8")
+
+    data_dir = tmp_path / "data"
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(f'[general]\ndata_dir = "{data_dir}"\n', encoding="utf-8")
+
+    result = runner.invoke(app, ["--config", str(cfg_file), "memory", str(series_dir), "--refresh"])
+    assert result.exit_code == 0
+    assert "nenhum metadado encontrado" in result.output.lower()

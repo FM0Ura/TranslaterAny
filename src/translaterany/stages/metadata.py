@@ -71,13 +71,18 @@ class MetadataStage(Stage):
         override_id: int | None = getattr(metadata_cfg, "anilist_id", None)
 
         match = None
-        if override_id is not None and hasattr(self.anilist_client, "get_anime_by_id"):
-            try:
-                match = self.anilist_client.get_anime_by_id(override_id)
-            except Exception as exc:
-                logger.warning("Falha ao buscar AniList por ID %s: %s", override_id, exc)
-
-        if match is None and self.anilist_client is not None:
+        if override_id is not None:
+            if hasattr(self.anilist_client, "get_anime_by_id"):
+                try:
+                    match = self.anilist_client.get_anime_by_id(override_id)
+                except Exception as exc:
+                    logger.warning("Falha ao buscar AniList por ID %s: %s", override_id, exc)
+            if match is None:
+                logger.warning(
+                    "AniList não encontrou anime para o override_id=%s; busca por título omitida.",
+                    override_id,
+                )
+        elif self.anilist_client is not None:
             try:
                 match = self.anilist_client.search_anime(title, year)
             except Exception as exc:

@@ -129,15 +129,16 @@ Regras validadas:
 ```python
 @dataclass(frozen=True)
 class Series:
-    key: str            # slug estável
-    name: str           # nome da pasta
-    root: Path          # caminho absoluto da pasta
+    key: str  # slug estável
+    name: str  # nome da pasta
+    root: Path  # caminho absoluto da pasta
+
 
 @dataclass(frozen=True)
 class Episode:
     series: Series
-    key: str            # M0: caminho relativo slugificado; M1: "S01E04"
-    source: Path        # caminho absoluto do .mkv
+    key: str  # M0: caminho relativo slugificado; M1: "S01E04"
+    source: Path  # caminho absoluto do .mkv
 ```
 
 **Slug** (`util.fs.slugify`): minúsculas, qualquer sequência de caracteres não alfanuméricos Unicode → `-`, sem hífens nas pontas, mais sufixo de 6 caracteres do SHA-256 do nome original para evitar colisão (ex.: `High School D×D (2012)` → `high-school-d-d-2012-1a2b3c`). Unicode no caminho de origem é preservado em `root`/`source`; o slug é só para o diretório de dados.
@@ -151,12 +152,13 @@ class StageScope(StrEnum):
     EPISODE = "episode"
     SERIES = "series"
 
+
 class Stage(ABC):
-    name: ClassVar[str]                 # identificador único (config, artefatos, manifest)
-    version: ClassVar[str]              # mudar = invalidar cache (lógica ou prompt mudou)
+    name: ClassVar[str]  # identificador único (config, artefatos, manifest)
+    version: ClassVar[str]  # mudar = invalidar cache (lógica ou prompt mudou)
     scope: ClassVar[StageScope]
-    inputs: ClassVar[tuple[str, ...]] = ()   # etapas cujos artefatos esta lê
-    reads_source: ClassVar[bool] = False     # lê o arquivo de origem diretamente (entra no hash); só em escopo episode
+    inputs: ClassVar[tuple[str, ...]] = ()  # etapas cujos artefatos esta lê
+    reads_source: ClassVar[bool] = False  # lê o arquivo de origem diretamente (entra no hash); só em escopo episode
     Options: ClassVar[type[BaseModel]] = NoOptions
 
     def __init__(self, options: BaseModel) -> None: ...
@@ -166,17 +168,17 @@ class Stage(ABC):
         """Lê entradas via ctx, grava exatamente um artefato via ctx.output."""
 
     def doctor_checks(self) -> list[Check]:
-        return []                       # etapas contribuem com verificações próprias
+        return []  # etapas contribuem com verificações próprias
 ```
 
 ```python
 @dataclass
 class StageContext:
     series: Series
-    episode: Episode | None             # None quando scope == SERIES
-    episodes: list[Episode]             # todos os episódios da série (útil para etapas de série)
-    inputs: InputReader                 # leitura de artefatos das etapas declaradas em `inputs`
-    output: OutputWriter                # gravação do artefato desta etapa
+    episode: Episode | None  # None quando scope == SERIES
+    episodes: list[Episode]  # todos os episódios da série (útil para etapas de série)
+    inputs: InputReader  # leitura de artefatos das etapas declaradas em `inputs`
+    output: OutputWriter  # gravação do artefato desta etapa
     llm: LLMClient
     log: logging.Logger
 ```
@@ -319,20 +321,23 @@ class Usage:
     output_tokens: int = 0
     cached_input_tokens: int = 0
 
+
 @dataclass(frozen=True)
 class LLMRequest[T: BaseModel]:
-    model: str                      # apelido de modelo (resolvido no M2)
-    instructions: str               # prefixo fixo (cacheável)
-    prompt: str                     # parte variável
+    model: str  # apelido de modelo (resolvido no M2)
+    instructions: str  # prefixo fixo (cacheável)
+    prompt: str  # parte variável
     output_type: type[T]
     temperature: float | None = None
-    tag: str = ""                   # rótulo livre para logs/métricas (ex.: nome da etapa)
+    tag: str = ""  # rótulo livre para logs/métricas (ex.: nome da etapa)
+
 
 @dataclass(frozen=True)
 class LLMResponse[T: BaseModel]:
     output: T
-    model_id: str                   # modelo efetivamente usado
+    model_id: str  # modelo efetivamente usado
     usage: Usage = field(default_factory=Usage)
+
 
 class LLMClient(Protocol):
     def generate[T: BaseModel](self, request: LLMRequest[T]) -> LLMResponse[T]: ...
@@ -369,8 +374,10 @@ class CheckResult:
     status: Literal["ok", "warn", "fail"]
     message: str
 
+
 class Check(Protocol):
     name: str
+
     def run(self) -> CheckResult: ...
 ```
 

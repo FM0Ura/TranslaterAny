@@ -188,12 +188,82 @@ def test_metadata_stage_cache_payload(tmp_path: Path) -> None:
     series_without_override = Series(name="Charlotte", path=tmp_path)
     assert stage.cache_payload(series_without_override, None) == {"anilist_id": None}
 
+    series_explicit_none = Series(name="Charlotte", path=tmp_path, config=None)
+    assert stage.cache_payload(series_explicit_none, None) == {"anilist_id": None}
+
     series_with_override = Series(
         name="Charlotte",
         path=tmp_path,
         config=SeriesConfig(metadata=SeriesMetadataConfig(anilist_id=20954)),
     )
     assert stage.cache_payload(series_with_override, None) == {"anilist_id": 20954}
+
+
+def test_metadata_stage_with_override_id_failure_does_not_fallback(tmp_path: Path) -> None:
+    captured: MetadataArtifact | None = None
+
+    class MockOutput:
+        def json(self, obj: MetadataArtifact) -> None:
+            nonlocal captured
+            captured = obj
+
+    class MockAniList:
+        def __init__(self) -> None:
+            self.get_by_id_called_with = None
+
+        def get_anime_by_id(self, anilist_id: int) -> AniListMatch | None:
+            self.get_by_id_called_with = anilist_id
+            return None
+
+        def search_anime(self, title: str, year: int | None) -> AniListMatch | None:
+            raise AssertionError("search_anime não deve ser chamado como fallback quando há override_id")
+
+    mock_anilist = MockAniList()
+    stage = MetadataStage(anilist_client=mock_anilist, jikan_client=None)
+    config = SeriesConfig(metadata=SeriesMetadataConfig(anilist_id=999999))
+    series = Series(name="Existing Title (2020)", path=tmp_path, config=config)
+    ctx = SimpleNamespace(
+        series=series,
+        episode=None,
+        output=MockOutput(),
+        inputs=SimpleNamespace(json=lambda *a: None),
+    )
+    stage.run(ctx)
+    assert mock_anilist.get_by_id_called_with == 999999
+    assert captured is not None
+    assert captured.matched is False
+    assert captured.anilist_id == 999999
+    assert captured.title == "Existing Title"
+
+
+def test_metadata_stage_with_override_id_exception_does_not_fallback(tmp_path: Path) -> None:
+    captured: MetadataArtifact | None = None
+
+    class MockOutput:
+        def json(self, obj: MetadataArtifact) -> None:
+            nonlocal captured
+            captured = obj
+
+    class MockAniList:
+        def get_anime_by_id(self, anilist_id: int) -> AniListMatch | None:
+            raise RuntimeError("API timeout")
+
+        def search_anime(self, title: str, year: int | None) -> AniListMatch | None:
+            raise AssertionError("search_anime não deve ser chamado quando override_id falha")
+
+    stage = MetadataStage(anilist_client=MockAniList(), jikan_client=None)
+    config = SeriesConfig(metadata=SeriesMetadataConfig(anilist_id=88888))
+    series = Series(name="Existing Title (2020)", path=tmp_path, config=config)
+    ctx = SimpleNamespace(
+        series=series,
+        episode=None,
+        output=MockOutput(),
+        inputs=SimpleNamespace(json=lambda *a: None),
+    )
+    stage.run(ctx)
+    assert captured is not None
+    assert captured.matched is False
+    assert captured.anilist_id == 88888
 
 
 def test_metadata_stage_offline_fallback(tmp_path: Path) -> None:

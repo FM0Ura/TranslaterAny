@@ -45,6 +45,10 @@ class JikanClient:
             resp.raise_for_status()
         return resp
 
+    def clear_cache(self, mal_id: int) -> None:
+        """Remove o arquivo de cache em disco para o mal_id especificado."""
+        (self.jikan_dir / f"{mal_id}_episodes.json").unlink(missing_ok=True)
+
     def get_episode_synopses(self, mal_id: int) -> dict[int, EpisodeSynopsis]:
         """Obtém sinopses de episódios do Jikan por mal_id com fallback para cache em disco."""
         cache_file = self.jikan_dir / f"{mal_id}_episodes.json"

@@ -23,6 +23,10 @@ def test_glossary_entry_content_hash():
     entry3 = GlossaryEntry(term="Plunder", translation="Pilhar", category=GlossaryCategory.TECHNIQUE)
     assert entry1.content_hash() != entry3.content_hash()
 
+    entry_pipe1 = GlossaryEntry(term="a|b", translation="c")
+    entry_pipe2 = GlossaryEntry(term="a", translation="b|c")
+    assert entry_pipe1.content_hash() != entry_pipe2.content_hash()
+
 
 def test_character_entry_defaults():
     char = CharacterEntry(name="Yuu Otosaka", gender=Gender.MALE, role=CharacterRole.MAIN)

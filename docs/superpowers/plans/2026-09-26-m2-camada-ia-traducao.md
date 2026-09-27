@@ -91,6 +91,7 @@ from pydantic import ValidationError
 from translaterany.config.loader import load_config_from_str
 from translaterany.config.model import AppConfig, LLMConfig
 
+
 def test_default_llm_config_is_local_with_ollama():
     config = load_config_from_str("")
     assert config.llm.profile == "local"
@@ -101,6 +102,7 @@ def test_default_llm_config_is_local_with_ollama():
     assert config.llm.models["translategemma"].num_ctx == 4096
     assert config.llm.profiles["local"].translate == "translategemma"
     assert config.llm.profiles["local"].review == "gemma4"
+
 
 def test_custom_llm_config_toml():
     toml_text = """
@@ -134,6 +136,7 @@ def test_custom_llm_config_toml():
     assert config.llm.providers["gemini"].api_key == "test-key"
     assert config.llm.profiles["hibrido"].review == "gemini_flash"
 
+
 def test_portuguese_validation_error_message():
     invalid_toml = """
     [llm]
@@ -146,6 +149,7 @@ def test_portuguese_validation_error_message():
 ```python
 # tests/test_bazarr_subtitles.py
 from translaterany.library.discovery import is_bazarr_auxiliary_subtitle
+
 
 def test_bazarr_auxiliary_subtitles():
     assert is_bazarr_auxiliary_subtitle("anime.S01E01.pt-BR.hi.srt") is True
@@ -170,12 +174,15 @@ from pathlib import Path
 from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
 
 class ProviderConfig(_Strict):
     base_url: str | None = None
     api_key: str | None = None
+
 
 class ModelConfig(_Strict):
     provider: str
@@ -183,10 +190,12 @@ class ModelConfig(_Strict):
     num_ctx: int = 4096
     temperature: float = 0.3
 
+
 class ProfileConfig(_Strict):
     translate: str = "translategemma"
     review: str = "gemma4"
     options: dict[str, Any] = Field(default_factory=dict)
+
 
 class LLMConfig(_Strict):
     profile: Literal["local", "hibrido", "nuvem"] = "local"
@@ -212,19 +221,24 @@ class LLMConfig(_Strict):
         }
     )
 
+
 class GeneralConfig(_Strict):
     data_dir: Path | None = None
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
+
 class DiscoveryConfig(_Strict):
     min_file_age: float = 120
+
 
 class PipelineConfig(_Strict):
     stages: list[str]
 
+
 class StageConfig(_Strict):
     enabled: bool | None = None
     options: dict[str, Any] = Field(default_factory=dict)
+
 
 class AppConfig(_Strict):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
@@ -272,12 +286,15 @@ from translaterany.config.model import LLMConfig
 from translaterany.llm.client import LLMRequest, LLMResponse, LLMTransientError, LLMRefusalError
 from translaterany.llm.pydantic_ai_client import PydanticAIClient
 
+
 class ItemOut(BaseModel):
     id: str
     text: str
 
+
 class BatchOut(BaseModel):
     items: list[ItemOut]
+
 
 def test_pydantic_ai_client_resolution_and_generation(monkeypatch):
     config = LLMConfig()
@@ -287,11 +304,14 @@ def test_pydantic_ai_client_resolution_and_generation(monkeypatch):
     async def mock_run(*args, **kwargs):
         class MockRunResult:
             data = BatchOut(items=[ItemOut(id="1", text="Olá mundo")])
+
             def usage(self):
                 class MockUsage:
                     request_tokens = 10
                     response_tokens = 5
+
                 return MockUsage()
+
         return MockRunResult()
 
     monkeypatch.setattr("pydantic_ai.Agent.run", mock_run)
@@ -308,12 +328,14 @@ def test_pydantic_ai_client_resolution_and_generation(monkeypatch):
     assert res.output.items[0].text == "Olá mundo"
     assert res.usage.input_tokens > 0
 
+
 def test_pydantic_ai_client_maps_connection_error(monkeypatch):
     config = LLMConfig()
     client = PydanticAIClient(config)
 
     async def mock_run_fail(*args, **kwargs):
         import httpx
+
         raise httpx.ConnectError("Connection refused")
 
     monkeypatch.setattr("pydantic_ai.Agent.run", mock_run_fail)
@@ -355,6 +377,7 @@ from translaterany.llm.client import (
     LLMTransientError,
     Usage,
 )
+
 
 class PydanticAIClient(LLMClient):
     def __init__(self, config: LLMConfig):
@@ -452,6 +475,7 @@ git commit -m "feat(llm): implementação de PydanticAIClient com suporte a Olla
 # tests/test_chunking.py
 from translaterany.subtitles.chunking import DialogueLine, create_dialogue_batches
 
+
 def test_chunking_creates_batches_with_sliding_context():
     lines = [DialogueLine(id=str(i), text=f"Line number {i} with some english content.") for i in range(1, 61)]
     # Com teto baixo de tokens, deve gerar múltiplos blocos
@@ -466,9 +490,11 @@ def test_chunking_creates_batches_with_sliding_context():
     assert len(batches[1].context) > 0
     assert batches[1].context[-1].text == batches[0].lines[-1].text
 
+
 def test_prompt_formatting():
     from translaterany.subtitles.chunking import format_batch_prompt
     from translaterany.subtitles.chunking import ContextLine
+
     batch_lines = [DialogueLine(id="1", text="Hello"), DialogueLine(id="2", text="World")]
     context = [ContextLine(text="Previous statement")]
     prompt = format_batch_prompt(batch_lines, context)
@@ -491,21 +517,26 @@ Criar `src/translaterany/subtitles/chunking.py`:
 from dataclasses import dataclass
 from pydantic import BaseModel
 
+
 class DialogueLine(BaseModel):
     id: str
     text: str
 
+
 class ContextLine(BaseModel):
     text: str
+
 
 @dataclass(frozen=True)
 class DialogueBatch:
     lines: list[DialogueLine]
     context: list[ContextLine]
 
+
 def estimate_tokens(text: str) -> int:
     """Estimativa rápida de tokens (~4 caracteres por token)."""
     return max(1, len(text) // 4)
+
 
 def create_dialogue_batches(
     lines: list[DialogueLine],
@@ -533,6 +564,7 @@ def create_dialogue_batches(
         batches.append(DialogueBatch(lines=current_lines, context=list(recent_history[-max_context_lines:])))
 
     return batches
+
 
 def format_batch_prompt(lines: list[DialogueLine], context: list[ContextLine]) -> str:
     sections: list[str] = []
@@ -582,6 +614,7 @@ from translaterany.llm.client import LLMClient, LLMRequest, LLMResponse, LLMTran
 from translaterany.subtitles.chunking import DialogueLine
 from translaterany.subtitles.translator import DialogueBatchTranslator, TranslationBatch, TranslationItem
 
+
 class MockLLM(LLMClient):
     def __init__(self, behavior_fn):
         self.behavior_fn = behavior_fn
@@ -590,6 +623,7 @@ class MockLLM(LLMClient):
     def generate(self, request):
         self.calls += 1
         return self.behavior_fn(self.calls, request)
+
 
 def test_translator_reconciles_missing_ids():
     # Primeira chamada devolve apenas ID '1', faltando o '2'. Segunda chamada devolve '2'.
@@ -605,6 +639,7 @@ def test_translator_reconciles_missing_ids():
     assert res == {"1": "Olá", "2": "Mundo"}
     assert client.calls == 2
 
+
 def test_translator_bisection_on_malformed_json():
     # Falha se o bloco tiver tamanho > 1; passa quando dividido em blocos de 1 fala
     def behavior(call_count, req):
@@ -619,6 +654,7 @@ def test_translator_bisection_on_malformed_json():
     lines = [DialogueLine(id="1", text="Hello"), DialogueLine(id="2", text="World")]
     res = translator.translate_lines(lines)
     assert res == {"1": "Olá", "2": "Mundo"}
+
 
 def test_translator_graceful_degradation_to_original_text():
     # Simula falha irrecuperável em todas as tentativas
@@ -670,12 +706,15 @@ Mantenha rigorosamente o significado pretendido, pontuação expressiva (... ! ?
 Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as falas identificadas por seus IDs.
 NÃO traduza as falas marcadas como contexto."""
 
+
 class TranslationItem(BaseModel):
     id: str
     text: str
 
+
 class TranslationBatch(BaseModel):
     items: list[TranslationItem] = Field(default_factory=list)
+
 
 class DialogueBatchTranslator:
     def __init__(
@@ -760,7 +799,9 @@ class DialogueBatchTranslator:
             else:
                 # Nível 4: Degradação graciosa
                 failed_line = lines[0]
-                logger.warning("Falha ao traduzir fala id=%s ('%s'). Mantendo original.", failed_line.id, failed_line.text)
+                logger.warning(
+                    "Falha ao traduzir fala id=%s ('%s'). Mantendo original.", failed_line.id, failed_line.text
+                )
                 self.fallback_count += 1
                 return {failed_line.id: failed_line.text}
 
@@ -781,7 +822,7 @@ class DialogueBatchTranslator:
             for line in batch.lines:
                 recent_context.append(ContextLine(text=batch_result.get(line.id, line.text)))
             if len(recent_context) > self.max_context_lines:
-                recent_context = recent_context[-self.max_context_lines:]
+                recent_context = recent_context[-self.max_context_lines :]
 
         return all_translations
 ```
@@ -821,6 +862,7 @@ from translaterany.llm.fake import FakeLLM
 from translaterany.stages.translate_dialogue import StageTranslateDialogue
 from translaterany.subtitles.classify import ClassifiedUnit, ClassifiedUnitCollection
 
+
 def test_translate_dialogue_preserves_inline_tags(tmp_path):
     # Unidade com tags de formatação ASS
     unit = ClassifiedUnit(
@@ -835,11 +877,11 @@ def test_translate_dialogue_preserves_inline_tags(tmp_path):
         style="Default",
     )
     collection = ClassifiedUnitCollection(units=[unit])
-    
+
     # FakeLLM devolvendo tradução simples
     fake_llm = FakeLLM(responses={"Hello world!": "Olá mundo!"})
     stage = StageTranslateDialogue(client=fake_llm)
-    
+
     translated_collection = stage.translate_collection(collection)
     res_unit = translated_collection.units[0]
     assert res_unit.clean_text == "Olá mundo!"
@@ -864,6 +906,7 @@ from translaterany.llm.client import LLMClient
 from translaterany.subtitles.chunking import DialogueLine
 from translaterany.subtitles.translator import DialogueBatchTranslator
 from translaterany.subtitles.classify import ClassifiedUnit, ClassifiedUnitCollection
+
 
 class StageTranslateDialogue(Stage):
     name: ClassVar[str] = "translate_dialogue"
@@ -943,22 +986,29 @@ git commit -m "feat(stages): etapa translate_dialogue integrada ao pipeline e gr
 # tests/test_doctor_llm.py
 from translaterany.util.doctor import check_ollama_status
 
+
 def test_check_ollama_status_offline(monkeypatch):
     import httpx
+
     def mock_get(*args, **kwargs):
         raise httpx.ConnectError("Offline")
+
     monkeypatch.setattr(httpx, "get", mock_get)
 
     ok, msg = check_ollama_status("http://localhost:11434")
     assert ok is False
     assert "não está acessível" in msg
 
+
 def test_check_ollama_status_ok(monkeypatch):
     import httpx
+
     class MockResp:
         status_code = 200
+
         def json(self):
             return {"models": [{"name": "translategemma:12b"}, {"name": "gemma4:12b"}]}
+
     monkeypatch.setattr(httpx, "get", lambda *a, **kw: MockResp())
 
     ok, msg = check_ollama_status("http://localhost:11434")
@@ -972,6 +1022,7 @@ from typer.testing import CliRunner
 from translaterany.cli.app import app
 
 runner = CliRunner()
+
 
 def test_estimate_command_dry_run():
     result = runner.invoke(app, ["estimate", "--help"])
@@ -1024,6 +1075,7 @@ from translaterany.config.loader import load_config_from_str
 from translaterany.llm.fake import FakeLLM
 from translaterany.pipeline.runner import PipelineRunner
 from tests.mkvtools import create_synthetic_mkv
+
 
 def test_m2_pipeline_end_to_end(tmp_path):
     video_path = tmp_path / "Season 1" / "Anime S01E01.mkv"

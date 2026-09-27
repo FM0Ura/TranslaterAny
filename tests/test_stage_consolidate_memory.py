@@ -200,3 +200,72 @@ def test_consolidate_memory_multiple_episodes_and_new_characters(tmp_path: Path)
     assert len(glossary) == 2
     assert "Plunder" in glossary
     assert "Collapse" in glossary
+
+
+def test_consolidate_memory_ignores_short_tokens_and_honorifics(tmp_path: Path) -> None:
+    from translaterany.memory.store import MemoryStore
+
+    series = Series(name="Dr. Stone (2019)", path=tmp_path)
+    store = ArtifactStore(tmp_path / "data")
+
+    meta = MetadataArtifact(
+        matched=True,
+        anilist_id=105333,
+        title="Dr. Stone",
+        characters=[CharacterEntry(name="Senku Ishigami", gender=Gender.MALE)],
+    )
+    # Menções:
+    # - "Ishigami": token válido (> 2 chars, não honorífico) -> deve ser adicionado aos aliases de Senku
+    # - "san": honorífico comum -> NÃO deve ser adicionado aos aliases e NÃO deve virar novo personagem
+    # - "yo": token curto (<= 2 chars) -> NÃO deve virar novo personagem
+    # - "kun": honorífico -> NÃO deve virar novo personagem
+    # - "Taiju Oki": personagem novo válido -> deve ser registrado
+    ep1 = ExtractTermsArtifact(
+        episode_key="S01E01",
+        terms=[],
+        character_mentions=["Ishigami", "san", "yo", "kun", "Taiju Oki"],
+    )
+
+    class MockOutput:
+        def json(self, obj: ConsolidatedMemoryArtifact) -> None:
+            pass
+
+    class MockInputs:
+        def json(self, name: str, model: type) -> object:
+            if name == "metadata":
+                return meta
+            raise ValueError(name)
+
+        def json_all(self, name: str, model: type) -> dict[str, ExtractTermsArtifact]:
+            if name == "extract_terms":
+                return {"S01E01": ep1}
+            raise ValueError(name)
+
+    stage = ConsolidateMemoryStage()
+    ctx = SimpleNamespace(
+        series=series,
+        episode=None,
+        inputs=MockInputs(),
+        output=MockOutput(),
+        store=store,
+        llm=None,
+    )
+    stage.run(ctx)
+
+    mem_store = MemoryStore(store.series_dir(series.key) / "memory")
+    chars = mem_store.load_characters()
+
+    char_names = {c.name for c in chars}
+    assert "Senku Ishigami" in char_names
+    assert "Taiju Oki" in char_names
+    # "san", "yo", "kun" não devem virar personagens
+    assert "san" not in char_names
+    assert "yo" not in char_names
+    assert "kun" not in char_names
+
+    # Senku deve ter recebido "Ishigami" como alias, mas não os honoríficos/curtos
+    senku = next(c for c in chars if c.name == "Senku Ishigami")
+    assert "Ishigami" in senku.aliases
+    assert "san" not in senku.aliases
+    assert "yo" not in senku.aliases
+    assert "kun" not in senku.aliases

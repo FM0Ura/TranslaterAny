@@ -83,15 +83,18 @@ Arquivos gerados:
 from enum import StrEnum
 from pydantic import BaseModel, Field
 
+
 class EntrySource(StrEnum):
     USER = "user"
     METADATA = "metadata"
     EXTRACTED = "extracted"
 
+
 class CharacterRole(StrEnum):
     MAIN = "main"
     SUPPORTING = "supporting"
     BACKGROUND = "background"
+
 
 class Gender(StrEnum):
     MALE = "male"
@@ -99,29 +102,32 @@ class Gender(StrEnum):
     NEUTRAL = "neutral"
     UNKNOWN = "unknown"
 
+
 class CharacterEntry(BaseModel):
-    name: str                           # Nome ocidental/romanizado (ex: "Yuu Otosaka")
-    native_name: str | None = None      # Nome original (ex: "乙坂 有宇")
-    aliases: list[str] = Field(default_factory=list) # Apelidos (ex: ["Yuu", "Grim Reaper"])
-    gender: Gender = Gender.UNKNOWN     # Gênero (AniList define com precisão)
+    name: str  # Nome ocidental/romanizado (ex: "Yuu Otosaka")
+    native_name: str | None = None  # Nome original (ex: "乙坂 有宇")
+    aliases: list[str] = Field(default_factory=list)  # Apelidos (ex: ["Yuu", "Grim Reaper"])
+    gender: Gender = Gender.UNKNOWN  # Gênero (AniList define com precisão)
     role: CharacterRole = CharacterRole.SUPPORTING
-    speech_style: str | None = None     # Ex: "sarcástico, informal, autoconfiante"
+    speech_style: str | None = None  # Ex: "sarcástico, informal, autoconfiante"
     notes: str | None = None
     source: EntrySource = EntrySource.EXTRACTED
 
+
 class GlossaryCategory(StrEnum):
-    NAME = "name"           # Nomes de pessoas / entidades
-    PLACE = "place"         # Cidades, escolas, reinos
-    TECHNIQUE = "technique" # Golpes, habilidades, magias (ex: "Plunder", "Time Leap")
-    OBJECT = "object"       # Itens específicos, artefatos
-    ORGANIZATION = "org"    # Escolas, conselhos, facções
-    GENERAL = "general"     # Gírias, conceitos do universo
+    NAME = "name"  # Nomes de pessoas / entidades
+    PLACE = "place"  # Cidades, escolas, reinos
+    TECHNIQUE = "technique"  # Golpes, habilidades, magias (ex: "Plunder", "Time Leap")
+    OBJECT = "object"  # Itens específicos, artefatos
+    ORGANIZATION = "org"  # Escolas, conselhos, facções
+    GENERAL = "general"  # Gírias, conceitos do universo
+
 
 class GlossaryEntry(BaseModel):
-    term: str                           # Termo original em EN/JA (ex: "Hoshinoumi Academy")
-    translation: str                    # Tradução oficial em PT-BR (ex: "Academia Hoshinoumi")
+    term: str  # Termo original em EN/JA (ex: "Hoshinoumi Academy")
+    translation: str  # Tradução oficial em PT-BR (ex: "Academia Hoshinoumi")
     category: GlossaryCategory = GlossaryCategory.GENERAL
-    keep_original: bool = False         # Se True, não traduz (ex: nomes de golpes em inglês)
+    keep_original: bool = False  # Se True, não traduz (ex: nomes de golpes em inglês)
     aliases: list[str] = Field(default_factory=list)
     notes: str | None = None
     source: EntrySource = EntrySource.EXTRACTED
@@ -129,14 +135,17 @@ class GlossaryEntry(BaseModel):
     def content_hash(self) -> str:
         """Hash do conteúdo relevante da entrada para detecção de staleness."""
         import hashlib
+
         data = f"{self.term}|{self.translation}|{self.category}|{self.keep_original}|{','.join(sorted(self.aliases))}"
         return hashlib.sha256(data.encode("utf-8")).hexdigest()[:12]
 
+
 class EpisodeSynopsis(BaseModel):
-    episode_key: str                    # Chave canônica do episódio (ex: "S01E01")
-    number: int                         # Número sequencial absoluto ou da temporada
+    episode_key: str  # Chave canônica do episódio (ex: "S01E01")
+    number: int  # Número sequencial absoluto ou da temporada
     title: str | None = None
     synopsis: str = ""
+
 
 class StoryMemory(BaseModel):
     title: str
@@ -146,7 +155,7 @@ class StoryMemory(BaseModel):
     synopsis: str = ""
     genres: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
-    episodes: dict[str, EpisodeSynopsis] = Field(default_factory=dict) # Indexado por ep.key
+    episodes: dict[str, EpisodeSynopsis] = Field(default_factory=dict)  # Indexado por ep.key
 ```
 
 ### 5.3 Artefatos de Pipeline
@@ -156,6 +165,7 @@ class StoryMemory(BaseModel):
 from pydantic import BaseModel, Field
 from translaterany.memory.models import CharacterEntry, GlossaryEntry, StoryMemory
 
+
 class MetadataArtifact(BaseModel):
     matched: bool
     anilist_id: int | None = None
@@ -164,10 +174,12 @@ class MetadataArtifact(BaseModel):
     characters: list[CharacterEntry] = Field(default_factory=list)
     story: StoryMemory | None = None
 
+
 class ExtractTermsArtifact(BaseModel):
     episode_key: str
     terms: list[GlossaryEntry] = Field(default_factory=list)
     character_mentions: list[str] = Field(default_factory=list)
+
 
 class ConsolidatedMemoryArtifact(BaseModel):
     series_name: str
@@ -189,18 +201,18 @@ A tupla completa do pipeline padrão em `src/translaterany/stages/__init__.py` p
 
 ```python
 DEFAULT_PIPELINE: tuple[str, ...] = (
-    "inventory",            # episode: valida integridade e descobre faixas do arquivo
-    "metadata",             # series: busca AniList + Jikan e gera metadata.json
-    "select_track",         # episode: escolhe a faixa de legenda EN
-    "extract",              # episode: extrai o .ass original do MKV
-    "normalize",            # episode: separa tags inline e gera NormalizedDoc
-    "classify",             # episode: classifica dialogue/sign/song
-    "extract_terms",        # episode: extrai termos candidatos com IA
-    "consolidate_memory",   # series: reduce das extrações e consolidação dos YAMLs
-    "translate_dialogue",   # episode: traduz diálogos com glossário e personagens
-    "write",                # episode: reconstitui ASS e injeta ; TranslaterAny
-    "publish",              # episode: publica <video>.pt-BR.ass
-    "remux",                # episode: opcional (desabilitado por padrão)
+    "inventory",  # episode: valida integridade e descobre faixas do arquivo
+    "metadata",  # series: busca AniList + Jikan e gera metadata.json
+    "select_track",  # episode: escolhe a faixa de legenda EN
+    "extract",  # episode: extrai o .ass original do MKV
+    "normalize",  # episode: separa tags inline e gera NormalizedDoc
+    "classify",  # episode: classifica dialogue/sign/song
+    "extract_terms",  # episode: extrai termos candidatos com IA
+    "consolidate_memory",  # series: reduce das extrações e consolidação dos YAMLs
+    "translate_dialogue",  # episode: traduz diálogos com glossário e personagens
+    "write",  # episode: reconstitui ASS e injeta ; TranslaterAny
+    "publish",  # episode: publica <video>.pt-BR.ass
+    "remux",  # episode: opcional (desabilitado por padrão)
 )
 ```
 

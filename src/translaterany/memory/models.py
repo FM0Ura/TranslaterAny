@@ -1,6 +1,7 @@
 """Modelos de dados para memória da série (personagens, glossário e história)."""
 
 import hashlib
+import json
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
@@ -56,7 +57,14 @@ class GlossaryEntry(BaseModel):
 
     def content_hash(self) -> str:
         """Hash do conteúdo relevante da entrada para detecção de staleness."""
-        data = f"{self.term}|{self.translation}|{self.category}|{self.keep_original}|{','.join(sorted(self.aliases))}"
+        payload = {
+            "aliases": sorted(self.aliases),
+            "category": str(self.category),
+            "keep_original": self.keep_original,
+            "term": self.term,
+            "translation": self.translation,
+        }
+        data = json.dumps(payload, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(data.encode("utf-8")).hexdigest()[:12]
 
 

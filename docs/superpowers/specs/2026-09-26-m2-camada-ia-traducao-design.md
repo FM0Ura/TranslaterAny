@@ -139,12 +139,15 @@ class DialogueLine(BaseModel):
     id: str
     text: str
 
+
 class ContextLine(BaseModel):
     text: str
+
 
 class TranslationItem(BaseModel):
     id: str
     text: str
+
 
 class TranslationBatch(BaseModel):
     items: list[TranslationItem]

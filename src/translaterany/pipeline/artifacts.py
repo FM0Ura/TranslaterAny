@@ -27,11 +27,7 @@ class ArtifactStore:
                 p
                 for p in (self.data_dir / "series").iterdir()
                 if p.is_dir()
-                and (
-                    p.name.startswith(f"{series_key}-")
-                    or series_key.startswith(f"{p.name}-")
-                    or p.name == series_key
-                )
+                and (p.name.startswith(f"{series_key}-") or series_key.startswith(f"{p.name}-") or p.name == series_key)
             ]
             if len(candidates) == 1:
                 return candidates[0]

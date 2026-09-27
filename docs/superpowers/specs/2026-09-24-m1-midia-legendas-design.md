@@ -143,10 +143,10 @@ Lê `mkvmerge -J` do MKV. Ferramentas externas rodam com `LC_ALL=C.UTF-8` e saí
 ```python
 @dataclass(frozen=True)
 class AssEvent:
-    index: int          # ordem entre os eventos
-    line_no: int        # linha no arquivo (0-based)
+    index: int  # ordem entre os eventos
+    line_no: int  # linha no arquivo (0-based)
     kind: Literal["dialogue", "comment"]
-    fields: dict[str, str]   # colunas do Format, exceto Text (Layer, Start, End, Style, Name, ...)
+    fields: dict[str, str]  # colunas do Format, exceto Text (Layer, Start, End, Style, Name, ...)
     text: str
 ```
 `AssDocument` guarda as linhas originais (com terminadores), os eventos e metadados (`bom`, `newline`, `format`).
