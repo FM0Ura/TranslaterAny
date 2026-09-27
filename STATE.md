@@ -9,9 +9,9 @@
 
 ## Onde estamos
 
-- **Fase:** M3 concluído com sucesso e integrado ao master.
-- **Marco atual:** **M3 — Memória da série** — concluído (✅), suíte completa com 374 testes automatizados passando.
-- **Próxima ação:** elaboração da spec e planejamento do **M4 — Tradução contextual**.
+- **Fase:** M4 concluído com sucesso e integrado ao master.
+- **Marco atual:** **M4 — Tradução contextual** — concluído (✅), suíte completa com 396 testes automatizados passando.
+- **Próxima ação:** elaboração da spec e planejamento do **M5 — Verificações e métricas**.
 
 ## Progresso dos marcos
 
@@ -23,7 +23,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M1 — Mídia e legendas | ✅ | [spec](docs/superpowers/specs/2026-09-24-m1-midia-legendas-design.md) | [plano](docs/superpowers/plans/2026-09-24-m1-midia-legendas.md) | concluído (237 testes) |
 | M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
-| M4 — Tradução contextual | 📝 | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | — | spec em revisão |
+| M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
 | M5 — Verificações e métricas | ⬜ | — | — | |
 | M6 — Refinamento I | ⬜ | — | — | |
 | M7 — Refinamento II | ⬜ | — | — | |
@@ -74,6 +74,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-26 | M2 executado: 289 testes (+52 novos testes); camada LLM via `PydanticAIClient` (Ollama/OpenAI/Gemini), chunking semântico com overlap de contexto, preservação de marcadores inline (`⟦1⟧`), resiliência com fallback para texto original | |
 | 2026-09-26 | M2 CLI e Pipeline: comandos `doctor` (checagens de Ollama/GPU/modelos) e `estimate` (contagem de tokens e estimativa de custos) implementados; `run` integrado com `PydanticAIClient` para Ollama; pipeline E2E validado | |
 | 2026-09-26 | M3 executado: 364 testes (+75 novos testes); metadados canônicos via AniList/Jikan, etapas metadata, extract_terms e consolidate_memory integradas ao pipeline; persistência em YAML (characters, glossary, story) com precedência estrita (user > metadata > extracted); injeção de glossário por episódio e rastreamento de staleness com retry --stale; comando CLI memory e testes E2E | |
+| 2026-09-27 | M4 executado: 396 testes (+22 novos testes); memória de tradução (TM) da série com precedência user > auto, fusão e redistribuição inteligente de frases partidas consecutivas, análise de contexto de cena por IA, tradução especializada de placas e músicas (com preservação estrita de karaokê/romaji), tradução contextualizada de diálogos com políticas de honoríficos ('keep') e palavrões ('faithful') e fallback neutro de gênero quando a confiança for baixa; pipeline consolidado com redistribute_sentences gerando UnitTexts final para write | |
 
 ---
 
@@ -83,8 +84,8 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 |---|---|
 | Quais modelos locais concretos usar por etapa (famílias 7B–14B Q4 que cabem em 12 GB) | spec do M2 |
 | Obter chave de API Gemini e/ou OpenAI (opcional) | antes de testar perfis `hibrido`/`nuvem` (M2) |
-| Política global padrão de honoríficos (manter / adaptar / remover) | spec do M4 |
-| Nível padrão de palavrão | spec do M4 |
+| Política global padrão de honoríficos (manter / adaptar / remover) | decidida no M4 (`honorifics = "keep"`) |
+| Nível padrão de palavrão | decidida no M4 (`profanity = "faithful"`) |
 | **Casamento pasta/temporada → AniList** quando o `.nfo` só tem TVDB/TMDB: busca por título + ano + nº de eps, ou usar bases comunitárias de mapeamento (ex.: projetos Anime-Lists / Fribb, que ligam TVDB/TMDB ↔ AniDB/AniList/MAL) — avaliar | spec do M3 |
 | **Escopo da memória da série**: por pasta (show inteiro, todas as temporadas — glossário unificado) ou por temporada/entrada AniList? Metadados vêm por entrada AniList e precisam ser combinados | spec do M3 |
 | Modelos locais que **recusam conteúdo** (fan service) — critério na escolha dos modelos | spec do M2 |
@@ -137,6 +138,7 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Escrever o spec do **M4 — Tradução contextual** (tratamento e honoríficos, consistência de tom, diálogos entre múltiplos personagens, contextualização de falas ambíguas).
-2. Validação prática do pipeline do M3 em casos de teste reais com modelos locais.
+1. Escrever o spec do **M5 — Verificações e métricas** (checagens determinísticas de regras de legendagem: CPS, CPL, durações mín/máx, overlap de tempo, pontuação).
+2. Validação prática do pipeline do M4 em casos de teste reais com modelos locais.
+
 

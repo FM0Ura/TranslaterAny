@@ -142,8 +142,9 @@ def test_doctor_command_integration(monkeypatch, tmp_path):
     monkeypatch.setattr("translaterany.media.mkv.tool_available", lambda tool: f"/usr/bin/{tool}")
 
     stages = (
-        '["inventory", "metadata", "select_track", "extract", '
-        '"normalize", "classify", "extract_terms", "consolidate_memory", "translate_dialogue"]'
+        '["inventory", "metadata", "select_track", "extract", "normalize", "classify", '
+        '"extract_terms", "consolidate_memory", "translation_memory", "merge_sentences", '
+        '"scene_analysis", "translate_dialogue"]'
     )
     cfg_file = tmp_path / "config.toml"
     cfg_file.write_text(

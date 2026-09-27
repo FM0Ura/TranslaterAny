@@ -276,7 +276,7 @@ def test_pipeline_integration_translate_dialogue(data_dir: Path, synthetic_serie
     from translaterany.stages.extract import ExtractStage
     from translaterany.stages.normalize import NormalizeStage
     from translaterany.stages.select_track import SelectTrackStage
-    from translaterany.stages.write import WriteStage
+    from translaterany.stages.write import WriteOptions, WriteStage
 
     fake_llm = FakeLLM(
         responses={
@@ -290,7 +290,7 @@ def test_pipeline_integration_translate_dialogue(data_dir: Path, synthetic_serie
         NormalizeStage(),
         ClassifyStage(),
         StageTranslateDialogue(inputs=("normalize", "classify")),
-        WriteStage(),
+        WriteStage(WriteOptions(text_source="translate_dialogue")),
     ]
     store = ArtifactStore(data_dir)
     series, episodes = discover(synthetic_series)
