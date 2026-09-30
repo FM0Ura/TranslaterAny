@@ -26,9 +26,8 @@ from translaterany.checks.snapshots import (
 from translaterany.checks.text import plain
 from translaterany.config.model import AppConfig, ChecksConfig
 from translaterany.media.mkv import extract_attachments, font_attachments, probe
-from translaterany.memory.matching import select_for_text
+from translaterany.memory.matching import load_memory_for_text
 from translaterany.memory.models import CharacterEntry, GlossaryEntry
-from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.units import Episode, Series
@@ -146,14 +145,7 @@ class QualityChecksStage(Stage):
         ctx.output.json(metrics)
 
     def _memory(self, ctx: StageContext, text: str) -> tuple[list[GlossaryEntry], list[CharacterEntry]]:
-        store = ctx.store
-        if store is None:
-            return [], []
-        mem_dir = store.series_dir(ctx.series.key) / "memory"
-        if not mem_dir.exists():
-            return [], []
-        mem = MemoryStore(mem_dir)
-        return select_for_text(mem.load_glossary().values(), mem.load_characters(), text)
+        return load_memory_for_text(ctx.store, ctx.series.key, text)
 
     def _font_checks(self, ctx: StageContext, doc: NormalizedDoc, state: Mapping[str, str]) -> list[Finding]:
         assert ctx.episode is not None

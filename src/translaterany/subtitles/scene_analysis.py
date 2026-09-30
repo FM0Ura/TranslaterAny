@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from translaterany.memory.models import CharacterEntry
 from translaterany.subtitles.classify import Scene
 from translaterany.subtitles.merge import CompositeUnit, MergedUnitsDoc
+from translaterany.subtitles.scenes import group_by_scene, scene_index_of
 
 logger = logging.getLogger(__name__)
 
@@ -66,31 +67,17 @@ def analyze_scenes(
         for c in characters
     ]
     final_lines = dict(fallback_lines)
-    for group in _scene_groups(merged_doc, scenes, unit_events or {}, max_lines_per_call):
+    by_id = {u.composite_id: u for u in merged_doc.units}
+    members = {u.composite_id: list(u.unit_ids) for u in merged_doc.units}
+    ids = [u.composite_id for u in merged_doc.units]
+    scene_of = scene_index_of(ids, members, unit_events or {}, scenes)
+    for id_group in group_by_scene(ids, scene_of, max_lines_per_call):
+        group = [by_id[i] for i in id_group]
         parsed = _analyze_group(group, char_list, synopsis, client, model)
         for k, v in parsed.lines.items():
-            if k in final_lines and any(u.composite_id == k for u in group):
+            if k in final_lines and k in id_group:
                 final_lines[k] = v
     return SceneAnalysisDoc(lines=final_lines)
-
-
-def _scene_groups(
-    merged_doc: MergedUnitsDoc,
-    scenes: list[Scene],
-    unit_events: Mapping[str, list[int]],
-    max_lines: int,
-) -> list[list[CompositeUnit]]:
-    """Agrupa as falas pela cena do 1º evento da 1ª unidade; falas sem cena formam um grupo à parte."""
-    scene_of_event = {ev: i for i, sc in enumerate(scenes) for ev in sc.events}
-    by_scene: dict[int, list[CompositeUnit]] = {}
-    for unit in merged_doc.units:
-        events = unit_events.get(unit.unit_ids[0], []) if unit.unit_ids else []
-        index = scene_of_event.get(events[0], len(scenes)) if events else len(scenes)
-        by_scene.setdefault(index, []).append(unit)
-    step = max(1, max_lines)
-    return [
-        units[i : i + step] for _, units in sorted(by_scene.items()) for i in range(0, len(units), step)
-    ]
 
 
 def _analyze_group(

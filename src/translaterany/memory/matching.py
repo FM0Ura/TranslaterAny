@@ -2,8 +2,12 @@
 
 import re
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 from translaterany.memory.models import CharacterEntry, GlossaryEntry
+
+if TYPE_CHECKING:
+    from translaterany.pipeline.artifacts import ArtifactStore
 
 
 def matches_term(term: str, text: str) -> bool:
@@ -21,3 +25,18 @@ def select_for_text(
     terms = [e for e in glossary if any(matches_term(t, text) for t in (e.term, *e.aliases))]
     chars = [c for c in characters if any(matches_term(n, text) for n in (c.name, *c.aliases))]
     return terms, chars
+
+
+def load_memory_for_text(
+    store: ArtifactStore | None, series_key: str, text: str
+) -> tuple[list[GlossaryEntry], list[CharacterEntry]]:
+    """Glossário e personagens da série mencionados no texto (filtro por episódio)."""
+    if store is None:
+        return [], []
+    mem_dir = store.series_dir(series_key) / "memory"
+    if not mem_dir.exists():
+        return [], []
+    from translaterany.memory.store import MemoryStore  # import tardio: evita ciclo memory <-> pipeline
+
+    mem = MemoryStore(mem_dir)
+    return select_for_text(mem.load_glossary().values(), mem.load_characters(), text)
