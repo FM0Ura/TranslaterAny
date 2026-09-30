@@ -99,6 +99,16 @@ def load_config(
 
     if config.pipeline is None:
         config.pipeline = PipelineConfig(stages=list(default_pipeline))
+
+    from translaterany.checks import check_names  # import tardio: checks depende de config.model
+
+    unknown = sorted(set(config.checks.disabled) - check_names())
+    if unknown:
+        raise ConfigError(
+            _format(where, [f"checks.disabled: checagem desconhecida {', '.join(unknown)} "
+                            f"(disponíveis: {', '.join(sorted(check_names()))})"])
+        )
+
     stages = _build_stages(config, registry, where)
     data_dir = data_dir_override or config.general.data_dir or default_data_dir(env)
     return ResolvedConfig(

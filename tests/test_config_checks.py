@@ -1,5 +1,8 @@
 """Seção [checks] e preços por modelo (M5)."""
 
+import pytest
+
+from translaterany.config.loader import ConfigError, load_config
 from translaterany.config.model import AppConfig, ChecksConfig, LLMConfig, ModelConfig, ProfileConfig
 from translaterany.llm.pricing import price_lookup
 
@@ -38,3 +41,10 @@ def test_price_lookup_resolves_profile_role_and_model_key() -> None:
     assert prices("translate") == (1.0, 4.0)  # papel do perfil ativo
     assert prices("cheap") == (1.0, 4.0)  # chave direta
     assert prices("desconhecido") == (0.0, 0.0)
+
+
+def test_unknown_disabled_check_is_config_error(tmp_path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text('[checks]\ndisabled = ["nao_existe"]\n', encoding="utf-8")
+    with pytest.raises(ConfigError, match="checks.disabled"):
+        load_config(path, tmp_path / "data")
