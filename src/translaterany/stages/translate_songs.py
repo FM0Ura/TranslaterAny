@@ -15,6 +15,7 @@ from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.normalize import NormalizedDoc
 from translaterany.subtitles.songs import translate_songs
+from translaterany.subtitles.texts import UnitTexts
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +25,14 @@ class TranslateSongsOptions(BaseModel):
     model: str = "translate"
     fallback_model: str | None = "translategemma"
     max_tokens_per_batch: int = 800
+    translate: bool = False  # músicas ficam no original; ligue para traduzi-las
     max_lines_per_batch: int | None = 1  # uma fala por chamada: evita desalinhamento de IDs
 
 
 @register_stage
 class TranslateSongsStage(Stage):
     name: ClassVar[str] = "translate_songs"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: músicas puladas por padrão
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
@@ -58,6 +60,9 @@ class TranslateSongsStage(Stage):
             self.inputs = inputs
 
     def run(self, ctx: StageContext) -> None:
+        if not self.options.translate:
+            ctx.output.json(UnitTexts())  # letra original preservada
+            return
         client = self.client or ctx.llm
         doc = ctx.inputs.json("normalize", NormalizedDoc)
         classification = ctx.inputs.json("classify", Classification)

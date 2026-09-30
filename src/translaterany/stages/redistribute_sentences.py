@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import logging
-from typing import ClassVar
+from collections.abc import Sequence
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
+from translaterany.config.model import AppConfig
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.stage_metrics import count
+from translaterany.pipeline.units import Episode, Series
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification
+from translaterany.subtitles.linebreak import wrap_line
 from translaterany.subtitles.merge import MergedUnitsDoc
 from translaterany.subtitles.normalize import NormalizedDoc
 from translaterany.subtitles.redistribute import redistribute_composite_unit
@@ -29,7 +33,7 @@ class RedistributeSentencesOptions(BaseModel):
 @register_stage
 class RedistributeSentencesStage(Stage):
     name: ClassVar[str] = "redistribute_sentences"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: quebra de linha pelo CPL; músicas só via translate_songs
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
@@ -44,6 +48,17 @@ class RedistributeSentencesStage(Stage):
     )
     enabled_by_default: ClassVar[bool] = True
     Options: ClassVar[type[BaseModel]] = RedistributeSentencesOptions
+
+    def __init__(self, options: BaseModel | None = None) -> None:
+        super().__init__(options)
+        self.max_cpl = 42  # padrão Netflix; o loader aplica o [checks] via bind_pipeline
+
+    def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
+        if app is not None:
+            self.max_cpl = app.checks.max_cpl
+
+    def cache_payload(self, series: Series | None, episode: Episode | None) -> Any:
+        return {"max_cpl": self.max_cpl}
 
     def run(self, ctx: StageContext) -> None:
         doc = ctx.inputs.json("normalize", NormalizedDoc)
@@ -104,10 +119,17 @@ class RedistributeSentencesStage(Stage):
         # 3. Músicas
         final_texts.update(songs_texts)
 
-        # 4. TM matches remanescentes
+        # 4. TM matches remanescentes (músicas só chegam pelo translate_songs, que pode pulá-las)
         for uid, txt in tm_matched.items():
-            if uid not in final_texts:
+            u_class = classification.units.get(uid)
+            if uid not in final_texts and not (u_class and u_class.type == "song"):
                 final_texts[uid] = txt
+
+        # Quebra de linha do diálogo pelo CPL (o modelo recebe a frase sem \N)
+        for uid, txt in final_texts.items():
+            u_class = classification.units.get(uid)
+            if u_class and u_class.type == "dialogue":
+                final_texts[uid] = wrap_line(txt, self.max_cpl)
 
         # 5. Auto-alimentação da TM da série para músicas e placas traduzidas
         if self.options.auto_feed_tm:
@@ -121,7 +143,7 @@ class RedistributeSentencesStage(Stage):
 
             series = getattr(ctx, "series", None)
             if series is not None and store is not None:
-                from translaterany.memory.tm import TMEntrySource, TranslationMemoryStore
+                from translaterany.memory.tm import TranslationMemoryStore
 
                 tm_path = store.series_dir(series.key) / "memory" / "translation_memory.yaml"
                 tm_store = TranslationMemoryStore(tm_path)

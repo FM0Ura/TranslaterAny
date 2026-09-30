@@ -97,7 +97,16 @@ def test_stages_translate_signs_and_songs():
     assert captured_signs.texts["s2"] == "Sala dos Professores"
 
     fake_songs_llm = FakeLLM(responses={"Fly high to the sky": "Voe alto para o céu"})
-    songs_stage = TranslateSongsStage(client=fake_songs_llm)
+    from translaterany.stages.translate_songs import TranslateSongsOptions
+
+    skipping = TranslateSongsStage(client=fake_songs_llm)  # padrão: músicas ficam no original
+    skip_out = MockSongsOutput()
+    skipping.run(SimpleNamespace(inputs=MockInputs(), output=skip_out, llm=fake_songs_llm))  # type: ignore[arg-type]
+    assert captured_songs is not None and captured_songs.texts == {}
+    assert fake_songs_llm.calls == []
+    captured_songs = None
+
+    songs_stage = TranslateSongsStage(client=fake_songs_llm, options=TranslateSongsOptions(translate=True))
     songs_ctx = SimpleNamespace(inputs=MockInputs(), output=MockSongsOutput(), llm=fake_songs_llm)
     songs_stage.run(songs_ctx)  # type: ignore[arg-type]
 

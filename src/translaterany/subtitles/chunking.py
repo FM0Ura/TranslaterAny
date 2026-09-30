@@ -71,6 +71,7 @@ def format_batch_prompt(
     glossary: Sequence[GlossaryEntry] = (),
     characters: Sequence[CharacterEntry] = (),
     line_contexts: Mapping[str, Any] | None = None,
+    char_budgets: Mapping[str, int] | None = None,
 ) -> str:
     sections: list[str] = []
     if glossary:
@@ -123,6 +124,13 @@ def format_batch_prompt(
         sections.append("[CONTEXTO RECENTE - APENAS LEITURA, NÃO TRADUZIR]:")
         for idx, ctx in enumerate(context, 1):
             sections.append(f"[CTX-{idx}] {ctx.text}")
+        sections.append("")
+
+    budgets = [(line.id, char_budgets[line.id]) for line in lines if char_budgets and line.id in char_budgets]
+    if budgets:
+        sections.append("[LIMITE DE CARACTERES DA LEGENDA]:")
+        for line_id, budget in budgets:
+            sections.append(f"- [{line_id}] no máximo {budget} caracteres")
         sections.append("")
 
     sections.append("[FALAS A TRADUZIR]:")

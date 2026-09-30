@@ -12,6 +12,7 @@ from translaterany.pipeline.registry import REGISTRY
 from translaterany.pipeline.runner import Runner
 from translaterany.stages import DEFAULT_PIPELINE
 from translaterany.stages.metadata import MetadataStage
+from translaterany.stages.translate_songs import TranslateSongsOptions, TranslateSongsStage
 from translaterany.subtitles.ass import parse_ass
 
 pytestmark = needs_mkvtoolnix
@@ -66,6 +67,8 @@ def test_m4_e2e_pipeline_two_episodes(tmp_path: Path):
             continue
         if name == "metadata":
             stages_instances.append(MetadataStage(anilist_client=None, jikan_client=None))
+        elif name == "translate_songs":  # músicas são opcionais; este teste cobre a tradução + TM
+            stages_instances.append(TranslateSongsStage(options=TranslateSongsOptions(translate=True)))
         else:
             stages_instances.append(REGISTRY.get(name)())
 

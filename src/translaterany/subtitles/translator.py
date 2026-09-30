@@ -55,6 +55,7 @@ class DialogueBatchTranslator:
         profanity_policy: str = "faithful",
         line_contexts: Mapping[str, Any] | None = None,
         max_lines_per_batch: int | None = None,
+        char_budgets: Mapping[str, int] | None = None,
         metrics: StageMetrics | None = None,
     ):
         self.metrics = metrics
@@ -69,6 +70,7 @@ class DialogueBatchTranslator:
         self.profanity_policy = profanity_policy
         self.line_contexts = dict(line_contexts or {})
         self.max_lines_per_batch = max_lines_per_batch
+        self.char_budgets = dict(char_budgets or {})
 
         base_instructions = system_instructions or SYSTEM_INSTRUCTIONS
         policy_lines: list[str] = []
@@ -102,6 +104,12 @@ class DialogueBatchTranslator:
         if has_low_conf or self.line_contexts:
             policy_lines.append(
                 "- Gênero e falantes indeterminados: para falas com baixa confiança (low confidence) ou falante desconhecido, adote formulações gramaticalmente neutras (neutral gender phrasing) em português."
+            )
+
+        if self.char_budgets:
+            policy_lines.append(
+                "- Legibilidade: a legenda precisa ser lida a tempo. Respeite o limite de caracteres indicado, "
+                "condensando a frase de forma natural sem perder o sentido (corte redundâncias, não informação)."
             )
 
         if policy_lines:
@@ -147,6 +155,7 @@ class DialogueBatchTranslator:
             glossary=glossary,
             characters=characters,
             line_contexts=self.line_contexts,
+            char_budgets=self.char_budgets,
         )
         expected_ids = {line.id for line in lines}
         target_model = self.model_name

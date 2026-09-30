@@ -1,9 +1,10 @@
 import logging
-from typing import TYPE_CHECKING, ClassVar
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel
 
-from translaterany.config.model import ProviderConfig
+from translaterany.config.model import AppConfig, ProviderConfig
 from translaterany.llm.client import LLMClient
 from translaterany.memory.artifacts import ConsolidatedMemoryArtifact
 from translaterany.memory.matching import select_for_text
@@ -13,9 +14,11 @@ from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.stage_metrics import StageMetrics, count
+from translaterany.pipeline.units import Episode, Series
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.chunking import DialogueLine
 from translaterany.subtitles.classify import Classification, ClassifiedUnit, ClassifiedUnitCollection
+from translaterany.subtitles.linebreak import char_budget, flatten_breaks
 from translaterany.subtitles.merge import MergedUnitsDoc
 from translaterany.subtitles.normalize import NormalizedDoc
 from translaterany.subtitles.scene_analysis import SceneAnalysisDoc
@@ -43,7 +46,7 @@ class TranslateDialogueOptions(BaseModel):
 @register_stage
 class StageTranslateDialogue(Stage):
     name: ClassVar[str] = "translate_dialogue"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: frase sem \N para o modelo + orçamento de caracteres
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
@@ -76,6 +79,14 @@ class StageTranslateDialogue(Stage):
         self.client = client
         if inputs is not None:
             self.inputs = inputs
+        self.max_cps, self.max_cpl = 17.0, 42  # padrão Netflix; o loader aplica o [checks] via bind_pipeline
+
+    def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
+        if app is not None:
+            self.max_cps, self.max_cpl = app.checks.max_cps, app.checks.max_cpl
+
+    def cache_payload(self, series: Series | None, episode: Episode | None) -> Any:
+        return {"max_cps": self.max_cps, "max_cpl": self.max_cpl}
 
     def translate_collection(self, collection: ClassifiedUnitCollection) -> ClassifiedUnitCollection:
         dialogue_units = [u for u in collection.units if u.line_type == "dialogue"]
@@ -188,30 +199,42 @@ class StageTranslateDialogue(Stage):
         lines: list[DialogueLine] = []
         final_texts: dict[str, str] = {}
         units_to_verify: dict[str, str] = {}
+        durations: dict[str, int] = {}
 
         if merged_doc and merged_doc.units:
             for comp in merged_doc.units:
                 if len(comp.unit_ids) == 1 and comp.composite_id in tm_resolved:
                     final_texts[comp.composite_id] = tm_resolved[comp.composite_id]
                 else:
-                    lines.append(DialogueLine(id=comp.composite_id, text=comp.text_with_markers))
+                    lines.append(DialogueLine(id=comp.composite_id, text=flatten_breaks(comp.text_with_markers)))
+                    durations[comp.composite_id] = sum(comp.durations_ms)
                     units_to_verify[comp.composite_id] = comp.text_with_markers
         else:
             for u in dialogue_units:
                 if u.id in tm_resolved:
                     final_texts[u.id] = tm_resolved[u.id]
                 else:
-                    lines.append(DialogueLine(id=u.id, text=u.text))
+                    lines.append(DialogueLine(id=u.id, text=flatten_breaks(u.text)))
                     units_to_verify[u.id] = u.text
 
         if lines:
             count(ctx, "lines", len(lines))
+            events = {e.index: e for e in normalized.events}
+            for u in dialogue_units:
+                spans = [events[i].end_ms - events[i].start_ms for i in u.events if i in events]
+                durations.setdefault(u.id, min(spans) if spans else 0)
+            budgets = {
+                line.id: b
+                for line in lines
+                if (b := char_budget(durations.get(line.id, 0), max_cps=self.max_cps, max_cpl=self.max_cpl))
+            }
             translator = DialogueBatchTranslator(
                 client=client,
                 model_name=self.options.model,
                 fallback_model=self.options.fallback_model,
                 max_tokens_per_batch=self.options.max_tokens_per_batch,
-            max_lines_per_batch=self.options.max_lines_per_batch,
+                max_lines_per_batch=self.options.max_lines_per_batch,
+                char_budgets=budgets,
                 max_context_lines=self.options.max_context_lines,
                 glossary=matched_glossary,
                 characters=matched_characters,
