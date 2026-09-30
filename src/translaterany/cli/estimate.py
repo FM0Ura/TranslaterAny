@@ -158,13 +158,19 @@ def estimate(
         if model_cfg is not None
         else 0.0
     )
-    if total_cost == 0.0:
+    if provider == "ollama" or profile_name == "local":
         console.print("- Custo estimado: [green]$0.00 USD[/green] (Inferência 100% local)")
     else:
-        console.print(
-            f"- Custo total estimado: [yellow]${total_cost:.4f} USD[/yellow] "
-            f"(Limite configurado: ${cfg.llm.max_cost_usd:.2f} USD)"
-        )
+        if total_cost == 0.0:
+            console.print(
+                "- Custo estimado: [yellow]$0.00 USD[/yellow] "
+                "[red](Aviso: preços não configurados em [llm.models])[/red]"
+            )
+        else:
+            console.print(
+                f"- Custo total estimado: [yellow]${total_cost:.4f} USD[/yellow] "
+                f"(Limite configurado: ${cfg.llm.max_cost_usd:.2f} USD)"
+            )
         if total_cost > cfg.llm.max_cost_usd:
             console.print(
                 f"[red]Atenção: O custo estimado excede o teto configurado de max_cost_usd "
