@@ -34,6 +34,7 @@ class TranslateDialogueOptions(BaseModel):
     model: str = "translate"
     fallback_model: str | None = "translategemma"
     max_tokens_per_batch: int = 800
+    max_lines_per_batch: int | None = 1  # uma fala por chamada: evita desalinhamento de IDs
     max_context_lines: int = 5
     honorifics: str = "keep"
     profanity: str = "faithful"
@@ -87,6 +88,7 @@ class StageTranslateDialogue(Stage):
             model_name=self.options.model,
             fallback_model=self.options.fallback_model,
             max_tokens_per_batch=self.options.max_tokens_per_batch,
+            max_lines_per_batch=self.options.max_lines_per_batch,
             max_context_lines=self.options.max_context_lines,
             honorifics_policy=self.options.honorifics,
             profanity_policy=self.options.profanity,
@@ -209,6 +211,7 @@ class StageTranslateDialogue(Stage):
                 model_name=self.options.model,
                 fallback_model=self.options.fallback_model,
                 max_tokens_per_batch=self.options.max_tokens_per_batch,
+            max_lines_per_batch=self.options.max_lines_per_batch,
                 max_context_lines=self.options.max_context_lines,
                 glossary=matched_glossary,
                 characters=matched_characters,

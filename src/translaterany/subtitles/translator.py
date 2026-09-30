@@ -54,6 +54,7 @@ class DialogueBatchTranslator:
         honorifics_policy: str = "keep",
         profanity_policy: str = "faithful",
         line_contexts: Mapping[str, Any] | None = None,
+        max_lines_per_batch: int | None = None,
         metrics: StageMetrics | None = None,
     ):
         self.metrics = metrics
@@ -67,6 +68,7 @@ class DialogueBatchTranslator:
         self.honorifics_policy = honorifics_policy
         self.profanity_policy = profanity_policy
         self.line_contexts = dict(line_contexts or {})
+        self.max_lines_per_batch = max_lines_per_batch
 
         base_instructions = system_instructions or SYSTEM_INSTRUCTIONS
         policy_lines: list[str] = []
@@ -173,8 +175,11 @@ class DialogueBatchTranslator:
         translations: dict[str, str] = {}
         if output:
             for item in output.items:
-                if item.id in expected_ids:
-                    translations[item.id] = item.text
+                item_id = _normalize_id(item.id)
+                if item_id in expected_ids:
+                    translations[item_id] = item.text
+            if not translations and len(lines) == 1 and len(output.items) == 1:
+                translations[lines[0].id] = output.items[0].text  # chamada de uma fala: o ID não importa
 
         # Nível 2: Reconciliação de IDs ausentes
         missing_ids = expected_ids - set(translations.keys())
@@ -220,6 +225,7 @@ class DialogueBatchTranslator:
             lines,
             max_tokens_per_batch=self.max_tokens_per_batch,
             max_context_lines=self.max_context_lines,
+            max_lines_per_batch=self.max_lines_per_batch,
         )
         all_translations: dict[str, str] = {}
         recent_context: list[ContextLine] = []
@@ -241,3 +247,8 @@ class DialogueBatchTranslator:
                 recent_context = []
 
         return all_translations
+
+
+def _normalize_id(raw: str) -> str:
+    """O modelo às vezes devolve o ID como aparece no prompt ("[u287]")."""
+    return raw.strip().strip("[]").strip()

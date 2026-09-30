@@ -2,8 +2,8 @@
 
 from collections import deque
 from collections.abc import Mapping, Sequence
-from typing import Any
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -34,7 +34,10 @@ def create_dialogue_batches(
     lines: list[DialogueLine],
     max_tokens_per_batch: int = 800,
     max_context_lines: int = 5,
+    max_lines_per_batch: int | None = None,
 ) -> list[DialogueBatch]:
+    """`max_lines_per_batch=1` manda uma fala por chamada: modelos de tradução pura (TranslateGemma)
+    desalinham IDs em lotes, deslocando traduções para a fala vizinha."""
     batches: list[DialogueBatch] = []
     current_lines: list[DialogueLine] = []
     current_tokens = 0
@@ -42,7 +45,8 @@ def create_dialogue_batches(
 
     for line in lines:
         line_tokens = estimate_tokens(line.text) + 6  # overhead por fala
-        if current_lines and (current_tokens + line_tokens > max_tokens_per_batch):
+        full = max_lines_per_batch is not None and len(current_lines) >= max_lines_per_batch
+        if current_lines and (full or current_tokens + line_tokens > max_tokens_per_batch):
             context_slice = list(recent_history) if max_context_lines > 0 else []
             batches.append(DialogueBatch(lines=current_lines, context=context_slice))
             if max_context_lines > 0:

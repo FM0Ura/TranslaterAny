@@ -13,18 +13,20 @@ from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.merge import MergedUnitsDoc
-from translaterany.subtitles.scene_analysis import SceneAnalysisDoc, analyze_scenes
+from translaterany.subtitles.normalize import NormalizedDoc
+from translaterany.subtitles.scene_analysis import analyze_scenes
 
 
 class SceneAnalysisOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
     model: str = "review"
+    max_lines_per_call: int = 40  # cenas longas são divididas em blocos
 
 
 @register_stage
 class SceneAnalysisStage(Stage):
     name: ClassVar[str] = "scene_analysis"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: uma chamada por cena
     scope: ClassVar[StageScope] = StageScope.EPISODE
     inputs: ClassVar[tuple[str, ...]] = ("normalize", "classify", "consolidate_memory", "merge_sentences")
     enabled_by_default: ClassVar[bool] = True
@@ -37,6 +39,7 @@ class SceneAnalysisStage(Stage):
     def run(self, ctx: StageContext) -> None:
         merged_doc = ctx.inputs.json("merge_sentences", MergedUnitsDoc)
         classification = ctx.inputs.json("classify", Classification)
+        normalized = ctx.inputs.json("normalize", NormalizedDoc)
 
         store = getattr(ctx, "store", None)
         if store is None:
@@ -63,5 +66,7 @@ class SceneAnalysisStage(Stage):
             synopsis=synopsis,
             client=client,
             model=self.options.model,
+            unit_events={u.id: u.events for u in normalized.units},
+            max_lines_per_call=self.options.max_lines_per_call,
         )
         ctx.output.json(doc)

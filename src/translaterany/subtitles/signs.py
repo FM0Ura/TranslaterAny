@@ -32,6 +32,7 @@ def translate_signs(
     model: str = "translate",
     fallback_model: str | None = "translategemma",
     max_tokens_per_batch: int = 800,
+    max_lines_per_batch: int | None = 1,
     metrics: StageMetrics | None = None,
 ) -> UnitTexts:
     """Traduz placas e elementos gráficos visuais, respeitando concisão e marcadores."""
@@ -64,6 +65,7 @@ def translate_signs(
         model_name=model,
         fallback_model=fallback_model,
         max_tokens_per_batch=max_tokens_per_batch,
+        max_lines_per_batch=max_lines_per_batch,
         max_context_lines=0,
         metrics=metrics,
         system_instructions=SIGNS_SYSTEM_INSTRUCTIONS,
