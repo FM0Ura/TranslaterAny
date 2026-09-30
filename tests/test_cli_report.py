@@ -67,3 +67,17 @@ def test_report_exit_codes(tmp_path: Path, series_dir: Path) -> None:
     (never / "Season 1").mkdir(parents=True)
     (never / "Season 1" / "S01E01.mkv").write_text("x", encoding="utf-8")
     assert _invoke("--config", cfg, "report", str(never)).exit_code == 1
+
+
+def test_report_episode_escapes_untrusted_markup(tmp_path: Path, series_dir: Path) -> None:
+    data_dir = tmp_path / "data"
+    store = ArtifactStore(data_dir)
+    series, _ = discover(series_dir)
+    store.write_series_info(series)
+    m = metrics(10, 1, 14)
+    m.final.findings[0].excerpt = "[/i] fala [Music]"
+    m.final.findings[0].message = "msg [red]x"
+    write_episode(store, "S01E01", metrics=m, series=series.key)
+    result = _invoke("--config", _config(tmp_path, data_dir), "report", str(series_dir), "--episode", "S01E01")
+    assert result.exit_code == 0, result.output
+    assert "[Music]" in result.output and "[/i] fala" in result.output and "msg [red]x" in result.output

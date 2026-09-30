@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 from pydantic import ValidationError
+from rich.markup import escape
 from rich.table import Table
 
 from translaterany.cli.app import EXIT_FAILURE, EXIT_USAGE, AppState, app, console, load_or_exit
@@ -28,16 +29,16 @@ def _arrow(delta: float) -> str:
 
 
 def _render(report: SeriesReport) -> None:
-    table = Table(title=f"Processo por etapa — {report.series}")
+    table = Table(title=f"Processo por etapa — {escape(report.series)}")
     for col in ("Etapa", "OK", "Falhas", "Tempo total", "Tempo médio", "Chamadas", "Tokens ent.", "Tokens saída",
                 "Custo (USD)", "Erros IA", "Contadores"):  # fmt: skip
         table.add_column(col)
     for name, s in report.stages.items():
         table.add_row(
-            name, str(s.units_done), str(s.units_failed), f"{s.duration_s:.1f}s", f"{s.mean_duration_s:.1f}s",
+            escape(name), str(s.units_done), str(s.units_failed), f"{s.duration_s:.1f}s", f"{s.mean_duration_s:.1f}s",
             str(s.llm.calls), str(s.llm.input_tokens), str(s.llm.output_tokens), f"{s.llm.cost_usd:.4f}",
-            ", ".join(f"{k}={v}" for k, v in s.llm.errors.items()) or "—",
-            ", ".join(f"{k}={v}" for k, v in s.counters.items()) or "—",
+            escape(", ".join(f"{k}={v}" for k, v in s.llm.errors.items())) or "—",
+            escape(", ".join(f"{k}={v}" for k, v in s.counters.items())) or "—",
         )  # fmt: skip
     console.print(table)
 
@@ -46,14 +47,16 @@ def _render(report: SeriesReport) -> None:
         for col in ("Modelo", "Chamadas", "Tokens ent.", "Tokens saída", "Custo (USD)"):
             models.add_column(col)
         for model_id, m in report.models.items():
-            models.add_row(model_id, str(m.calls), str(m.input_tokens), str(m.output_tokens), f"{m.cost_usd:.4f}")
+            models.add_row(
+                escape(model_id), str(m.calls), str(m.input_tokens), str(m.output_tokens), f"{m.cost_usd:.4f}"
+            )
         console.print(models)
 
     final = Table(title=f"Indicadores finais — {report.lines} linhas em {report.episodes} episódio(s)")
     for col in ("Checagem", "error", "warn", "info", "Taxa"):
         final.add_column(col)
     for check, c in sorted(report.final_checks.items()):
-        final.add_row(check, str(c.counts.error), str(c.counts.warn), str(c.counts.info), f"{c.rate:.1%}")
+        final.add_row(escape(check), str(c.counts.error), str(c.counts.warn), str(c.counts.info), f"{c.rate:.1%}")
     console.print(final)
     rs = report.reading_speed
     console.print(
@@ -66,7 +69,7 @@ def _render(report: SeriesReport) -> None:
             snaps.add_column(col)
         for name, s in report.snapshots.items():
             snaps.add_row(
-                name, str(s.episodes), str(s.changed), str(s.new), str(s.resolved), f"{s.edit_ratio_mean:.1%}"
+                escape(name), str(s.episodes), str(s.changed), str(s.new), str(s.resolved), f"{s.edit_ratio_mean:.1%}"
             )
         console.print(snaps)
 
@@ -75,12 +78,14 @@ def _render(report: SeriesReport) -> None:
         for col in ("Episódio", "Linhas", "Com error", "Taxa"):
             worst.add_column(col)
         for r in report.worst_episodes:
-            worst.add_row(r.episode, str(r.lines), str(r.error_lines), f"{r.error_rate:.1%}")
+            worst.add_row(escape(r.episode), str(r.lines), str(r.error_lines), f"{r.error_rate:.1%}")
         console.print(worst)
     if report.missing_metrics:
-        console.print(f"[yellow]Sem métricas (rode `translaterany run`): {', '.join(report.missing_metrics)}[/yellow]")
+        console.print(
+            f"[yellow]Sem métricas (rode `translaterany run`): {escape(', '.join(report.missing_metrics))}[/yellow]"
+        )
     for warning in report.warnings:
-        console.print(f"[yellow]Aviso: {warning}[/yellow]")
+        console.print(f"[yellow]Aviso: {escape(warning)}[/yellow]")
 
 
 @app.command()
@@ -98,10 +103,10 @@ def report(
     try:
         series, _ = discover(path)
     except NotADirectoryError as exc:
-        console.print(f"[red]{exc}[/red]")
+        console.print(f"[red]{escape(str(exc))}[/red]")
         raise typer.Exit(EXIT_USAGE) from exc
     if not store.series_dir(series.key).exists():
-        console.print(f"Pasta nunca processada: {series.name}")
+        console.print(f"Pasta nunca processada: {escape(series.name)}")
         raise typer.Exit(EXIT_FAILURE)
 
     base: SeriesReport | None = None
@@ -109,7 +114,7 @@ def report(
         try:
             base = SeriesReport.model_validate_json(baseline.read_text(encoding="utf-8"))
         except (OSError, ValidationError, UnicodeDecodeError) as exc:
-            console.print(f"[red]Linha de base ilegível: {baseline} ({type(exc).__name__})[/red]")
+            console.print(f"[red]Linha de base ilegível: {escape(str(baseline))} ({type(exc).__name__})[/red]")
             raise typer.Exit(EXIT_USAGE) from exc
         if base.schema_version != REPORT_SCHEMA:
             console.print(f"[red]Linha de base com schema {base.schema_version}; esperado {REPORT_SCHEMA}.[/red]")
@@ -119,7 +124,7 @@ def report(
         result = build_report(store, series.key, series.name, [s.name for s in cfg.stages],
                               episodes=[episode] if episode else None)  # fmt: skip
     except ManifestError as exc:
-        console.print(f"[red]{exc}[/red]")
+        console.print(f"[red]{escape(str(exc))}[/red]")
         raise typer.Exit(EXIT_FAILURE) from exc
     if result.episodes and len(result.missing_metrics) == result.episodes:
         console.print("Nenhuma métrica encontrada — rode `translaterany run` primeiro.")
@@ -130,14 +135,16 @@ def report(
         try:
             metrics = load_episode_metrics(store, series.key, episode)
         except MetricsError as exc:
-            console.print(f"[yellow]{exc}[/yellow]")
+            console.print(f"[yellow]{escape(str(exc))}[/yellow]")
             metrics = None
         if metrics is not None:
-            table = Table(title=f"Achados finais — {episode}")
+            table = Table(title=f"Achados finais — {escape(episode)}")
             for col in ("Unidade", "Checagem", "Severidade", "Mensagem", "Trecho"):
                 table.add_column(col)
             for f in metrics.final.findings + metrics.episode_checks:
-                table.add_row(f.unit_id or "—", f.check, f.severity, f.message, f.excerpt or "")
+                table.add_row(
+                    escape(f.unit_id or "—"), escape(f.check), f.severity, escape(f.message), escape(f.excerpt or "")
+                )
             console.print(table)
     if base is not None:
         table = Table(title="Comparação com a linha de base")
@@ -145,10 +152,10 @@ def report(
             table.add_column(col)
         for row in compare_reports(result, base):
             table.add_row(
-                row.metric, f"{row.current:.4g}", f"{row.baseline:.4g}", f"{row.delta:+.4g}", _arrow(row.delta)
+                escape(row.metric), f"{row.current:.4g}", f"{row.baseline:.4g}", f"{row.delta:+.4g}", _arrow(row.delta)
             )
         console.print(table)
     if json_out is not None:
         json_out.parent.mkdir(parents=True, exist_ok=True)
         json_out.write_text(result.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
-        console.print(f"Relatório salvo em {json_out}")
+        console.print(f"Relatório salvo em {escape(str(json_out))}")
