@@ -2,7 +2,7 @@
 
 - **Marco:** M6 (ver [`ROADMAP.md`](../../../ROADMAP.md))
 - **Data:** 2026-09-30
-- **Status:** proposto (2026-09-30) · plano: pendente
+- **Status:** aprovado (2026-09-30) · plano: [2026-09-30-m6-refinamento-i.md](../plans/2026-09-30-m6-refinamento-i.md)
 - **Depende de:** M4 ([spec](2026-09-27-m4-traducao-contextual-design.md)) e M5 ([spec](2026-09-30-m5-verificacoes-metricas-design.md)), mais as correções de uso real de 2026-09-30 (API nativa do Ollama, uma fala por chamada, análise por cena, legibilidade)
 - **Branch:** `m6-refinamento-i` (a partir de `m5-verificacoes-metricas`)
 

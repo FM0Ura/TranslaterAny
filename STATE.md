@@ -10,8 +10,8 @@
 ## Onde estamos
 
 - **Fase:** M5 integrado ao master; M6 em especificação (branch `m6-refinamento-i`).
-- **Marco atual:** **M6 — Refinamento I** — spec escrito, aguardando revisão.
-- **Próxima ação:** revisão do spec do M6 e plano de implementação.
+- **Marco atual:** **M6 — Refinamento I** — spec aprovado; plano escrito, aguardando revisão.
+- **Próxima ação:** revisão do plano do M6 e execução.
 
 ## Progresso dos marcos
 
@@ -25,7 +25,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
 | M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
 | M5 — Verificações e métricas | ✅ | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | integrado ao master (510 testes); aceite com 1 episódio (Charlotte S01E01) — temporada inteira pendente |
-| M6 — Refinamento I | 📝 | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | — | spec em revisão (branch `m6-refinamento-i`) |
+| M6 — Refinamento I | 📋 | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | plano em revisão (9 tarefas, branch `m6-refinamento-i`) |
 | M7 — Refinamento II | ⬜ | — | — | |
 | M8 — Portões e laço do QA | ⬜ | — | — | fim da v1 |
 
