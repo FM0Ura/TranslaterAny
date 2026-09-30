@@ -118,3 +118,20 @@ def reading_speed(line: LineInput, env: CheckEnv) -> list[Finding]:
             )
         )
     return findings
+
+
+@line_check("profanity_added", {"dialogue"})
+def profanity_added(line: LineInput, env: CheckEnv) -> list[Finding]:
+    if lexicon.EN_PROFANITY.search(plain(line.source)):
+        return []
+    match = lexicon.PT_PROFANITY.search(plain(line.target))
+    if not match:
+        return []
+    return [
+        Finding(
+            check="profanity_added",
+            unit_id=line.id,
+            severity="warn",
+            message=f"palavrão sem equivalente no original: '{match.group(0)}'",
+        )
+    ]

@@ -23,3 +23,13 @@ PT_PT_PROGRESSIVE = re.compile(
     r"\b(?:estou|estás|está|estamos|estão|estava|estavam) a \w+(?:ar|er|ir)\b", re.IGNORECASE
 )
 SPANISH = re.compile(r"[¿¡ñÑ]|\b(?:pero|muy|también|usted|gracias|hola)\b", re.IGNORECASE)
+PT_PROFANITY = re.compile(
+    r"\b(?:merda|porra|caralho|puta|puto|foda|foder|fodido|fodida|cacete|desgraça|desgraçado|desgraçada|"
+    r"arrombado|arrombada|babaca|idiota|imbecil|otário|otária|vadia|cuzão)\b",
+    re.IGNORECASE,
+)
+EN_PROFANITY = re.compile(
+    r"\b(?:shit|fuck\w*|damn\w*|bitch\w*|bastard\w*|ass|asshole|crap|idiot\w*|moron\w*|jerk\w*|hell|"
+    r"dumbass|screw\w*|piss\w*|dick\w*|stupid)\b",
+    re.IGNORECASE,
+)
