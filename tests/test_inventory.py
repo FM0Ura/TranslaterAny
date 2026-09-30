@@ -51,5 +51,6 @@ def test_builtin_stages_registered_and_default_pipeline() -> None:
         "write",
         "publish",
         "remux",
+        "quality_checks",
     )
     assert REGISTRY.get("remux").enabled_by_default is False

@@ -100,7 +100,7 @@ def test_default_config_runs_m1_pipeline(tmp_path: Path, monkeypatch) -> None:
         assert stage in result.output
     assert "remux" not in result.output  # desligado por padrão
     status = runner.invoke(app, ["--data-dir", str(tmp_path / "d"), "status", str(root)], env=env)
-    assert "Dialog - ENG" in status.output and "publish" in status.output
+    assert "Dialog - ENG" in status.output and "quality_checks" in status.output
     assert not list(root.glob("*.pt-BR.ass"))
 
 

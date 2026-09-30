@@ -10,6 +10,7 @@ from translaterany.stages import (  # noqa: F401
     metadata,
     normalize,
     publish,
+    quality_checks,
     redistribute_sentences,
     remux,
     scene_analysis,
@@ -21,7 +22,7 @@ from translaterany.stages import (  # noqa: F401
     write,
 )
 
-# Pipeline usado quando não há [pipeline] no config (remux vem desabilitado: enabled_by_default = False).
+# Pipeline usado quando não há [pipeline] no config (remux vem desabilitado; quality_checks mede o resultado).
 DEFAULT_PIPELINE: tuple[str, ...] = (
     "inventory",
     "metadata",
@@ -41,4 +42,5 @@ DEFAULT_PIPELINE: tuple[str, ...] = (
     "write",
     "publish",
     "remux",
+    "quality_checks",
 )
