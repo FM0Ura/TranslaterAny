@@ -6,9 +6,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from translaterany.llm.metered import LLMStats
 from translaterany.util.fs import atomic_write_text
 
-MANIFEST_SCHEMA = 1
+MANIFEST_SCHEMA = 2
+_READABLE_SCHEMAS = frozenset({1, 2})  # schema 1 (até o M4) só não tem llm/counters
 
 type UnitStatus = Literal["ok", "skipped", "failed"]
 
@@ -26,6 +28,8 @@ class StageRecord(BaseModel):
     finished_at: datetime = Field(default_factory=datetime.now)
     duration_s: float = 0.0
     error: str | None = None
+    llm: LLMStats | None = None
+    counters: dict[str, int] = Field(default_factory=dict)
 
 
 class UnitInfo(BaseModel):
@@ -52,11 +56,12 @@ def load_manifest(path: Path, unit: UnitInfo) -> Manifest:
         manifest = Manifest.model_validate_json(path.read_text(encoding="utf-8"))
     except (ValidationError, UnicodeDecodeError, OSError) as exc:
         raise ManifestError(f"manifest inválido em {path}: {exc}") from exc
-    if manifest.schema_version != MANIFEST_SCHEMA:
+    if manifest.schema_version not in _READABLE_SCHEMAS:
         raise ManifestError(
             f"manifest em {path} tem schema {manifest.schema_version}; "
-            f"esta versão entende apenas o schema {MANIFEST_SCHEMA}"
+            f"esta versão entende os schemas {', '.join(map(str, sorted(_READABLE_SCHEMAS)))}"
         )
+    manifest.schema_version = MANIFEST_SCHEMA  # o próximo save grava no formato atual
     return manifest
 
 

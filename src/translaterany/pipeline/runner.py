@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Literal
 
 from translaterany.llm.client import LLMClient
+from translaterany.llm.metered import LLMStats, MeteredLLM
+from translaterany.llm.pricing import PriceFn
 from translaterany.pipeline.artifacts import (
     ArtifactStore,
     InputError,
@@ -20,6 +22,7 @@ from translaterany.pipeline.cache import combine_hashes, compute_key
 from translaterany.pipeline.lock import SeriesLock
 from translaterany.pipeline.manifest import StageRecord
 from translaterany.pipeline.stage import SkipEpisode, Stage, StageContext, StageScope
+from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.pipeline.units import Episode, Series
 from translaterany.util.fs import cleanup_tmp, file_sha256, fingerprint
 
@@ -56,12 +59,14 @@ class Runner:
         llm: LLMClient,
         log: logging.Logger | None = None,
         on_progress: ProgressFn | None = None,
+        prices: PriceFn | None = None,
     ) -> None:
         self.stages = list(stages)
         self.store = store
         self.llm = llm
         self.log = log or logging.getLogger("translaterany.runner")
         self.on_progress = on_progress
+        self.prices = prices
         self._scopes: dict[str, StageScope] = {}
         for stage in self.stages:
             if stage.reads_source and stage.scope is StageScope.SERIES:
@@ -157,8 +162,10 @@ class Runner:
             if record is not None and record.status == "done" and record.artifact is not None:
                 candidate = directory / record.artifact
                 previous = candidate if candidate.exists() else None
+            metered = MeteredLLM(self.llm, self.prices)
+            metrics = StageMetrics()
             writer = OutputWriter(directory, stage.name)
-            ctx = self._context(stage, series, episode, episodes, manifests, writer, previous, force)
+            ctx = self._context(stage, series, episode, episodes, manifests, writer, previous, force, metered, metrics)
             if (
                 previous is not None
                 and record is not None
@@ -189,7 +196,9 @@ class Runner:
                 return "skipped"
         except Exception as exc:  # KeyboardInterrupt não é Exception: propaga
             error = exc
-        return self._finish(stage, manifests, episode, unit_name, error, digest, key, writer, started, t0)
+        return self._finish(
+            stage, manifests, episode, unit_name, error, digest, key, writer, started, t0, metered, metrics
+        )
 
     def _context(
         self,
@@ -201,6 +210,8 @@ class Runner:
         writer: OutputWriter,
         previous: Path | None,
         force: bool,
+        llm: MeteredLLM,
+        metrics: StageMetrics,
     ) -> StageContext:
         return StageContext(
             series=series,
@@ -216,7 +227,8 @@ class Runner:
                 manifests,
             ),
             output=writer,
-            llm=self.llm,
+            llm=llm,
+            metrics=metrics,
             log=self.log.getChild(stage.name),
             previous_output=previous,
             force=force,
@@ -235,11 +247,13 @@ class Runner:
         writer: OutputWriter,
         started: datetime,
         t0: float,
+        metered: MeteredLLM | None = None,
+        metrics: StageMetrics | None = None,
     ) -> Outcome:
         manifest = manifests.get(episode)
 
         if error is not None:
-            return self._fail(stage, manifests, episode, unit_name, error, started, t0)
+            return self._fail(stage, manifests, episode, unit_name, error, started, t0, metered, metrics)
 
         assert writer.written is not None
         manifest.stages[stage.name] = StageRecord(
@@ -250,6 +264,8 @@ class Runner:
             started_at=started,
             finished_at=datetime.now(UTC),
             duration_s=round(time.perf_counter() - t0, 3),
+            llm=_llm_stats(metered),
+            counters=dict(metrics.counters) if metrics else {},
         )
         manifests.save(episode)
         return "done"
@@ -263,6 +279,8 @@ class Runner:
         error: Exception,
         started: datetime,
         t0: float,
+        metered: MeteredLLM | None = None,
+        metrics: StageMetrics | None = None,
     ) -> Outcome:
         self.log.error("%s: falha em %s — %s: %s", stage.name, unit_name, type(error).__name__, error)
         self.log.debug("traceback da falha em %s", unit_name, exc_info=error)  # arquivo de log / --verbose
@@ -273,10 +291,16 @@ class Runner:
             finished_at=datetime.now(UTC),
             duration_s=round(time.perf_counter() - t0, 3),
             error=f"{type(error).__name__}: {error}",
+            llm=_llm_stats(metered),
+            counters=dict(metrics.counters) if metrics else {},
         )
         manifest.status = "failed"
         manifests.save(episode)
         return "failed"
+
+
+def _llm_stats(metered: MeteredLLM | None) -> LLMStats | None:
+    return metered.stats if metered is not None and metered.stats.calls else None
 
 
 def _done_hash(record: StageRecord | None, name: str) -> str:
@@ -297,12 +321,14 @@ class PipelineRunner:
         from translaterany.config.loader import ResolvedConfig, _build_stages, default_data_dir, load_config
         from translaterany.config.model import AppConfig, PipelineConfig
         from translaterany.llm.fake import FakeLLM
+        from translaterany.llm.pricing import price_lookup
         from translaterany.pipeline.registry import REGISTRY
         from translaterany.stages import DEFAULT_PIPELINE
 
         if isinstance(config, ResolvedConfig):
             self.stages = config.stages
             self.data_dir = config.data_dir
+            self.prices = price_lookup(config.llm)
         elif isinstance(config, AppConfig):
             cfg_copy = config.model_copy(deep=True)
             if cfg_copy.pipeline is None:
@@ -311,10 +337,12 @@ class PipelineRunner:
             data_dir = cfg_copy.general.data_dir or default_data_dir()
             self.stages = tuple(stages)
             self.data_dir = Path(data_dir).expanduser()
+            self.prices = price_lookup(cfg_copy.llm)
         else:
             resolved = load_config()
             self.stages = resolved.stages
             self.data_dir = resolved.data_dir
+            self.prices = price_lookup(resolved.llm)
 
         self._store = store
         self.client = client if client is not None else FakeLLM()
@@ -324,5 +352,5 @@ class PipelineRunner:
 
         series, episodes = discover(path)
         store = self._store or ArtifactStore(self.data_dir)
-        runner = Runner(self.stages, store, self.client)
+        runner = Runner(self.stages, store, self.client, prices=self.prices)
         return runner.run(series, episodes, force=force)

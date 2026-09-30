@@ -31,7 +31,7 @@ def test_roundtrip_uses_schema_key(tmp_path: Path) -> None:
     manifest = Manifest(unit=UnitInfo(series="s"))
     manifest.stages["x"] = _record()
     save_manifest(path, manifest)
-    assert '"schema": 1' in path.read_text()
+    assert '"schema": 2' in path.read_text()
     loaded = load_manifest(path, UnitInfo(series="ignorado"))
     assert loaded.unit.series == "s"
     assert loaded.stages["x"].artifact == "a.json"

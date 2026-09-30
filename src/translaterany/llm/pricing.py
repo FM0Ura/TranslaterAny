@@ -1,8 +1,10 @@
 """Tabela de preços por apelido de modelo (USD por milhão de tokens)."""
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from translaterany.config.model import LLMConfig
+if TYPE_CHECKING:  # evita ciclo: config -> pipeline -> manifest -> llm.metered -> pricing
+    from translaterany.config.model import LLMConfig
 
 type PriceFn = Callable[[str], tuple[float, float]]
 

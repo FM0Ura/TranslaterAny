@@ -3,7 +3,7 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar
@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from translaterany.llm.client import LLMClient
 from translaterany.pipeline.artifacts import ArtifactStore, InputReader, OutputWriter
+from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.pipeline.units import Episode, Series
 from translaterany.util.doctor import Check
 
@@ -45,6 +46,7 @@ class StageContext:
     previous_output: Path | None = None  # artefato anterior desta etapa para a unidade, se houver
     force: bool = False  # `run --force`: permite sobrescrever PT-BR de terceiros
     store: ArtifactStore | None = None
+    metrics: StageMetrics = field(default_factory=StageMetrics)
 
 
 class Stage(ABC):
