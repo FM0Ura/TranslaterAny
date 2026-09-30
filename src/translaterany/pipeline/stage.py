@@ -60,6 +60,7 @@ class Stage(ABC):
     reads_source: ClassVar[bool] = False  # lê o arquivo de origem diretamente
     translates: ClassVar[bool] = False  # produz texto traduzido (libera publish/remux)
     produces_texts: ClassVar[bool] = False  # artefato é UnitTexts (instantâneo medido pela quality_checks)
+    produces_dialogue: ClassVar[bool] = False  # artefato é o mapa de diálogo por frase (entrada da redistribuição)
     enabled_by_default: ClassVar[bool] = True  # sem [stages.X] no config, a etapa roda?
     Options: ClassVar[type[BaseModel]] = NoOptions
 

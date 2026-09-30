@@ -50,6 +50,7 @@ class StageTranslateDialogue(Stage):
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
+    produces_dialogue: ClassVar[bool] = True
     inputs: ClassVar[tuple[str, ...]] = (
         "normalize",
         "classify",
