@@ -1,0 +1,446 @@
+{
+  "schema": 1,
+  "series": "Charlotte (2015)",
+  "generated_at": "2026-09-30T18:21:57.840129",
+  "episodes": 1,
+  "lines": 437,
+  "stages": {
+    "inventory": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.008,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "metadata": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 2.545,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "select_track": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.067,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "extract": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.357,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "normalize": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.279,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "classify": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.045,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "extract_terms": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 25.429,
+      "llm": {
+        "calls": 1,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 1,
+            "input_tokens": 5191,
+            "output_tokens": 509,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {}
+    },
+    "consolidate_memory": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.014,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "translation_memory": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.042,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "tm_candidates": 467,
+        "tm_hits": 0
+      }
+    },
+    "merge_sentences": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.119,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "merged_groups": 28,
+        "merged_units": 59
+      }
+    },
+    "scene_analysis": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 676.938,
+      "llm": {
+        "calls": 20,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 20,
+            "input_tokens": 17318,
+            "output_tokens": 22060,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {}
+    },
+    "translate_dialogue": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 656.365,
+      "llm": {
+        "calls": 346,
+        "errors": {},
+        "by_model": {
+          "translategemma:12b": {
+            "calls": 346,
+            "input_tokens": 230002,
+            "output_tokens": 15233,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines": 346,
+        "markers_lost": 1
+      }
+    },
+    "translate_signs": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 88.468,
+      "llm": {
+        "calls": 60,
+        "errors": {},
+        "by_model": {
+          "translategemma:12b": {
+            "calls": 60,
+            "input_tokens": 19220,
+            "output_tokens": 2278,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines": 60,
+        "fallback_original": 2,
+        "markers_lost": 17
+      }
+    },
+    "translate_songs": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.002,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "redistribute_sentences": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 1.962,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "redistributed": 28,
+        "tm_fed": 37
+      }
+    },
+    "write": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.12,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "publish": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.086,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "quality_checks": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.481,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    }
+  },
+  "models": {
+    "gemma4:12b": {
+      "calls": 21,
+      "input_tokens": 22509,
+      "output_tokens": 22569,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.0
+    },
+    "translategemma:12b": {
+      "calls": 406,
+      "input_tokens": 249222,
+      "output_tokens": 17511,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.0
+    }
+  },
+  "final_checks": {
+    "reading_speed": {
+      "counts": {
+        "info": 0,
+        "warn": 0,
+        "error": 38
+      },
+      "lines": {
+        "info": 0,
+        "warn": 0,
+        "error": 38
+      },
+      "affected_lines": 38,
+      "rate": 0.087
+    },
+    "negation": {
+      "counts": {
+        "info": 0,
+        "warn": 6,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 6,
+        "error": 0
+      },
+      "affected_lines": 6,
+      "rate": 0.0137
+    },
+    "length_ratio": {
+      "counts": {
+        "info": 0,
+        "warn": 5,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 5,
+        "error": 0
+      },
+      "affected_lines": 5,
+      "rate": 0.0114
+    },
+    "untranslated": {
+      "counts": {
+        "info": 0,
+        "warn": 0,
+        "error": 25
+      },
+      "lines": {
+        "info": 0,
+        "warn": 0,
+        "error": 25
+      },
+      "affected_lines": 25,
+      "rate": 0.0572
+    },
+    "glossary": {
+      "counts": {
+        "info": 0,
+        "warn": 6,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 6,
+        "error": 0
+      },
+      "affected_lines": 6,
+      "rate": 0.0137
+    },
+    "names": {
+      "counts": {
+        "info": 0,
+        "warn": 1,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 1,
+        "error": 0
+      },
+      "affected_lines": 1,
+      "rate": 0.0023
+    }
+  },
+  "reading_speed": {
+    "cps_p50": 12.0,
+    "cps_p95": 19.0,
+    "cps_max": 31.63,
+    "over_limit": 36,
+    "cps_histogram": [
+      0,
+      0,
+      0,
+      3,
+      5,
+      16,
+      20,
+      33,
+      30,
+      29,
+      26,
+      41,
+      39,
+      35,
+      28,
+      22,
+      12,
+      15,
+      5,
+      4,
+      4,
+      4,
+      1,
+      1,
+      0,
+      0,
+      1,
+      0,
+      1,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "snapshots": {
+    "translate_dialogue": {
+      "episodes": 1,
+      "changed": 346,
+      "new": 107,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "translate_signs": {
+      "episodes": 1,
+      "changed": 60,
+      "new": 20,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "translate_songs": {
+      "episodes": 1,
+      "changed": 0,
+      "new": 0,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "redistribute_sentences": {
+      "episodes": 1,
+      "changed": 128,
+      "new": 11,
+      "resolved": 57,
+      "edit_ratio_mean": 0.0048
+    }
+  },
+  "worst_episodes": [
+    {
+      "episode": "S01E01",
+      "lines": 437,
+      "error_lines": 63,
+      "error_rate": 0.1442
+    }
+  ],
+  "missing_metrics": [],
+  "warnings": []
+}
