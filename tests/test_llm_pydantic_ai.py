@@ -18,6 +18,15 @@ from translaterany.llm.client import (
 from translaterany.llm.pydantic_ai_client import PydanticAIClient
 
 
+def _cloud_config(**kw) -> LLMConfig:
+    """Modelos num provedor de nuvem: o caminho pydantic-ai atende só nuvem (Ollama vai pela API nativa)."""
+    return LLMConfig(
+        providers={"openai": ProviderConfig(api_key="sk-test")},
+        models={"translategemma": ModelConfig(provider="openai", model="translategemma:12b")},
+        **kw,
+    )
+
+
 class ItemOut(BaseModel):
     id: str
     text: str
@@ -28,7 +37,7 @@ class BatchOut(BaseModel):
 
 
 def test_pydantic_ai_client_resolution_and_generation(monkeypatch):
-    config = LLMConfig()
+    config = _cloud_config()
     client = PydanticAIClient(config)
 
     # Mock da geração do agent
@@ -63,7 +72,7 @@ def test_pydantic_ai_client_resolution_and_generation(monkeypatch):
 
 
 def test_pydantic_ai_client_maps_connection_error(monkeypatch):
-    config = LLMConfig()
+    config = _cloud_config()
     client = PydanticAIClient(config)
 
     async def mock_run_fail(*args, **kwargs):
@@ -82,7 +91,7 @@ def test_pydantic_ai_client_maps_connection_error(monkeypatch):
 
 
 def test_pydantic_ai_client_maps_timeout_error(monkeypatch):
-    config = LLMConfig()
+    config = _cloud_config()
     client = PydanticAIClient(config)
 
     async def mock_run_timeout(*args, **kwargs):
@@ -101,7 +110,7 @@ def test_pydantic_ai_client_maps_timeout_error(monkeypatch):
 
 
 def test_pydantic_ai_client_maps_content_filter_error(monkeypatch):
-    config = LLMConfig()
+    config = _cloud_config()
     client = PydanticAIClient(config)
 
     async def mock_run_refusal(*args, **kwargs):
@@ -120,7 +129,7 @@ def test_pydantic_ai_client_maps_content_filter_error(monkeypatch):
 
 
 def test_pydantic_ai_client_maps_string_refusal_error(monkeypatch):
-    config = LLMConfig()
+    config = _cloud_config()
     client = PydanticAIClient(config)
 
     async def mock_run_refusal(*args, **kwargs):
@@ -139,7 +148,7 @@ def test_pydantic_ai_client_maps_string_refusal_error(monkeypatch):
 
 
 def test_pydantic_ai_client_maps_unexpected_model_behavior_error(monkeypatch):
-    config = LLMConfig()
+    config = _cloud_config()
     client = PydanticAIClient(config)
 
     async def mock_run_validation(*args, **kwargs):
@@ -158,7 +167,7 @@ def test_pydantic_ai_client_maps_unexpected_model_behavior_error(monkeypatch):
 
 
 def test_pydantic_ai_client_maps_validation_error(monkeypatch):
-    config = LLMConfig()
+    config = _cloud_config()
     client = PydanticAIClient(config)
 
     async def mock_run_validation(*args, **kwargs):
@@ -209,7 +218,7 @@ def test_pydantic_ai_client_unknown_provider_raises_config_error():
 
 
 def test_pydantic_ai_client_resolves_profile_task_alias(monkeypatch):
-    config = LLMConfig(profile="local")
+    config = _cloud_config(profile="local")
     client = PydanticAIClient(config)
 
     async def mock_run(*args, **kwargs):
@@ -272,7 +281,7 @@ def test_pydantic_ai_client_resolves_custom_base_url_and_api_key():
 
 
 def test_pydantic_ai_client_generate_inside_running_event_loop(monkeypatch):
-    config = LLMConfig()
+    config = _cloud_config()
     client = PydanticAIClient(config)
 
     async def mock_run(*args, **kwargs):

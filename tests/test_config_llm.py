@@ -13,7 +13,7 @@ def test_default_llm_config_is_local_with_ollama():
     assert config.llm.providers["ollama"].base_url == "http://localhost:11434/v1"
     assert "translategemma" in config.llm.models
     assert config.llm.models["translategemma"].model == "translategemma:12b"
-    assert config.llm.models["translategemma"].num_ctx == 4096
+    assert config.llm.models["translategemma"].num_ctx == 8192
     assert config.llm.profiles["local"].translate == "translategemma"
     assert config.llm.profiles["local"].review == "gemma4"
 

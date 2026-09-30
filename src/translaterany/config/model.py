@@ -20,6 +20,7 @@ class ModelConfig(_Strict):
     model: str
     num_ctx: int = 4096
     temperature: float = 0.3
+    think: bool = False  # raciocínio de modelos "thinking" (ex.: gemma4); desligado gasta bem menos tokens
     input_price_per_mtok: float = 0.0  # USD por milhão de tokens de entrada
     output_price_per_mtok: float = 0.0  # USD por milhão de tokens de saída
 
@@ -42,8 +43,8 @@ class LLMConfig(_Strict):
     )
     models: dict[str, ModelConfig] = Field(
         default_factory=lambda: {
-            "translategemma": ModelConfig(provider="ollama", model="translategemma:12b", num_ctx=4096, temperature=0.3),
-            "gemma4": ModelConfig(provider="ollama", model="gemma4:12b", num_ctx=8192, temperature=0.7),
+            "translategemma": ModelConfig(provider="ollama", model="translategemma:12b", num_ctx=8192, temperature=0.3),
+            "gemma4": ModelConfig(provider="ollama", model="gemma4:12b", num_ctx=16384, temperature=0.7),
         }
     )
     profiles: dict[str, ProfileConfig] = Field(

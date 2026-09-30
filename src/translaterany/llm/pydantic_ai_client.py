@@ -18,9 +18,10 @@ from translaterany.llm.client import (
     LLMTransientError,
     Usage,
 )
+from translaterany.llm.ollama_native import OllamaNativeClient
 
 if TYPE_CHECKING:
-    from translaterany.config.model import LLMConfig
+    from translaterany.config.model import LLMConfig, ModelConfig
 
 network_errors = [httpx.ConnectError, httpx.TimeoutException]
 try:
@@ -60,6 +61,7 @@ except ImportError:
 class PydanticAIClient(LLMClient):
     def __init__(self, config: LLMConfig):
         self.config = config
+        self._ollama: dict[str, OllamaNativeClient] = {}
 
     def _resolve_model(self, model_alias: str) -> tuple[str, str | None, str | None, dict[str, Any]]:
         # Resolve se model_alias for o nome direto ou tarefa do perfil ativo
@@ -109,6 +111,9 @@ class PydanticAIClient(LLMClient):
 
     def generate[T: BaseModel](self, request: LLMRequest[T]) -> LLMResponse[T]:
         model_name, base_url, api_key, extra_args = self._resolve_model(request.model)
+        model_cfg = self._model_config(request.model)
+        if model_cfg.provider == "ollama":
+            return self._generate_ollama(request, model_cfg, base_url or "http://localhost:11434")
 
         if request.temperature is not None:
             extra_args["temperature"] = request.temperature
@@ -169,4 +174,28 @@ class PydanticAIClient(LLMClient):
             output=result.data,
             model_id=model_name,
             usage=usage,
+        )
+
+
+    def _model_config(self, alias: str) -> ModelConfig:
+        profile = self.config.profiles.get(self.config.profile)
+        if profile is not None and isinstance(getattr(profile, alias, None), str):
+            alias = getattr(profile, alias)
+        return self.config.models[alias]  # _resolve_model já validou
+
+    def _generate_ollama[T: BaseModel](
+        self, request: LLMRequest[T], model_cfg: ModelConfig, base_url: str
+    ) -> LLMResponse[T]:
+        """Ollama vai pela API nativa: o /v1 ignora num_ctx e não desliga o raciocínio."""
+        client = self._ollama.get(base_url)
+        if client is None:
+            client = self._ollama[base_url] = OllamaNativeClient(base_url)
+        return client.chat(
+            model=model_cfg.model,
+            instructions=request.instructions,
+            prompt=request.prompt,
+            output_type=request.output_type,
+            num_ctx=model_cfg.num_ctx,
+            temperature=request.temperature if request.temperature is not None else model_cfg.temperature,
+            think=model_cfg.think,
         )
