@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -88,6 +89,34 @@ def extract_track(path: Path, track_id: int, dest: Path) -> None:
     result = _run(["mkvextract", str(path), "tracks", f"{track_id}:{dest}"], check=False)
     if result.returncode > 1 or not dest.exists():
         raise MediaError(f"falha ao extrair a faixa {track_id} de {path.name}: {_first_line(result)}")
+
+
+_FONT_MIMES = frozenset(
+    {"application/x-truetype-font", "application/vnd.ms-opentype", "application/font-sfnt", "application/x-font-ttf"}
+)
+_FONT_EXTS = (".ttf", ".otf", ".ttc")
+
+
+def font_attachments(info: MkvInfo) -> list[Attachment]:
+    return [
+        a
+        for a in info.attachments
+        if a.content_type.startswith("font/")
+        or a.content_type in _FONT_MIMES
+        or a.file_name.lower().endswith(_FONT_EXTS)
+    ]
+
+
+def extract_attachments(path: Path, attachments: Sequence[Attachment], dest_dir: Path) -> list[Path]:
+    """Extrai anexos para dest_dir como '<id>-<nome>'. Devolve os arquivos que de fato existem."""
+    if not attachments:
+        return []
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    targets = {a.id: dest_dir / f"{a.id}-{Path(a.file_name).name or 'font'}" for a in attachments}
+    result = _run(["mkvextract", str(path), "attachments", *(f"{i}:{p}" for i, p in targets.items())], check=False)
+    if result.returncode > 1:
+        raise MediaError(f"falha ao extrair anexos de {path.name}: {_first_line(result)}")
+    return [p for p in targets.values() if p.exists()]
 
 
 def tool_available(name: str) -> str | None:
