@@ -2,7 +2,7 @@
 
 - **Marco:** M5 (ver [`ROADMAP.md`](../../../ROADMAP.md))
 - **Data:** 2026-09-30
-- **Status:** proposto (2026-09-30) · plano: pendente
+- **Status:** aprovado (2026-09-30) · plano: [2026-09-30-m5-verificacoes-metricas.md](../plans/2026-09-30-m5-verificacoes-metricas.md)
 - **Depende de:** M0 ([spec](2026-09-24-m0-fundacao-design.md)), M1 ([spec](2026-09-24-m1-midia-legendas-design.md)), M2 ([spec](2026-09-26-m2-camada-ia-traducao-design.md)), M3 ([spec](2026-09-26-m3-memoria-serie-design.md)) e M4 ([spec](2026-09-27-m4-traducao-contextual-design.md))
 
 ---
@@ -80,7 +80,7 @@ class LineInput(BaseModel):
 
 class CheckEnv(BaseModel):
     glossary: list[GlossaryEntry]        # glossário filtrado do episódio
-    names: list[str]                     # nomes + aliases de characters.yaml
+    names: list[list[str]]               # por personagem: nome + aliases (characters.yaml)
     limits: ChecksConfig                 # limites do config
 
 class Finding(BaseModel):
@@ -89,6 +89,7 @@ class Finding(BaseModel):
     severity: Severity
     message: str                         # em PT-BR
     value: float | None = None           # ex.: CPS medido
+    excerpt: str | None = None           # trecho do PT (até 60 caracteres), só nos achados finais
 ```
 
 Checagens de linha implementam `LineCheck` (`name`, `line_types`, `run(line, env) -> list[Finding]`) e ficam num registro `CHECKS`. `run_line_checks(lines, env) -> list[Finding]` aplica todas as habilitadas; uma checagem que lança exceção gera `Finding(check="check_crashed", severity="error", ...)` em vez de propagar.
@@ -100,7 +101,7 @@ Os textos são comparados **sem tags ASS e sem marcadores**, exceto em `markers`
 | Checagem | Regra | Severidade | Tipos |
 |---|---|---|---|
 | `markers` | multiconjunto de `⟦n⟧` do PT ≠ do EN | error | todos |
-| `untranslated` | PT idêntico ao EN (ignorando caixa/espaços), ou ≥ 50% das palavras do PT em lista de palavras funcionais inglesas (*the, and, you, is, to, of, what, I…*) com ≥ 3 palavras | error | dialogue, sign |
+| `untranslated` | PT idêntico ao EN (ignorando caixa/espaços) com ≥ 2 palavras no EN — interjeições curtas (*Huh?*) não contam —, ou ≥ 50% das palavras do PT em lista de palavras funcionais inglesas (*the, and, you, is, to, of, what, I…*) com ≥ 3 palavras | error | dialogue, sign |
 | `length_ratio` | `len(PT)/len(EN)` fora de `[0.5, 2.0]`, só se `len(EN) ≥ 10` | warn | dialogue |
 | `numbers` | sequência de algarismos do EN ausente no PT | warn | dialogue, sign |
 | `negation` | EN com negação (*not, n't, never, no, nobody, nothing, none, neither, nor, without*) e PT sem (*não, nunca, nem, nada, ninguém, nenhum(a), jamais, sem*) | warn | dialogue |
@@ -210,12 +211,12 @@ class QualityChecksStage(Stage):
     version = "1"
     scope = StageScope.EPISODE
     reads_source = True           # para extrair fontes anexadas
-    inputs = ("normalize", "classify", "merge_sentences", "consolidate_memory", *snapshots)
+    inputs = ("normalize", "classify", "extract", "merge_sentences", "consolidate_memory", *snapshots)
 ```
 
 - `Stage` ganha `produces_texts: ClassVar[bool] = False`; `translate_dialogue`, `translate_signs`, `translate_songs` e `redistribute_sentences` passam a declarar `True`.
-- `Stage` ganha o gancho `bind_pipeline(self, previous: Sequence[Stage]) -> None` (padrão: não faz nada). O loader (`_build_stages`) chama-o logo após instanciar a etapa, com as etapas **habilitadas** que vêm antes, e só depois valida as entradas. `QualityChecksStage` usa-o para definir `self.snapshots` (as anteriores com `produces_texts`, na ordem do pipeline) e `self.inputs`.
-- `merge_sentences` e `consolidate_memory` entram nas entradas só se estiverem habilitadas antes dela (sem eles: nenhum id composto; glossário/fichas vazios).
+- `Stage` ganha o gancho `bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None` (padrão: não faz nada). O loader (`_build_stages`) chama-o logo após instanciar a etapa, com as etapas **habilitadas** que vêm antes e o `AppConfig`, e só depois valida as entradas. `QualityChecksStage` usa-o para definir `self.snapshots` (as anteriores com `produces_texts`, na ordem do pipeline), `self.inputs` e `self.limits` (a seção `[checks]`). Sem o gancho (etapa construída direto, como nos testes E2E), valem os quatro instantâneos padrão e `ChecksConfig()`.
+- `extract` (estilos → fontes), `merge_sentences` e `consolidate_memory` entram nas entradas só se estiverem habilitadas antes dela (sem eles: nenhum id composto; glossário/fichas vazios).
 - `cache_payload` inclui o `ChecksConfig` — mudar limites recalcula as métricas.
 - Entra no `DEFAULT_PIPELINE` como **última** etapa (depois de `remux`).
 

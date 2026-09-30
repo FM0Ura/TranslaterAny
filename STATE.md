@@ -10,8 +10,8 @@
 ## Onde estamos
 
 - **Fase:** M5 em especificação.
-- **Marco atual:** **M5 — Verificações e métricas** — spec escrito, aguardando revisão do usuário.
-- **Próxima ação:** revisão do spec do M5 e, aprovado, plano de implementação.
+- **Marco atual:** **M5 — Verificações e métricas** — spec aprovado; plano escrito, aguardando revisão.
+- **Próxima ação:** revisão do plano do M5 e escolha do modo de execução.
 
 ## Progresso dos marcos
 
@@ -24,7 +24,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
 | M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
-| M5 — Verificações e métricas | 📝 | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | — | spec em revisão |
+| M5 — Verificações e métricas | 📋 | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | plano em revisão (13 tarefas) |
 | M6 — Refinamento I | ⬜ | — | — | |
 | M7 — Refinamento II | ⬜ | — | — | |
 | M8 — Portões e laço do QA | ⬜ | — | — | fim da v1 |
@@ -139,7 +139,7 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Revisar o spec do **M5** e escrever o plano de implementação.
+1. Revisar o plano do **M5** e executá-lo.
 2. Validação prática do pipeline do M4 em casos de teste reais com modelos locais.
 
 
