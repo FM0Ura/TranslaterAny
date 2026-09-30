@@ -16,17 +16,17 @@ def test_songs_are_skipped_by_default() -> None:
 
 
 def test_flatten_breaks_joins_lines() -> None:
-    assert flatten_breaks("Since I was young,\\NI had always wondered.") == "Since I was young, I had always wondered."
+    assert flatten_breaks("When the rain stopped,\\NI walked home alone.") == "When the rain stopped, I walked home alone."
     assert flatten_breaks("a \\N b\\nc") == "a b c"
 
 
 def test_wrap_line_keeps_short_lines_on_one_line() -> None:
-    assert wrap_line("Vai dormir logo.", 42) == "Vai dormir logo."
-    assert wrap_line("Desde pequeno,\\Nsempre me perguntei.", 42) == "Desde pequeno, sempre me perguntei."
+    assert wrap_line("Fecha a porta logo.", 42) == "Fecha a porta logo."
+    assert wrap_line("Quando a chuva parou,\\Neu voltei sozinho.", 42) == "Quando a chuva parou, eu voltei sozinho."
 
 
 def test_wrap_line_splits_long_lines_balanced_and_bottom_heavy() -> None:
-    text = "Você tem usado isso para colar em todas as suas provas desde o começo do ano."
+    text = "Você tem escondido as chaves da padaria em todas as gavetas desde o começo do ano."
     wrapped = wrap_line(text, 42)
     top, bottom = wrapped.split("\\N")
     assert top + " " + bottom == text
@@ -40,12 +40,12 @@ def test_wrap_line_breaks_ties_toward_longer_bottom_line() -> None:
 
 
 def test_wrap_line_prefers_break_after_punctuation() -> None:
-    wrapped = wrap_line("No entanto, agora eu finalmente encontrei uma maneira de usar meu poder.", 42)
-    assert wrapped.startswith("No entanto, agora eu finalmente") or wrapped.split("\\N")[0].endswith(",")
+    wrapped = wrap_line("Depois de esperar tanto tempo sob a chuva, eu finalmente consegui abrir a velha porta.", 42)
+    assert wrapped.startswith("Depois de esperar tanto tempo sob a chuva,") or wrapped.split("\\N")[0].endswith(",")
 
 
 def test_wrap_line_counts_visible_chars_only() -> None:
-    text = "⟦1⟧Nossa!⟦2⟧ Eu não fazia ideia de que dava pra deixar elas gostosas assim!"
+    text = "⟦1⟧Uau!⟦2⟧ Eu nunca imaginei que o bolo ficaria tão macio desse jeito!"
     top, bottom = wrap_line(text, 42).split("\\N")
     assert "⟦1⟧" in top and "⟦2⟧" in top
 

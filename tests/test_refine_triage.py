@@ -10,14 +10,14 @@ def line(i: str, src: str, tgt: str) -> LineInput:
 
 def test_meaning_signals_from_checks() -> None:
     lines = [line("u1", "I don't know.", "Eu sei."), line("u2", "Great!", "Ótimo!"),
-             line("u3", "You cheated on 3 tests.", "Você colou, seu merda.")]  # fmt: skip
+             line("u3", "You lied 3 times.", "Você mentiu, seu merda.")]  # fmt: skip
     got = meaning_signals(lines, CheckEnv())
     assert got == {"u1": ["negation"], "u3": ["numbers", "profanity_added"]}
 
 
 def test_colloquial_signals() -> None:
     lines = [
-        line("u1", "However, I found it.", "No entanto, eu encontrei."),
+        line("u1", "However, I lost it.", "No entanto, eu perdi."),
         line("u2", "I'll do it.", "Vou fazê-lo."),
         line("u3", "I'm really tired.", "Eu estou cansado."),
         line("u4", "Are you coming?", "Tu vens?"),

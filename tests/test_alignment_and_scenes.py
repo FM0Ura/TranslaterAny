@@ -44,9 +44,9 @@ def test_translator_sends_one_line_per_call_with_previous_translation_as_context
 
 
 def test_translator_accepts_bracketed_ids() -> None:
-    llm = FakeLLM(lambda req: TranslationBatch(items=[TranslationItem(id="[u1]", text="Ah, não posso dizer.")]))
+    llm = FakeLLM(lambda req: TranslationBatch(items=[TranslationItem(id="[u1]", text="Ah, isso eu não conto.")]))
     tr = DialogueBatchTranslator(llm, max_lines_per_batch=1)
-    assert tr.translate_lines(lines(1)) == {"u1": "Ah, não posso dizer."}
+    assert tr.translate_lines(lines(1)) == {"u1": "Ah, isso eu não conto."}
 
 
 def test_translator_accepts_single_item_with_wrong_id_in_single_line_call() -> None:

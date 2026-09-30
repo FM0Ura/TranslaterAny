@@ -43,8 +43,8 @@ Style: Default,Arial,48
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:01:00.00,0:01:03.00,Default,,0,0,0,,You've been using it to cheat on all your tests.
-Dialogue: 0,0:01:04.00,0:01:07.00,Default,,0,0,0,,However, I found it.
+Dialogue: 0,0:01:00.00,0:01:03.00,Default,,0,0,0,,You've been hiding it from all the neighbors.
+Dialogue: 0,0:01:04.00,0:01:07.00,Default,,0,0,0,,However, I lost it.
 """
 
 
@@ -54,16 +54,16 @@ def script(req):
         for line in req.prompt.splitlines():
             m = re.match(r"^\[(u[^\]]+)\]\s*(.*)$", line.strip())
             if m:
-                pt = {"You've": "Você andou colando em tudo, seu merda.", "However": "No entanto, eu encontrei."}
+                pt = {"You've": "Você andou escondendo tudo, seu merda.", "However": "No entanto, eu perdi."}
                 text = next(v for k, v in pt.items() if m.group(2).startswith(k))
                 items.append(TranslationItem(id=m.group(1), text=text))
         return TranslationBatch(items=items)
     if req.output_type is EditsResponse and req.tag == "review_meaning" and "merda" in req.prompt:
         uid = re.search(r'"id": "(u\d+)", "en": "You', req.prompt).group(1)
-        return EditsResponse(edits=[LineEdit(id=uid, new="Você andou colando em todas as provas.")])
+        return EditsResponse(edits=[LineEdit(id=uid, new="Você andou escondendo tudo dos vizinhos.")])
     if req.output_type is EditsResponse and req.tag == "colloquial":
         uid = re.search(r'"id": "(u\d+)", "en": "However', req.prompt).group(1)
-        return EditsResponse(edits=[LineEdit(id=uid, new="Mas eu achei.")])
+        return EditsResponse(edits=[LineEdit(id=uid, new="Mas eu perdi.")])
     try:
         return req.output_type()
     except Exception:
@@ -83,7 +83,7 @@ def test_m6_end_to_end(tmp_path: Path) -> None:
     summary = Runner(stages, store, FakeLLM(script)).run(series, episodes)
     assert not summary.failed
     final = (store.artifact_dir(series.key, episodes[0].key) / "redistribute_sentences.json").read_text()
-    assert "merda" not in final and "todas as provas" in final and "Mas eu achei." in final
+    assert "merda" not in final and "dos vizinhos" in final and "Mas eu perdi." in final
     manifest = store.load_manifest(series, episodes[0])
     assert manifest.stages["review_meaning"].counters["edits_applied"] == 1
     assert manifest.stages["colloquial"].counters["edits_applied"] == 1

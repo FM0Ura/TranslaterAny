@@ -9,7 +9,7 @@ def found(src: str, tgt: str, kind: str = "dialogue") -> list:
 
 
 def test_flags_profanity_absent_in_source() -> None:
-    hits = found("You've been using it to cheat on all your tests.", "Você colou em tudo, seu merda.")
+    hits = found("You've been hiding it from all the neighbors.", "Você escondeu tudo, seu merda.")
     assert len(hits) == 1 and hits[0].severity == "warn" and "merda" in hits[0].message
 
 

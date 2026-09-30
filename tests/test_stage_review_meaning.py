@@ -25,8 +25,8 @@ def ev(i: int, unit: str) -> EventInfo:
 DOC = NormalizedDoc(
     encoding=Encoding(bom=False, newline="\n"), format=[],
     events=[ev(0, "u1"), ev(1, "u2"), ev(2, "u3"), ev(3, "u4")],
-    units=[Unit(id="u1", style="Default", text="What's this I hear?", markers=0, events=[0]),
-           Unit(id="u2", style="Default", text="You cheated on all your tests.", markers=0, events=[1]),
+    units=[Unit(id="u1", style="Default", text="Where did the cat go?", markers=0, events=[0]),
+           Unit(id="u2", style="Default", text="You lied about all the recipes.", markers=0, events=[1]),
            Unit(id="u3", style="Default", text="Wait for me...", markers=0, events=[2]),
            Unit(id="u4", style="Default", text="...I'm coming!", markers=0, events=[3])],
 )  # fmt: skip
@@ -37,14 +37,14 @@ CLASSES = Classification(main_style="Default", counts={},
                                  Scene(id="s2", start_ms=6000, end_ms=12000, events=[2, 3])])  # fmt: skip
 MERGED = MergedUnitsDoc(units=[
     CompositeUnit(composite_id="u1", unit_ids=["u1"], durations_ms=[2500], clean_text="",
-                  text_with_markers="What's this I hear?"),
+                  text_with_markers="Where did the cat go?"),
     CompositeUnit(composite_id="u2", unit_ids=["u2"], durations_ms=[2500], clean_text="",
-                  text_with_markers="You cheated on all your tests."),
+                  text_with_markers="You lied about all the recipes."),
     CompositeUnit(composite_id="u3+u4", unit_ids=["u3", "u4"], durations_ms=[2500, 2500], clean_text="",
                   text_with_markers="Wait for me... ...I'm coming!"),
 ], merged_count=1)  # fmt: skip
 SCENE = SceneAnalysisDoc(lines={"u1": LineContext(speaker="Yumi", tone="teasing")})
-DIALOGUE = UnitTexts(texts={"u1": "Que barulho é esse?", "u2": "Você colou em tudo, seu merda.",
+DIALOGUE = UnitTexts(texts={"u1": "Cadê o gato?", "u2": "Você mentiu sobre tudo, seu merda.",
                             "u3+u4": "Espera... já vou!"}, used_terms={"Yu": "abc"})  # fmt: skip
 
 
@@ -79,15 +79,15 @@ def test_applies_valid_edits_per_scene_block() -> None:
     def script(req):
         prompts.append(req.prompt)
         if '"u2"' in req.prompt:
-            return EditsResponse(edits=[LineEdit(id="u1", new="Que história é essa?"),
-                                        LineEdit(id="u2", new="Você colou em todas as provas.")])  # fmt: skip
+            return EditsResponse(edits=[LineEdit(id="u1", new="Para onde o gato foi?"),
+                                        LineEdit(id="u2", new="Você mentiu sobre todas as receitas.")])  # fmt: skip
         return EditsResponse()
 
     doc, counters, _ = run(FakeLLM(script))
     assert len(prompts) == 2  # uma chamada por cena
     assert doc.texts == {
-        "u1": "Que história é essa?",
-        "u2": "Você colou em todas as provas.",
+        "u1": "Para onde o gato foi?",
+        "u2": "Você mentiu sobre todas as receitas.",
         "u3+u4": "Espera... já vou!",
     }
     assert doc.used_terms == {"Yu": "abc"}
@@ -99,7 +99,7 @@ def test_applies_valid_edits_per_scene_block() -> None:
 def test_invalid_edit_rejected_and_failed_block_passes_through() -> None:
     def script(req):
         if '"u2"' in req.prompt:
-            return EditsResponse(edits=[LineEdit(id="u1", new="Que porra é essa?")])  # piora: palavrão novo em u1
+            return EditsResponse(edits=[LineEdit(id="u1", new="Cadê a porra do gato?")])  # piora: palavrão novo em u1
         raise LLMOutputError("json inválido")
 
     doc, counters, _ = run(FakeLLM(script))

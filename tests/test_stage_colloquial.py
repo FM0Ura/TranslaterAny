@@ -11,9 +11,9 @@ from translaterany.refine.edits import EditsResponse, LineEdit
 from translaterany.stages.colloquial import ColloquialStage
 from translaterany.subtitles.texts import UnitTexts
 
-PRE = UnitTexts(texts={"u1": "No entanto, que história é essa?", "u2": "Você colou em tudo, seu merda.",
+PRE = UnitTexts(texts={"u1": "No entanto, para onde o gato foi?", "u2": "Você mentiu sobre tudo, seu merda.",
                        "u3+u4": "Espera... já vou!"})  # fmt: skip
-REVIEWED = UnitTexts(texts={"u1": "No entanto, que história é essa?", "u2": "Você colou em todas as provas.",
+REVIEWED = UnitTexts(texts={"u1": "No entanto, para onde o gato foi?", "u2": "Você mentiu sobre todas as receitas.",
                             "u3+u4": "Espera... já vou!"})  # fmt: skip
 
 
@@ -38,19 +38,19 @@ def test_only_triaged_lines_are_editable_and_context_edits_are_rejected() -> Non
 
     def script(req):
         prompts.append(req.prompt)
-        return EditsResponse(edits=[LineEdit(id="u1", new="Mas que história é essa?"),
+        return EditsResponse(edits=[LineEdit(id="u1", new="Mas para onde o gato foi?"),
                                     LineEdit(id="u3+u4", new="Peraí... tô indo!")])  # u3+u4 não é alvo  # fmt: skip
 
     doc, counters = run(FakeLLM(script))
     assert len(prompts) == 1  # a cena 2 não tem alvo: nenhuma chamada
     assert '"editavel": false' in prompts[0]  # u2 vai como contexto
-    assert doc.texts["u1"] == "Mas que história é essa?" and doc.texts["u3+u4"] == "Espera... já vou!"
+    assert doc.texts["u1"] == "Mas para onde o gato foi?" and doc.texts["u3+u4"] == "Espera... já vou!"
     assert counters["lines_targeted"] == 1 and counters["rejected_unknown_id"] == 1
 
 
 def test_reversal_to_pre_review_text_is_blocked_and_counted() -> None:
     def script(req):
-        return EditsResponse(edits=[LineEdit(id="u2", new="Você colou em tudo, seu merda.")])
+        return EditsResponse(edits=[LineEdit(id="u2", new="Você mentiu sobre tudo, seu merda.")])
 
     stage = ColloquialStage()
     stage.select_targets = lambda ids, data: {i: ["speech_style"] for i in ids}  # todos alvo
@@ -58,7 +58,7 @@ def test_reversal_to_pre_review_text_is_blocked_and_counted() -> None:
     ctx = SimpleNamespace(inputs=Inputs(), output=base.Output(), llm=FakeLLM(script), metrics=metrics, store=None,
                           series=SimpleNamespace(key="s"), episode=SimpleNamespace(key="S01E01"))  # fmt: skip
     stage.run(ctx)
-    assert base.Output.doc.texts["u2"] == "Você colou em todas as provas."
+    assert base.Output.doc.texts["u2"] == "Você mentiu sobre todas as receitas."
     assert metrics.counters["reversals"] >= 1
 
 
