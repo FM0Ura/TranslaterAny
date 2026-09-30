@@ -145,7 +145,7 @@ def colloquial_signals(lines: Sequence[LineInput], speakers_with_style: set[str]
 
 ### 5.4 Nova checagem `profanity_added` (pacote `checks`)
 
-`warn` quando o PT contém palavra do léxico de palavrões PT (merda, porra, caralho, puta, foda, foder, fodido, cacete, desgraça, arrombado, babaca, idiota*, imbecil*…) e o EN não contém nenhuma do léxico EN (shit, fuck, damn, bitch, bastard, ass, crap, idiot, moron, jerk, hell…). Tipos: `dialogue`. *Termos leves como "idiota" só contam se o EN também não tiver insulto equivalente (mesma regra).* Aparece no `report`.
+`warn` quando o PT contém palavra do léxico de palavrões PT (merda, porra, caralho, puta, foda, foder, fodido, cacete, desgraça, arrombado, babaca, idiota, imbecil…) e o EN não contém nenhuma do léxico EN (shit, fuck, damn, bitch, bastard, ass, crap, idiot, moron, jerk, hell…) — palavra inteira, sem diferenciar caixa. Tipos: `dialogue`. Aparece no `report`.
 
 ---
 
