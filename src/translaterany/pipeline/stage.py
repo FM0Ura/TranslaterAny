@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -15,6 +15,9 @@ from translaterany.pipeline.artifacts import ArtifactStore, InputReader, OutputW
 from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.pipeline.units import Episode, Series
 from translaterany.util.doctor import Check
+
+if TYPE_CHECKING:
+    from translaterany.config.model import AppConfig
 
 
 class StageScope(StrEnum):
@@ -56,6 +59,7 @@ class Stage(ABC):
     inputs: tuple[str, ...] = ()  # pode ser redefinido por instância (a partir das opções)
     reads_source: ClassVar[bool] = False  # lê o arquivo de origem diretamente
     translates: ClassVar[bool] = False  # produz texto traduzido (libera publish/remux)
+    produces_texts: ClassVar[bool] = False  # artefato é UnitTexts (instantâneo medido pela quality_checks)
     enabled_by_default: ClassVar[bool] = True  # sem [stages.X] no config, a etapa roda?
     Options: ClassVar[type[BaseModel]] = NoOptions
 
@@ -69,6 +73,10 @@ class Stage(ABC):
     def cache_payload(self, series: Series, episode: Episode | None) -> Any:
         """Dados extras (JSON) que entram na chave de cache — ex.: a parte do series.toml que a etapa usa."""
         return None
+
+    def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:  # noqa: B027
+        """Chamado pelo loader com as etapas habilitadas que vêm antes desta e o config.
+        Etapas que dependem da composição do pipeline (ex.: quality_checks) ajustam `inputs` aqui."""
 
     def verify_cached(self, ctx: StageContext, artifact_path: Path) -> bool:
         """Chamado num cache hit. Etapas com efeitos fora do diretório de dados conferem se eles

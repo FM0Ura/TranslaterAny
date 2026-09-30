@@ -160,6 +160,7 @@ def _build_stages(config: AppConfig, registry: StageRegistry, where: str) -> lis
         if cls.reads_source and cls.scope is StageScope.SERIES:
             errors.append(f"stages.{name}: reads_source não é suportado em etapas de série")
         stage = cls(options)  # as entradas podem depender das opções (ex.: write.text_source)
+        stage.bind_pipeline(tuple(stages), config)
         for dep in stage.inputs:
             if dep not in available:
                 if dep not in order:
