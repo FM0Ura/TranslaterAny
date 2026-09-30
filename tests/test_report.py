@@ -104,3 +104,16 @@ def test_json_roundtrip_and_compare(store: ArtifactStore, tmp_path: Path) -> Non
     rows = {r.metric: r for r in compare_reports(current, baseline)}
     assert rows["final.reading_speed.rate"].delta == pytest.approx(0.25 - 0.5)
     assert "stage.translate_dialogue.cost_usd" in rows
+
+
+def test_rate_counts_affected_lines_not_findings(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path / "data")
+    m = metrics(10, 0, 12)
+    m.final.findings = [Finding(check="reading_speed", unit_id="u1", severity="error", message=x) for x in "abc"]
+    m.final.findings.append(Finding(check="reading_speed", unit_id="u1", severity="warn", message="d"))
+    m.final.checks = {"reading_speed": SeverityCounts(error=3, warn=1)}
+    m.final.lines_by_check = {"reading_speed": SeverityCounts(error=1, warn=1)}
+    write_episode(store, "S01E01", metrics=m)
+    cs = build_report(store, SERIES, "Show", ["quality_checks"]).final_checks["reading_speed"]
+    assert cs.counts.error == 3 and cs.affected_lines == 1 and cs.lines.error == 1
+    assert cs.rate == pytest.approx(0.1) and cs.rate <= 1

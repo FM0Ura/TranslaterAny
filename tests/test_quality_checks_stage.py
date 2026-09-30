@@ -119,3 +119,13 @@ def test_font_checks_turns_unexpected_errors_into_info_finding() -> None:
     assert len(findings) == 1
     assert findings[0].severity == "info" and findings[0].check == "font_glyphs"
     assert "RuntimeError" in findings[0].message
+
+
+def test_assemble_metrics_fills_lines_by_check() -> None:
+    from translaterany.checks import CheckEnv as _Env
+    from translaterany.checks.snapshots import LineSource
+
+    sources = {"u1": LineSource("x", "dialogue", "", 100)}
+    metrics, _ = assemble_metrics([("s", {"u1": "a" * 80 + "\\N" + "b\\Nc\\Nd"})], sources, {}, _Env(), [])
+    rs = metrics.final.lines_by_check["reading_speed"]
+    assert rs.error == 1 and metrics.final.checks["reading_speed"].error >= 2

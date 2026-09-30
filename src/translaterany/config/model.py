@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class _Strict(BaseModel):
@@ -81,12 +81,19 @@ class TranslationConfig(_Strict):
 class ChecksConfig(_Strict):
     """Limites das checagens (M5). Padrão Netflix PT-BR para velocidade de leitura."""
 
-    max_cps: float = 17.0
-    max_cpl: int = 42
-    max_lines: int = 2
+    max_cps: float = Field(17.0, gt=0)
+    max_cpl: int = Field(42, gt=0)
+    max_lines: int = Field(2, ge=1)
     length_ratio: tuple[float, float] = (0.5, 2.0)
-    length_ratio_min_chars: int = 10
+    length_ratio_min_chars: int = Field(10, ge=0)
     disabled: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_length_ratio(self) -> ChecksConfig:
+        low, high = self.length_ratio
+        if not 0 < low <= high:
+            raise ValueError("length_ratio deve ter 0 < mínimo <= máximo")
+        return self
 
 
 class AppConfig(_Strict):

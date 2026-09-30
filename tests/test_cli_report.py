@@ -81,3 +81,33 @@ def test_report_episode_escapes_untrusted_markup(tmp_path: Path, series_dir: Pat
     result = _invoke("--config", _config(tmp_path, data_dir), "report", str(series_dir), "--episode", "S01E01")
     assert result.exit_code == 0, result.output
     assert "[Music]" in result.output and "[/i] fala" in result.output and "msg [red]x" in result.output
+
+
+def test_report_zero_episodes_exits_1(tmp_path: Path, series_dir: Path) -> None:
+    data_dir = tmp_path / "data"
+    store = ArtifactStore(data_dir)
+    series, _ = discover(series_dir)
+    store.write_series_info(series)
+    result = _invoke("--config", _config(tmp_path, data_dir), "report", str(series_dir))
+    assert result.exit_code == 1 and "Nenhuma métrica encontrada" in result.output
+
+
+def test_report_json_unwritable_exits_2(tmp_path: Path, series_dir: Path) -> None:
+    cfg, _ = _setup(tmp_path, series_dir)
+    blocker = tmp_path / "arquivo"
+    blocker.write_text("x", encoding="utf-8")
+    result = _invoke("--config", cfg, "report", str(series_dir), "--json", str(blocker / "out.json"))
+    assert result.exit_code == 2 and "Não foi possível gravar" in result.output
+
+
+def test_report_baseline_episode_count_mismatch_warns(tmp_path: Path, series_dir: Path) -> None:
+    cfg, _ = _setup(tmp_path, series_dir)
+    out = tmp_path / "base.json"
+    _invoke("--config", cfg, "report", str(series_dir), "--json", str(out))
+    result = _invoke("--config", cfg, "report", str(series_dir), "--episode", "S01E01", "--baseline", str(out))
+    assert result.exit_code == 0 and "não são diretamente comparáveis" in result.output
+
+
+def test_report_shows_affected_lines_column(tmp_path: Path, series_dir: Path) -> None:
+    cfg, _ = _setup(tmp_path, series_dir)
+    assert "Linhas afetadas" in _invoke("--config", cfg, "report", str(series_dir)).output

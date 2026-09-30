@@ -19,6 +19,7 @@ class LineSource:
     line_type: str
     style: str
     duration_ms: int
+    composite: bool = False
 
 
 def build_sources(doc: NormalizedDoc, classes: Classification, merged: MergedUnitsDoc | None) -> dict[str, LineSource]:
@@ -35,7 +36,8 @@ def build_sources(doc: NormalizedDoc, classes: Classification, merged: MergedUni
         if len(comp.unit_ids) > 1 and comp.unit_ids[0] in sources:
             first = sources[comp.unit_ids[0]]
             sources[comp.composite_id] = LineSource(
-                comp.text_with_markers, first.line_type, first.style, sum(comp.durations_ms)
+                comp.text_with_markers, first.line_type, first.style, sum(comp.durations_ms),
+                composite=True,
             )
     return sources
 
@@ -55,7 +57,7 @@ def lines_for(texts: Mapping[str, str], sources: Mapping[str, LineSource]) -> tu
         lines.append(
             LineInput(
                 id=key, line_type=src.line_type, style=src.style, source=src.source, target=target,
-                duration_ms=src.duration_ms,
+                duration_ms=src.duration_ms, composite=src.composite,
             )  # fmt: skip
         )
     return lines, unknown

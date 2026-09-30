@@ -17,6 +17,7 @@ class LineInput(BaseModel):
     source: str  # EN com marcadores ⟦n⟧
     target: str  # PT-BR com marcadores ⟦n⟧
     duration_ms: int = 0
+    composite: bool = False  # id composto: nunca exibido como uma linha só (sem CPL/linhas)
 
 
 class CheckEnv(BaseModel):

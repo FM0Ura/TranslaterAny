@@ -48,3 +48,19 @@ def test_unknown_disabled_check_is_config_error(tmp_path) -> None:
     path.write_text('[checks]\ndisabled = ["nao_existe"]\n', encoding="utf-8")
     with pytest.raises(ConfigError, match="checks.disabled"):
         load_config(path, tmp_path / "data")
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"max_cps": 0},
+        {"max_cpl": 0},
+        {"max_lines": 0},
+        {"length_ratio_min_chars": -1},
+        {"length_ratio": (0, 2.0)},
+        {"length_ratio": (2.0, 0.5)},
+    ],
+)
+def test_checks_rejects_invalid_ranges(bad: dict) -> None:
+    with pytest.raises(ValueError):
+        ChecksConfig(**bad)

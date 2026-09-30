@@ -33,7 +33,9 @@ class StageSummary(BaseModel):
 
 
 class CheckSummary(BaseModel):
-    counts: SeverityCounts = Field(default_factory=SeverityCounts)
+    counts: SeverityCounts = Field(default_factory=SeverityCounts)  # achados
+    lines: SeverityCounts = Field(default_factory=SeverityCounts)  # linhas distintas por severidade
+    affected_lines: int = 0  # linhas distintas com warn ou error
     rate: float = 0.0
 
 
@@ -136,6 +138,14 @@ def build_report(
         report.lines += final.lines
         for check, counts in final.checks.items():
             report.final_checks.setdefault(check, CheckSummary()).counts.add(counts)
+        for check, line_counts in final.lines_by_check.items():
+            report.final_checks.setdefault(check, CheckSummary()).lines.add(line_counts)
+        affected: dict[str, set[str | None]] = {}
+        for f in final.findings:
+            if f.severity in ("warn", "error"):
+                affected.setdefault(f.check, set()).add(f.unit_id)
+        for check, units in affected.items():
+            report.final_checks.setdefault(check, CheckSummary()).affected_lines += len(units)
         rs = final.reading_speed
         report.reading_speed.over_limit += rs.over_limit
         report.reading_speed.cps_max = max(report.reading_speed.cps_max, rs.cps_max)
@@ -157,7 +167,7 @@ def build_report(
                 )
             )
     for check in report.final_checks.values():
-        check.rate = round((check.counts.warn + check.counts.error) / report.lines, 4) if report.lines else 0.0
+        check.rate = round(check.affected_lines / report.lines, 4) if report.lines else 0.0
     for stage, s in report.snapshots.items():
         s.edit_ratio_mean = round(edit_sums[stage] / s.episodes, 4) if s.episodes else 0.0
     report.reading_speed.cps_histogram = hist

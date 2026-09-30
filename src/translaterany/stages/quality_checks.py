@@ -93,6 +93,9 @@ def assemble_metrics(
         by_type=by_type,
         checks=summarize(state_findings),
         flagged_lines=flagged(state_findings),
+        lines_by_check={
+            check: flagged(f for f in state_findings if f.check == check) for check in {f.check for f in state_findings}
+        },
         reading_speed=reading_speed_stats(final_lines, env.limits),
         findings=state_findings,
     )

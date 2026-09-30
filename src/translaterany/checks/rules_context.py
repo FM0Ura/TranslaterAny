@@ -95,6 +95,8 @@ def reading_speed(line: LineInput, env: CheckEnv) -> list[Finding]:
                 value=round(m.cps, 2),
             )
         )
+    if line.composite:  # texto unido de várias unidades: só o CPS faz sentido
+        return findings
     if m.max_cpl > lim.max_cpl:
         findings.append(
             Finding(

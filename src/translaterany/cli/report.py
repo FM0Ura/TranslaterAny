@@ -53,10 +53,11 @@ def _render(report: SeriesReport) -> None:
         console.print(models)
 
     final = Table(title=f"Indicadores finais — {report.lines} linhas em {report.episodes} episódio(s)")
-    for col in ("Checagem", "error", "warn", "info", "Taxa"):
+    for col in ("Checagem", "error", "warn", "info", "Linhas afetadas", "Taxa"):
         final.add_column(col)
     for check, c in sorted(report.final_checks.items()):
-        final.add_row(escape(check), str(c.counts.error), str(c.counts.warn), str(c.counts.info), f"{c.rate:.1%}")
+        final.add_row(escape(check), str(c.counts.error), str(c.counts.warn), str(c.counts.info),
+                      str(c.affected_lines), f"{c.rate:.1%}")
     console.print(final)
     rs = report.reading_speed
     console.print(
@@ -126,7 +127,7 @@ def report(
     except ManifestError as exc:
         console.print(f"[red]{escape(str(exc))}[/red]")
         raise typer.Exit(EXIT_FAILURE) from exc
-    if result.episodes and len(result.missing_metrics) == result.episodes:
+    if len(result.missing_metrics) == result.episodes:
         console.print("Nenhuma métrica encontrada — rode `translaterany run` primeiro.")
         raise typer.Exit(EXIT_FAILURE)
 
@@ -147,6 +148,11 @@ def report(
                 )
             console.print(table)
     if base is not None:
+        if base.episodes != result.episodes:
+            console.print(
+                f"[yellow]Aviso: número de episódios diferente (atual {result.episodes}, base {base.episodes}); "
+                "tokens e custos são totais da série e não são diretamente comparáveis.[/yellow]"
+            )
         table = Table(title="Comparação com a linha de base")
         for col in ("Métrica", "Atual", "Base", "Δ", ""):
             table.add_column(col)
@@ -156,6 +162,12 @@ def report(
             )
         console.print(table)
     if json_out is not None:
-        json_out.parent.mkdir(parents=True, exist_ok=True)
-        json_out.write_text(result.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
+        try:
+            json_out.parent.mkdir(parents=True, exist_ok=True)
+            json_out.write_text(result.model_dump_json(by_alias=True, indent=2), encoding="utf-8")
+        except OSError as exc:
+            console.print(
+                f"[red]Não foi possível gravar o relatório em {escape(str(json_out))} ({type(exc).__name__})[/red]"
+            )
+            raise typer.Exit(EXIT_USAGE) from exc
         console.print(f"Relatório salvo em {escape(str(json_out))}")

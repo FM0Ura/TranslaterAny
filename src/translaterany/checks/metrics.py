@@ -46,6 +46,7 @@ class FinalMetrics(BaseModel):
     by_type: dict[str, int] = Field(default_factory=dict)
     checks: dict[str, SeverityCounts] = Field(default_factory=dict)
     flagged_lines: SeverityCounts = Field(default_factory=SeverityCounts)
+    lines_by_check: dict[str, SeverityCounts] = Field(default_factory=dict)  # unidades distintas por checagem
     reading_speed: ReadingSpeedStats = Field(default_factory=ReadingSpeedStats)
     findings: list[Finding] = Field(default_factory=list)
 

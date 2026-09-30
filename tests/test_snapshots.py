@@ -132,3 +132,10 @@ def test_metrics_model_roundtrip_uses_schema_alias() -> None:
     raw = m.model_dump_json(by_alias=True)
     assert '"schema":1' in raw.replace(" ", "")
     assert EpisodeMetrics.model_validate_json(raw) == m
+
+
+def test_composite_flag_propagates() -> None:
+    sources = build_sources(DOC, CLASSES, MERGED)
+    assert sources["u1+u2"].composite and not sources["u3"].composite
+    lines, _ = lines_for({"u1+u2": "x", "u3": "y"}, sources)
+    assert {ln.id: ln.composite for ln in lines} == {"u1+u2": True, "u3": False}

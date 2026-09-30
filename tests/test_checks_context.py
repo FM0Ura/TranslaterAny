@@ -90,3 +90,11 @@ def test_reading_speed_zero_duration_skips_cps() -> None:
     found = only(run_line_checks([line("x", "a" * 30, dur=0)], CheckEnv()), "reading_speed")
     assert found == []
     assert measure("abc", 0).cps is None
+
+
+def test_reading_speed_composite_skips_cpl_and_lines_but_checks_cps() -> None:
+    comp = LineInput(id="u1+u2", line_type="dialogue", source="a b", target="a" * 75, duration_ms=1000, composite=True)
+    found = only(run_line_checks([comp], CheckEnv()), "reading_speed")
+    assert [f.message.split()[0] for f in found] == ["CPS"]
+    multi = comp.model_copy(update={"target": "a\\Nb\\Nc", "duration_ms": 10_000})
+    assert only(run_line_checks([multi], CheckEnv()), "reading_speed") == []
