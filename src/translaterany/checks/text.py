@@ -12,7 +12,7 @@ _WORD = re.compile(r"[^\W\d_]+(?:'[^\W\d_]+)?")
 def visible(text: str) -> str:
     text = MARKER_RE.sub("", text)
     text = _TAGS.sub("", text)
-    return text.replace("\\h", " ").replace("'", "'")
+    return text.replace("\\h", " ").replace("’", "'")
 
 
 def visible_lines(text: str) -> list[str]:

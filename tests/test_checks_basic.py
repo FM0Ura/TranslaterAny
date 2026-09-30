@@ -55,7 +55,7 @@ def test_numbers_missing() -> None:
 
 def test_negation_dropped() -> None:
     assert only(run_line_checks([line("I don't know.", "Eu sei.")], ENV), "negation")
-    assert only(run_line_checks([line("I don't know.", "Eu sei.")], ENV), "negation")  # apóstrofo curvo
+    assert only(run_line_checks([line("I don’t know.", "Eu sei.")], ENV), "negation")  # apóstrofo curvo
     assert not only(run_line_checks([line("I don't know.", "Eu não sei.")], ENV), "negation")
     assert not only(run_line_checks([line("I know.", "Eu sei.")], ENV), "negation")
 
