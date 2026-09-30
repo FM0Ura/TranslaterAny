@@ -90,3 +90,10 @@ def test_font_attachments_by_mime_or_extension() -> None:
         duration_ns=None,
     )
     assert [a.id for a in font_attachments(info)] == [1, 2, 4]
+
+
+def test_style_fonts_skips_short_style_rows() -> None:
+    ass = (
+        b"[V4+ Styles]\nFormat: Name, Fontname, Fontsize\nStyle: Broken,Arial\nStyle: Ok,Verdana,40\n"
+    )
+    assert style_fonts(ass) == {"Ok": "Verdana"}

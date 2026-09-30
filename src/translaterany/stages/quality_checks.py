@@ -25,7 +25,7 @@ from translaterany.checks.snapshots import (
 )
 from translaterany.checks.text import plain
 from translaterany.config.model import AppConfig, ChecksConfig
-from translaterany.media.mkv import MediaError, extract_attachments, font_attachments, probe
+from translaterany.media.mkv import extract_attachments, font_attachments, probe
 from translaterany.memory.matching import select_for_text
 from translaterany.memory.models import CharacterEntry, GlossaryEntry
 from translaterany.memory.store import MemoryStore
@@ -168,5 +168,6 @@ class QualityChecksStage(Stage):
                 files = extract_attachments(ctx.episode.source, font_attachments(probe(ctx.episode.source)), Path(tmp))
                 faces, problems = load_font_faces(files)
                 return problems + check_font_glyphs(chars_by_font, faces)
-        except (MediaError, OSError) as exc:
-            return [Finding(check="font_glyphs", severity="info", message=f"fontes não verificadas: {exc}")]
+        except Exception as exc:  # fontes nunca derrubam o episódio
+            message = f"fontes não verificadas: {type(exc).__name__}: {exc}"
+            return [Finding(check="font_glyphs", severity="info", message=message)]

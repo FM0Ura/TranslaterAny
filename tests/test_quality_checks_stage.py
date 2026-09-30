@@ -106,3 +106,16 @@ def test_empty_snapshots_still_write_valid_metrics() -> None:
     assert state == {}
     assert metrics.final.lines == 0 and metrics.final.reading_speed.cps_p50 == 0.0
     assert metrics.snapshots == []
+
+
+def test_font_checks_turns_unexpected_errors_into_info_finding() -> None:
+    from types import SimpleNamespace
+
+    def boom(name: str) -> Path:
+        raise RuntimeError("quebrou")
+
+    ctx = SimpleNamespace(episode=SimpleNamespace(source=Path("x.mkv")), inputs=SimpleNamespace(path=boom))
+    findings = QualityChecksStage()._font_checks(ctx, None, {})  # type: ignore[arg-type]
+    assert len(findings) == 1
+    assert findings[0].severity == "info" and findings[0].check == "font_glyphs"
+    assert "RuntimeError" in findings[0].message

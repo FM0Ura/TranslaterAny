@@ -36,6 +36,8 @@ def style_fonts(ass_data: bytes) -> dict[str, str]:
         if key.strip().lower() == "format":
             fmt = [p.lower() for p in parts]
         elif key.strip().lower() == "style" and "name" in fmt and "fontname" in fmt:
+            if len(parts) < len(fmt):
+                continue  # linha de estilo malformada: ignora
             fonts[parts[fmt.index("name")]] = parts[fmt.index("fontname")].lstrip("@")
     return fonts
 
