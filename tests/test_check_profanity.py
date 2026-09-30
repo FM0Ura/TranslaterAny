@@ -24,8 +24,12 @@ def test_clean_lines_and_other_types_are_ignored() -> None:
 
 
 def test_word_boundaries() -> None:
-    assert not found("Classic", "Clássico")  # "ass" não casa dentro de "Classic"
-    assert not found("Hello there", "Olá")  # "hell" não casa dentro de "Hello"
+    # EN: "ass" não casa dentro de "Classic", portanto merda é flagged
+    assert len(found("Classic", "Que merda")) == 1
+    # EN: "hell" não casa dentro de "Hello there", portanto merda é flagged
+    assert len(found("Hello there", "Que merda")) == 1
+    # PT: "puta" não casa dentro de "computador" (word boundary)
+    assert found("Look at this.", "Olha o computador.") == []
 
 
 def test_registered() -> None:
