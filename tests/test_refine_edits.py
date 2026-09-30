@@ -55,3 +55,19 @@ def test_reversal_is_rejected() -> None:
     out = apply_edits(texts, [LineEdit(id="u3", new="Você colou em tudo, seu  merda.")], {"u3"}, SOURCES, ENV,
                       forbidden={"u3": "Você colou em tudo, seu merda."})  # fmt: skip
     assert out.rejected["reversal"] == 1 and out.applied == {}
+
+
+def test_accepted_edit_is_whitespace_normalized() -> None:
+    out = run(LineEdit(id="u1", new="  Eu não\nsei,  cara. "))
+    assert out.applied == {"u1": "Eu não sei, cara."}
+    assert out.texts["u1"] == "Eu não sei, cara."
+
+
+def test_override_tags_are_rejected_as_markers() -> None:
+    out = run(LineEdit(id="u1", new="{\\an8}Eu não sei mesmo."))
+    assert out.rejected["markers"] == 1 and out.applied == {}
+
+
+def test_reordered_markers_are_rejected() -> None:
+    out = run(LineEdit(id="u2", new="Para a ⟦2⟧velha⟦1⟧ estação."))
+    assert out.rejected["markers"] == 1 and out.applied == {}

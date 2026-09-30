@@ -1,7 +1,6 @@
 """Protocolo "só edições": o modelo devolve {id, new, reason}; cada edição é validada antes de aplicar."""
 
 import re
-from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
@@ -75,7 +74,7 @@ def apply_edits(
             reason = "empty"
         elif _norm(new) == _norm(current):
             reason = "unchanged"
-        elif Counter(marker_ids(new)) != Counter(marker_ids(src.source)):
+        elif "{" in new or "}" in new or marker_ids(new) != marker_ids(src.source):
             reason = "markers"
         elif forbidden and item in forbidden and _norm(new) == _norm(forbidden[item]):
             reason = "reversal"
@@ -86,6 +85,6 @@ def apply_edits(
         if reason is not None:
             outcome.rejected[reason] += 1
             continue
-        outcome.texts[item] = new
-        outcome.applied[item] = new
+        outcome.texts[item] = _norm(new)
+        outcome.applied[item] = _norm(new)
     return outcome
