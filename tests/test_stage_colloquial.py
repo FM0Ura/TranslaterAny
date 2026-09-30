@@ -2,14 +2,14 @@
 
 from types import SimpleNamespace
 
+import test_stage_review_meaning as base  # reaproveita DOC, CLASSES, MERGED, SCENE
+
 from translaterany.llm.fake import FakeLLM
 from translaterany.pipeline.registry import REGISTRY
 from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.refine.edits import EditsResponse, LineEdit
 from translaterany.stages.colloquial import ColloquialStage
 from translaterany.subtitles.texts import UnitTexts
-
-import test_stage_review_meaning as base  # reaproveita DOC, CLASSES, MERGED, SCENE
 
 PRE = UnitTexts(texts={"u1": "No entanto, que história é essa?", "u2": "Você colou em tudo, seu merda.",
                        "u3+u4": "Espera... já vou!"})  # fmt: skip
