@@ -24,7 +24,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
 | M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
-| M5 — Verificações e métricas | 🔨 | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | implementado; aceite real pendente (468 testes) |
+| M5 — Verificações e métricas | 🔨 | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | implementado; aceite real pendente (482 testes) |
 | M6 — Refinamento I | ⬜ | — | — | |
 | M7 — Refinamento II | ⬜ | — | — | |
 | M8 — Portões e laço do QA | ⬜ | — | — | fim da v1 |
@@ -76,7 +76,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-26 | M3 executado: 364 testes (+75 novos testes); metadados canônicos via AniList/Jikan, etapas metadata, extract_terms e consolidate_memory integradas ao pipeline; persistência em YAML (characters, glossary, story) com precedência estrita (user > metadata > extracted); injeção de glossário por episódio e rastreamento de staleness com retry --stale; comando CLI memory e testes E2E | |
 | 2026-09-27 | M4 executado: 396 testes (+22 novos testes); memória de tradução (TM) da série com precedência user > auto, fusão e redistribuição inteligente de frases partidas consecutivas, análise de contexto de cena por IA, tradução especializada de placas e músicas (com preservação estrita de karaokê/romaji), tradução contextualizada de diálogos com políticas de honoríficos ('keep') e palavrões ('faithful') e fallback neutro de gênero quando a confiança for baixa; pipeline consolidado com redistribute_sentences gerando UnitTexts final para write | |
 | 2026-09-30 | M5 (brainstorming): checagens "núcleo leve" (sem spaCy, que vai para o M7) + fontTools; padrão Netflix PT-BR (CPS 17, CPL 42, 2 linhas; exceder = error); abordagem A — `MeteredLLM` no runner grava camada 1 no manifest (schema 2), etapa `quality_checks` no fim do pipeline grava camada 2 em `metrics.json`, `report` junta; saída terminal + `--json` + `--baseline`; linhas de base em `docs/baselines/` só com agregados | achado: uso de tokens não era persistido; bug `episode.id` no `redistribute_sentences` corrigido no M5 |
-| 2026-09-30 | M5 executado (branch `m5-verificacoes-metricas`): `MeteredLLM` + manifest schema 2 (camada 1), etapa `quality_checks` + `metrics.json` (camada 2), comando `report` com `--json`/`--baseline`, correção de `episode.key` na TM; decisão: falhas de fontes viram achado `info` (`except Exception`), nunca derrubam o episódio | 468 testes; aceite real pendente |
+| 2026-09-30 | M5 executado (branch `m5-verificacoes-metricas`): `MeteredLLM` + manifest schema 2 (camada 1), etapa `quality_checks` + `metrics.json` (camada 2), comando `report` com `--json`/`--baseline`, correção de `episode.key` na TM; decisão: falhas de fontes viram achado `info` (`except Exception`), nunca derrubam o episódio; revisão final: linhas compostas não sofrem CPL/linhas, taxa por checagem = linhas afetadas (não achados), `ChecksConfig` com validação de faixas | 482 testes; aceite real pendente |
 
 ---
 
@@ -84,6 +84,9 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 
 | Pergunta | Quando decidir |
 |---|---|
+| M5: `font_glyphs` só aparece no `report --episode`; falta um resumo por série | quando incomodar (M6+) |
+| M5: episódio pulado (`SkipEpisode`) aparece como "sem métricas (rode run)"; `--episode` inexistente diz "nenhuma métrica" em vez de "episódio não encontrado" | quando incomodar (M6+) |
+| M5: entradas antigas da TM (gravadas antes da correção `episode.key`) seguem sem episódio até o episódio ser reprocessado | inofensivo; opcional |
 | Quais modelos locais concretos usar por etapa (famílias 7B–14B Q4 que cabem em 12 GB) | spec do M2 |
 | Obter chave de API Gemini e/ou OpenAI (opcional) | antes de testar perfis `hibrido`/`nuvem` (M2) |
 | Política global padrão de honoríficos (manter / adaptar / remover) | decidida no M4 (`honorifics = "keep"`) |
