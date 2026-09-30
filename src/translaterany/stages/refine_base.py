@@ -18,6 +18,7 @@ from translaterany.pipeline.stage_metrics import count
 from translaterany.pipeline.units import Episode, Series
 from translaterany.refine.blocks import ReviewLine, build_blocks, render_block_prompt
 from translaterany.refine.edits import REJECT_REASONS, EditsResponse, apply_edits
+from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.linebreak import char_budget
 from translaterany.subtitles.merge import MergedUnitsDoc
@@ -28,7 +29,8 @@ from translaterany.subtitles.texts import UnitTexts
 
 logger = logging.getLogger(__name__)
 
-_OPTIONAL = ("merge_sentences", "scene_analysis", "consolidate_memory")
+_OPTIONAL = ("merge_sentences", "scene_analysis", "consolidate_memory", "translation_memory")
+CONTEXT_WINDOW = 3  # falas de contexto por lado de cada alvo
 
 
 class RefineOptions(BaseModel):
@@ -116,12 +118,17 @@ class DialogueRefineStage(Stage):
         lines, _ = lines_for({i: texts[i] for i in ids}, sources)
         data = RefineData(sources=sources, lines=lines, env=env, speaker_of=speaker_of, characters=characters)
         targets = self.select_targets(ids, data)
+        if "translation_memory" in self.inputs:  # falas resolvidas pela memória de tradução não são revisadas
+            tm = ctx.inputs.json("translation_memory", TranslationMemoryArtifact)
+            targets = {i: s for i, s in targets.items() if i not in tm.matched_units}
         count(ctx, "lines_read", len(ids))
         count(ctx, "lines_targeted", len(targets))
         members = composite_members(merged)
         scene_of = scene_index_of(ids, members, {u.id: u.events for u in doc.units}, classes.scenes)
         forbidden = self.forbidden_texts(ctx, texts)
-        for block in build_blocks(ids, set(targets), scene_of, self.options.max_lines_per_block):
+        for block in build_blocks(
+            ids, set(targets), scene_of, self.options.max_lines_per_block, context_window=CONTEXT_WINDOW
+        ):
             count(ctx, "blocks")
             review = [
                 ReviewLine(
@@ -130,7 +137,12 @@ class DialogueRefineStage(Stage):
                     target=texts[i],
                     speaker=contexts[i].speaker if i in contexts else "Unknown",
                     tone=contexts[i].tone if i in contexts else "neutral",
-                    budget=char_budget(sources[i].duration_ms, max_cps=self.max_cps, max_cpl=self.max_cpl),
+                    budget=char_budget(
+                        sources[i].duration_ms,
+                        max_cps=self.max_cps,
+                        max_cpl=self.max_cpl,
+                        events=len(members.get(i, [i])),
+                    ),
                     signals=targets.get(i, []),
                     editable=i in targets,
                 )

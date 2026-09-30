@@ -40,8 +40,8 @@ def wrap_line(text: str, max_cpl: int) -> str:
     return f"{flat[:cut]}\\N{flat[cut + 1 :]}"
 
 
-def char_budget(duration_ms: int, *, max_cps: float, max_cpl: int) -> int | None:
-    """Caracteres que cabem na duração da fala (máximo: duas linhas cheias). None sem duração."""
+def char_budget(duration_ms: int, *, max_cps: float, max_cpl: int, events: int = 1) -> int | None:
+    """Caracteres que cabem na duração da fala (máximo: duas linhas cheias por evento). None sem duração."""
     if duration_ms <= 0:
         return None
-    return min(int(max_cps * duration_ms / 1000), 2 * max_cpl)
+    return min(int(max_cps * duration_ms / 1000), 2 * max_cpl * max(1, events))

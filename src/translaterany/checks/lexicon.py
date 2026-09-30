@@ -30,6 +30,6 @@ PT_PROFANITY = re.compile(
 )
 EN_PROFANITY = re.compile(
     r"\b(?:shit|fuck\w*|damn\w*|bitch\w*|bastard\w*|ass|asshole|crap|idiot\w*|moron\w*|jerk\w*|hell|"
-    r"dumbass|screw\w*|piss\w*|dick\w*|stupid)\b",
+    r"dumbass|screw\w*|piss\w*|dick\w*|stupid|fool\w*|dumb\w*|loser\w*|pervert\w*)\b",
     re.IGNORECASE,
 )

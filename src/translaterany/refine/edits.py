@@ -16,6 +16,8 @@ type RejectReason = Literal["unknown_id", "empty", "unchanged", "markers", "reve
 REJECT_REASONS: tuple[RejectReason, ...] = ("unknown_id", "empty", "unchanged", "markers", "reversal", "worse")
 WORSE_CHECKS = frozenset({"markers", "numbers", "negation", "names", "glossary", "profanity_added"})
 _SPACES = re.compile(r"\s+")
+MIN_LENGTH_RATIO = 0.5  # uma edição com menos da metade do texto visível é tratada como fragmento
+MIN_LENGTH_CHECKED = 10
 
 
 class LineEdit(BaseModel):
@@ -36,11 +38,16 @@ class EditOutcome:
 
 
 def normalize_edit_id(raw: str) -> str:
-    return raw.strip().strip("[]").strip()
+    return _SPACES.sub("", raw.strip().strip("[]"))
 
 
 def _norm(text: str) -> str:
     return _SPACES.sub(" ", text).strip()
+
+
+def _is_fragment(current: str, new: str) -> bool:
+    before = len(_norm(plain(current)))
+    return before >= MIN_LENGTH_CHECKED and len(_norm(plain(new))) < MIN_LENGTH_RATIO * before
 
 
 def _meaning_findings(item: str, text: str, src: LineSource, env: CheckEnv) -> set[str]:
@@ -78,7 +85,7 @@ def apply_edits(
             reason = "markers"
         elif forbidden and item in forbidden and _norm(new) == _norm(forbidden[item]):
             reason = "reversal"
-        elif _norm(plain(new)).casefold() == _norm(plain(src.source)).casefold() or (
+        elif _is_fragment(current, new) or _norm(plain(new)).casefold() == _norm(plain(src.source)).casefold() or (
             _meaning_findings(item, new, src, env) - _meaning_findings(item, current, src, env)
         ):
             reason = "worse"

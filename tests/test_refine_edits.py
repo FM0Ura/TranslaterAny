@@ -71,3 +71,15 @@ def test_override_tags_are_rejected_as_markers() -> None:
 def test_reordered_markers_are_rejected() -> None:
     out = run(LineEdit(id="u2", new="Para a ⟦2⟧velha⟦1⟧ estação."))
     assert out.rejected["markers"] == 1 and out.applied == {}
+
+
+def test_fragment_answer_is_rejected_as_worse() -> None:
+    texts = {**TEXTS, "u3": "Você mentiu sobre todas as receitas."}
+    out = apply_edits(texts, [LineEdit(id="u3", new="as receitas")], {"u3"}, SOURCES, ENV)
+    assert out.rejected["worse"] == 1 and out.applied == {}
+
+
+def test_edit_id_inner_whitespace_is_removed() -> None:
+    from translaterany.refine.edits import normalize_edit_id
+
+    assert normalize_edit_id(" [u2 + u3] ") == "u2+u3"

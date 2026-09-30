@@ -11,6 +11,8 @@ INSTRUCTIONS = """Você é revisor de legendas de anime (inglês -> português d
 Revise SOMENTE a fidelidade de cada fala "editavel": omissões, acréscimos (inclusive ofensas ou palavrões
 que não existem no original), sentido trocado, gênero ou número errado quando o contexto deixa claro.
 NÃO reescreva estilo nem troque palavras por gosto. Mantenha os marcadores ⟦n⟧ exatamente como estão.
+Responda com a lista "edits"; cada item tem "id" (o id da fala), "new" (a fala COMPLETA já corrigida em
+português do Brasil, nunca um trecho ou fragmento, mantendo os marcadores ⟦n⟧) e "reason" (justificativa curta).
 Respeite "limite_caracteres" quando houver. "sinais" indicam onde há risco. Falas com "editavel": false são
 só contexto. Responda apenas com as falas que precisam mudar; se nenhuma precisar, devolva a lista vazia."""
 

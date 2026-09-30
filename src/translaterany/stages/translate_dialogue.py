@@ -201,6 +201,7 @@ class StageTranslateDialogue(Stage):
         final_texts: dict[str, str] = {}
         units_to_verify: dict[str, str] = {}
         durations: dict[str, int] = {}
+        event_counts: dict[str, int] = {}
 
         if merged_doc and merged_doc.units:
             for comp in merged_doc.units:
@@ -209,6 +210,7 @@ class StageTranslateDialogue(Stage):
                 else:
                     lines.append(DialogueLine(id=comp.composite_id, text=flatten_breaks(comp.text_with_markers)))
                     durations[comp.composite_id] = sum(comp.durations_ms)
+                    event_counts[comp.composite_id] = len(comp.unit_ids)
                     units_to_verify[comp.composite_id] = comp.text_with_markers
         else:
             for u in dialogue_units:
@@ -227,7 +229,14 @@ class StageTranslateDialogue(Stage):
             budgets = {
                 line.id: b
                 for line in lines
-                if (b := char_budget(durations.get(line.id, 0), max_cps=self.max_cps, max_cpl=self.max_cpl))
+                if (
+                    b := char_budget(
+                        durations.get(line.id, 0),
+                        max_cps=self.max_cps,
+                        max_cpl=self.max_cpl,
+                        events=event_counts.get(line.id, 1),
+                    )
+                )
             }
             translator = DialogueBatchTranslator(
                 client=client,

@@ -8,6 +8,7 @@ from translaterany.llm.fake import FakeLLM
 from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.refine.edits import EditsResponse, LineEdit
 from translaterany.stages.review_meaning import ReviewMeaningStage
+from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification, Scene, UnitClass
 from translaterany.subtitles.merge import CompositeUnit, MergedUnitsDoc
 from translaterany.subtitles.normalize import Encoding, EventInfo, NormalizedDoc, Unit
@@ -51,7 +52,8 @@ DIALOGUE = UnitTexts(texts={"u1": "Cadê o gato?", "u2": "Você mentiu sobre tud
 class Inputs:
     def __init__(self, dialogue: UnitTexts = DIALOGUE) -> None:
         self.data = {"normalize": DOC, "classify": CLASSES, "merge_sentences": MERGED, "scene_analysis": SCENE,
-                     "translate_dialogue": dialogue}  # fmt: skip
+                     "translate_dialogue": dialogue,
+                     "translation_memory": TranslationMemoryArtifact()}  # fmt: skip
 
     def json(self, name, model):
         return self.data[name]
@@ -121,3 +123,45 @@ def test_bind_pipeline_picks_last_dialogue_stage_and_limits() -> None:
     stage.bind_pipeline(previous, AppConfig.model_validate({"checks": {"max_cps": 15}}))
     assert stage.dialogue_input == "translate_dialogue" and stage.max_cps == 15.0
     assert "merge_sentences" not in stage.inputs and "translate_dialogue" in stage.inputs
+
+
+def test_translation_memory_lines_are_never_editable_and_skip_the_llm() -> None:
+    def run_with_tm(matched: dict[str, str], llm):
+        stage = ReviewMeaningStage()
+        inputs = Inputs()
+        inputs.data["translation_memory"] = TranslationMemoryArtifact(matched_units=matched)
+        metrics = StageMetrics()
+        ctx = SimpleNamespace(inputs=inputs, output=Output(), llm=llm, metrics=metrics, store=None,
+                              series=SimpleNamespace(key="s"), episode=SimpleNamespace(key="S01E01"))  # fmt: skip
+        stage.run(ctx)
+        return Output.doc, metrics.counters
+
+    def script(req):
+        return EditsResponse(edits=[LineEdit(id="u1", new="Para onde o gato foi?"),
+                                    LineEdit(id="u2", new="Você mentiu sobre todas as receitas.")])  # fmt: skip
+
+    doc, counters = run_with_tm({"u1": "Cadê o gato?"}, FakeLLM(script))
+    assert doc.texts["u1"] == "Cadê o gato?" and doc.texts["u2"] == "Você mentiu sobre todas as receitas."
+    assert counters["lines_targeted"] == 2 and counters["rejected_unknown_id"] >= 1
+
+    llm = FakeLLM()  # qualquer chamada lançaria erro
+    doc, counters = run_with_tm({k: v for k, v in DIALOGUE.texts.items()}, llm)
+    assert doc.texts == DIALOGUE.texts and llm.calls == [] and counters.get("blocks", 0) == 0
+
+
+def test_composite_budget_uses_member_count_and_prompt_defines_fields() -> None:
+    prompts = []
+
+    def script(req):
+        prompts.append(req)
+        return EditsResponse()
+
+    run(FakeLLM(script))
+    from translaterany.stages.colloquial import INSTRUCTIONS as COLLOQUIAL
+    from translaterany.stages.review_meaning import INSTRUCTIONS as MEANING
+
+    for text in (MEANING, COLLOQUIAL):
+        assert '"edits"' in text and '"new"' in text and '"reason"' in text and "COMPLETA" in text
+    assert "speech_style" in COLLOQUIAL and "too_long" in COLLOQUIAL
+    # 5 s em dois eventos: 17 cps dá 85 caracteres; o teto antigo (84) valia para um só evento
+    assert '"id": "u3+u4"' in prompts[1].prompt and '"limite_caracteres": 85' in prompts[1].prompt

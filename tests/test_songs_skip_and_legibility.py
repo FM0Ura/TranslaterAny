@@ -83,3 +83,10 @@ def test_default_pipeline_still_loads(tmp_path: Path) -> None:
     cfg = tmp_path / "c.toml"
     cfg.write_text("", encoding="utf-8")
     assert any(s.name == "translate_songs" for s in load_config(cfg, tmp_path / "d").stages)
+
+
+def test_char_budget_cap_scales_with_events() -> None:
+    assert char_budget(20_000, max_cps=17, max_cpl=42, events=3) == 252
+    assert char_budget(20_000, max_cps=17, max_cpl=42) == 84
+    assert char_budget(5_000, max_cps=17, max_cpl=42, events=3) == 85
+    assert char_budget(20_000, max_cps=17, max_cpl=42, events=0) == 84

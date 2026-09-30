@@ -34,3 +34,10 @@ def test_word_boundaries() -> None:
 
 def test_registered() -> None:
     assert "profanity_added" in check_names()
+
+
+def test_extended_english_insults_count_as_present() -> None:
+    assert not found("You fool!", "Seu idiota!")
+    assert not found("You dumb kid!", "Seu idiota!")
+    assert not found("What a loser!", "Que idiota!")
+    assert not found("You pervert!", "Seu idiota!")
