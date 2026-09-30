@@ -3,15 +3,15 @@
 > Fotografia atual do desenvolvimento. O plano completo está em [`ROADMAP.md`](ROADMAP.md).
 > Atualize este arquivo ao concluir cada etapa de um marco (spec, plano, implementação) e sempre que uma decisão for tomada.
 
-**Última atualização:** 2026-09-27
+**Última atualização:** 2026-09-30
 
 ---
 
 ## Onde estamos
 
-- **Fase:** M4 concluído com sucesso e integrado ao master.
-- **Marco atual:** **M4 — Tradução contextual** — concluído (✅), suíte completa com 396 testes automatizados passando.
-- **Próxima ação:** elaboração da spec e planejamento do **M5 — Verificações e métricas**.
+- **Fase:** M5 em especificação.
+- **Marco atual:** **M5 — Verificações e métricas** — spec escrito, aguardando revisão do usuário.
+- **Próxima ação:** revisão do spec do M5 e, aprovado, plano de implementação.
 
 ## Progresso dos marcos
 
@@ -24,7 +24,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
 | M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
-| M5 — Verificações e métricas | ⬜ | — | — | |
+| M5 — Verificações e métricas | 📝 | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | — | spec em revisão |
 | M6 — Refinamento I | ⬜ | — | — | |
 | M7 — Refinamento II | ⬜ | — | — | |
 | M8 — Portões e laço do QA | ⬜ | — | — | fim da v1 |
@@ -75,6 +75,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-26 | M2 CLI e Pipeline: comandos `doctor` (checagens de Ollama/GPU/modelos) e `estimate` (contagem de tokens e estimativa de custos) implementados; `run` integrado com `PydanticAIClient` para Ollama; pipeline E2E validado | |
 | 2026-09-26 | M3 executado: 364 testes (+75 novos testes); metadados canônicos via AniList/Jikan, etapas metadata, extract_terms e consolidate_memory integradas ao pipeline; persistência em YAML (characters, glossary, story) com precedência estrita (user > metadata > extracted); injeção de glossário por episódio e rastreamento de staleness com retry --stale; comando CLI memory e testes E2E | |
 | 2026-09-27 | M4 executado: 396 testes (+22 novos testes); memória de tradução (TM) da série com precedência user > auto, fusão e redistribuição inteligente de frases partidas consecutivas, análise de contexto de cena por IA, tradução especializada de placas e músicas (com preservação estrita de karaokê/romaji), tradução contextualizada de diálogos com políticas de honoríficos ('keep') e palavrões ('faithful') e fallback neutro de gênero quando a confiança for baixa; pipeline consolidado com redistribute_sentences gerando UnitTexts final para write | |
+| 2026-09-30 | M5 (brainstorming): checagens "núcleo leve" (sem spaCy, que vai para o M7) + fontTools; padrão Netflix PT-BR (CPS 17, CPL 42, 2 linhas; exceder = error); abordagem A — `MeteredLLM` no runner grava camada 1 no manifest (schema 2), etapa `quality_checks` no fim do pipeline grava camada 2 em `metrics.json`, `report` junta; saída terminal + `--json` + `--baseline`; linhas de base em `docs/baselines/` só com agregados | achado: uso de tokens não era persistido; bug `episode.id` no `redistribute_sentences` corrigido no M5 |
 
 ---
 
@@ -138,7 +139,7 @@ Local: `temporada-teste/` (ignorada pelo git — **nunca versionar mídia nem tr
 
 ## Próximos passos
 
-1. Escrever o spec do **M5 — Verificações e métricas** (checagens determinísticas de regras de legendagem: CPS, CPL, durações mín/máx, overlap de tempo, pontuação).
+1. Revisar o spec do **M5** e escrever o plano de implementação.
 2. Validação prática do pipeline do M4 em casos de teste reais com modelos locais.
 
 
