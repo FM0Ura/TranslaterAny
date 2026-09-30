@@ -16,3 +16,10 @@ EN_NEGATION = re.compile(
 )
 PT_NEGATION = re.compile(r"\b(?:não|nunca|nem|nada|ninguém|nenhum|nenhuma|jamais|sem)\b", re.IGNORECASE)
 DIGITS = re.compile(r"\d+")
+PT_PT_WORDS = re.compile(
+    r"\b(?:autocarro|comboio|telemóvel|equipa|facto|ecrã|rapariga|casa de banho|pequeno-almoço)\b", re.IGNORECASE
+)
+PT_PT_PROGRESSIVE = re.compile(
+    r"\b(?:estou|estás|está|estamos|estão|estava|estavam) a \w+(?:ar|er|ir)\b", re.IGNORECASE
+)
+SPANISH = re.compile(r"[¿¡ñÑ]|\b(?:pero|muy|también|usted|gracias|hola)\b", re.IGNORECASE)

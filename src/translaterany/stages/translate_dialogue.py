@@ -1,5 +1,4 @@
 import logging
-import re
 from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
@@ -7,6 +6,7 @@ from pydantic import BaseModel
 from translaterany.config.model import ProviderConfig
 from translaterany.llm.client import LLMClient
 from translaterany.memory.artifacts import ConsolidatedMemoryArtifact
+from translaterany.memory.matching import select_for_text
 from translaterany.memory.models import CharacterEntry, GlossaryEntry
 from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.artifacts import ArtifactStore
@@ -27,15 +27,6 @@ if TYPE_CHECKING:
     from translaterany.config.loader import ResolvedConfig
 
 logger = logging.getLogger(__name__)
-
-
-def _matches_term(term: str, text: str) -> bool:
-    if not term:
-        return False
-    prefix = r"\b" if re.match(r"^\w", term) else ""
-    suffix = r"\b" if re.search(r"\w$", term) else ""
-    pattern = rf"{prefix}{re.escape(term)}{suffix}"
-    return bool(re.search(pattern, text, re.IGNORECASE))
 
 
 class TranslateDialogueOptions(BaseModel):
@@ -186,16 +177,8 @@ class StageTranslateDialogue(Stage):
                 all_characters = mem_store.load_characters()
                 glossary = mem_store.load_glossary()
                 full_text = "\n".join(u.text for u in dialogue_units)
-                for entry in glossary.values():
-                    terms_to_check = [entry.term, *entry.aliases]
-                    if any(_matches_term(t, full_text) for t in terms_to_check):
-                        matched_glossary.append(entry)
-                        used_terms_dict[entry.term] = entry.content_hash()
-
-                for char in all_characters:
-                    names_to_check = [char.name, *char.aliases]
-                    if any(_matches_term(n, full_text) for n in names_to_check):
-                        matched_characters.append(char)
+                matched_glossary, matched_characters = select_for_text(glossary.values(), all_characters, full_text)
+                used_terms_dict = {entry.term: entry.content_hash() for entry in matched_glossary}
 
         # Monta linhas a traduzir (respeitando merge_sentences e TM)
         lines: list[DialogueLine] = []
