@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
+from translaterany.pipeline.stage_metrics import count
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.merge import MergedUnitsDoc
@@ -31,6 +32,7 @@ class RedistributeSentencesStage(Stage):
     version: ClassVar[str] = "1"
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
+    produces_texts: ClassVar[bool] = True
     inputs: ClassVar[tuple[str, ...]] = (
         "normalize",
         "classify",
@@ -87,6 +89,8 @@ class RedistributeSentencesStage(Stage):
                     translated = dialogue_texts[comp.composite_id]
                     split = redistribute_composite_unit(comp, translated)
                     final_texts.update(split)
+                    if len(comp.unit_ids) > 1:
+                        count(ctx, "redistributed")
                 elif len(comp.unit_ids) == 1 and comp.composite_id in tm_matched:
                     final_texts[comp.composite_id] = tm_matched[comp.composite_id]
 
@@ -122,7 +126,7 @@ class RedistributeSentencesStage(Stage):
                 tm_path = store.series_dir(series.key) / "memory" / "translation_memory.yaml"
                 tm_store = TranslationMemoryStore(tm_path)
                 episode = getattr(ctx, "episode", None)
-                ep_id = getattr(episode, "id", "") if episode else ""
+                ep_id = episode.key if episode is not None else ""
 
                 for u in doc.units:
                     u_class = classification.units.get(u.id)
@@ -138,5 +142,6 @@ class RedistributeSentencesStage(Stage):
                                 category=cat,
                                 episode_key=ep_id,
                             )
+                            count(ctx, "tm_fed")
 
         ctx.output.json(UnitTexts(texts=final_texts))

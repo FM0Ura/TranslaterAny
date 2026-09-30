@@ -12,6 +12,7 @@ from translaterany.memory.tm import TranslationMemoryStore, normalize_tm_key
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
+from translaterany.pipeline.stage_metrics import count
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.normalize import NormalizedDoc
 
@@ -62,6 +63,7 @@ class TranslationMemoryStage(Stage):
 
         matched_units: dict[str, str] = {}
         matched_keys: list[str] = []
+        candidates = 0
 
         for unit in doc.units:
             u_class = classification.units.get(unit.id)
@@ -70,10 +72,13 @@ class TranslationMemoryStage(Stage):
             cat = u_class.type
             if cat not in ("dialogue", "sign", "song"):
                 continue
+            candidates += 1
 
             match = tm_store.lookup(unit.text, cat, min_dialogue_chars=self.options.min_dialogue_chars)
             if match is not None:
                 matched_units[unit.id] = match
                 matched_keys.append(normalize_tm_key(unit.text))
 
+        count(ctx, "tm_candidates", candidates)
+        count(ctx, "tm_hits", len(matched_units))
         ctx.output.json(TranslationMemoryArtifact(matched_units=matched_units, matched_keys=matched_keys))

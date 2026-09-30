@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
+from translaterany.pipeline.stage_metrics import count
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.merge import MergedUnitsDoc, merge_dialogue_units
@@ -45,4 +46,7 @@ class MergeSentencesStage(Stage):
             tm_resolved_ids=tm_resolved_ids,
             max_gap_ms=self.options.max_gap_ms,
         )
+        groups = [c for c in merged_doc.units if len(c.unit_ids) > 1]
+        count(ctx, "merged_groups", len(groups))
+        count(ctx, "merged_units", sum(len(c.unit_ids) for c in groups))
         ctx.output.json(merged_doc)

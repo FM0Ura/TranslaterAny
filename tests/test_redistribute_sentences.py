@@ -111,7 +111,7 @@ def test_stage_redistribute_sentences_consolidation_and_tm_autofeed(tmp_path):
 
     store = ArtifactStore(tmp_path)
     series_obj = SimpleNamespace(key="test-series")
-    ep_obj = SimpleNamespace(id="S01E01")
+    ep_obj = SimpleNamespace(key="S01E01")
 
     stage = RedistributeSentencesStage()
     ctx = SimpleNamespace(

@@ -12,6 +12,7 @@ from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
+from translaterany.pipeline.stage_metrics import StageMetrics, count
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.chunking import DialogueLine
 from translaterany.subtitles.classify import Classification, ClassifiedUnit, ClassifiedUnitCollection
@@ -44,6 +45,7 @@ class StageTranslateDialogue(Stage):
     version: ClassVar[str] = "1"
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
+    produces_texts: ClassVar[bool] = True
     inputs: ClassVar[tuple[str, ...]] = (
         "normalize",
         "classify",
@@ -201,6 +203,7 @@ class StageTranslateDialogue(Stage):
                     units_to_verify[u.id] = u.text
 
         if lines:
+            count(ctx, "lines", len(lines))
             translator = DialogueBatchTranslator(
                 client=client,
                 model_name=self.options.model,
@@ -212,6 +215,7 @@ class StageTranslateDialogue(Stage):
                 honorifics_policy=honorifics,
                 profanity_policy=profanity,
                 line_contexts=line_contexts,
+                metrics=ctx.metrics if isinstance(getattr(ctx, "metrics", None), StageMetrics) else None,
             )
             translated_texts = translator.translate_lines(lines)
 
@@ -227,6 +231,7 @@ class StageTranslateDialogue(Stage):
                             marker_ids(tr),
                         )
                         tr = orig_text
+                        count(ctx, "markers_lost")
                 final_texts[line_id] = tr
 
         ctx.output.json(UnitTexts(texts=final_texts, used_terms=used_terms_dict))

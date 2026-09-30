@@ -13,6 +13,7 @@ from translaterany.llm.client import (
     Usage,
 )
 from translaterany.memory.models import CharacterEntry, GlossaryEntry
+from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.subtitles.chunking import (
     ContextLine,
     DialogueLine,
@@ -53,7 +54,9 @@ class DialogueBatchTranslator:
         honorifics_policy: str = "keep",
         profanity_policy: str = "faithful",
         line_contexts: Mapping[str, Any] | None = None,
+        metrics: StageMetrics | None = None,
     ):
+        self.metrics = metrics
         self.client = client
         self.model_name = model_name
         self.fallback_model = fallback_model
@@ -105,6 +108,10 @@ class DialogueBatchTranslator:
         self.system_instructions = base_instructions
         self.total_usage = Usage()
         self.fallback_count = 0
+
+    def _count(self, name: str, n: int = 1) -> None:
+        if self.metrics is not None:
+            self.metrics.count(name, n)
 
     @retry(
         retry=retry_if_exception_type(LLMTransientError),
@@ -172,6 +179,7 @@ class DialogueBatchTranslator:
         # Nível 2: Reconciliação de IDs ausentes
         missing_ids = expected_ids - set(translations.keys())
         if missing_ids and len(missing_ids) < len(lines):
+            self._count("ids_reconciled", len(missing_ids))
             missing_lines = [line for line in lines if line.id in missing_ids]
             sub_results = self._process_batch(missing_lines, context, glossary=glossary, characters=characters)
             translations.update(sub_results)
@@ -180,6 +188,7 @@ class DialogueBatchTranslator:
         # Nível 3: Bisseção recursiva
         if missing_ids:
             if len(lines) > 1:
+                self._count("batches_split")
                 mid = len(lines) // 2
                 left = self._process_batch(lines[:mid], context, glossary=glossary, characters=characters)
                 right = self._process_batch(lines[mid:], context, glossary=glossary, characters=characters)
@@ -194,6 +203,7 @@ class DialogueBatchTranslator:
                     failed_line.text,
                 )
                 self.fallback_count += 1
+                self._count("fallback_original")
                 return {failed_line.id: failed_line.text}
 
         return translations

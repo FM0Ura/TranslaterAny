@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from translaterany.llm.client import LLMClient
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
+from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.normalize import NormalizedDoc
@@ -31,6 +32,7 @@ class TranslateSignsStage(Stage):
     version: ClassVar[str] = "1"
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
+    produces_texts: ClassVar[bool] = True
     inputs: ClassVar[tuple[str, ...]] = ("normalize", "classify", "translation_memory")
     enabled_by_default: ClassVar[bool] = True
     Options: ClassVar[type[BaseModel]] = TranslateSignsOptions
@@ -74,5 +76,6 @@ class TranslateSignsStage(Stage):
             model=self.options.model,
             fallback_model=self.options.fallback_model,
             max_tokens_per_batch=self.options.max_tokens_per_batch,
+            metrics=ctx.metrics if isinstance(getattr(ctx, "metrics", None), StageMetrics) else None,
         )
         ctx.output.json(result)

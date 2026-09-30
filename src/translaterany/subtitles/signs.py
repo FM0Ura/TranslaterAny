@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from translaterany.llm.client import LLMClient
+from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.subtitles.chunking import DialogueLine
 from translaterany.subtitles.classify import Classification, UnitClass
 from translaterany.subtitles.normalize import NormalizedDoc
@@ -31,6 +32,7 @@ def translate_signs(
     model: str = "translate",
     fallback_model: str | None = "translategemma",
     max_tokens_per_batch: int = 800,
+    metrics: StageMetrics | None = None,
 ) -> UnitTexts:
     """Traduz placas e elementos gráficos visuais, respeitando concisão e marcadores."""
     class_map = classes.units if isinstance(classes, Classification) else classes
@@ -54,12 +56,16 @@ def translate_signs(
     if not pending_units or client is None:
         return UnitTexts(texts=texts)
 
+    if metrics:
+        metrics.count("lines", len(pending_units))
+
     translator = DialogueBatchTranslator(
         client=client,
         model_name=model,
         fallback_model=fallback_model,
         max_tokens_per_batch=max_tokens_per_batch,
         max_context_lines=0,
+        metrics=metrics,
         system_instructions=SIGNS_SYSTEM_INSTRUCTIONS,
     )
     raw_translations = translator.translate_lines(pending_units)
@@ -78,6 +84,8 @@ def translate_signs(
                     marker_ids(tr),
                 )
                 tr = u.text
+                if metrics:
+                    metrics.count("markers_lost")
         texts[u.id] = tr
 
     return UnitTexts(texts=texts)

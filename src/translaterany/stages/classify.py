@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
+from translaterany.pipeline.stage_metrics import count
 from translaterany.pipeline.units import Episode, Series
 from translaterany.subtitles.classify import classify, disambiguate_uncertain_units
 from translaterany.subtitles.normalize import NormalizedDoc
@@ -44,5 +45,6 @@ class ClassifyStage(Stage):
             res = disambiguate_uncertain_units(
                 doc, res, client, model=self.options.model, scene_gap_ms=self.options.scene_gap_ms
             )
+            count(ctx, "ai_disambiguated", sum(1 for c in res.units.values() if c.rule == "ai_disambiguate"))
         ctx.output.json(res)
 
