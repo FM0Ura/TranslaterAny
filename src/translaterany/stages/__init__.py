@@ -2,6 +2,7 @@
 
 from translaterany.stages import (  # noqa: F401
     classify,
+    colloquial,
     consolidate_memory,
     extract,
     extract_terms,
