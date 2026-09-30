@@ -107,11 +107,13 @@ def estimate(
                 input_tokens = 6000
                 output_tokens = 4000
 
-            # Custo financeiro
-            if provider == "ollama" or profile_name == "local":
+            # Custo financeiro (preços do config; Ollama tem preço 0 por padrão)
+            if model_cfg is None:
                 cost_usd = 0.0
             else:
-                cost_usd = (input_tokens * 0.15 + output_tokens * 0.60) / 1_000_000
+                cost_usd = (
+                    input_tokens * model_cfg.input_price_per_mtok + output_tokens * model_cfg.output_price_per_mtok
+                ) / 1_000_000
 
             # Projeção de tempo (~25 tokens/s em GPU local; na nuvem ~50 tokens/s + 1s por bloco)
             if provider == "ollama" or profile_name == "local":
@@ -150,10 +152,15 @@ def estimate(
         f"(Modelo: [cyan]{translate_model_name}[/cyan] via [cyan]{provider}[/cyan])"
     )
 
-    if provider == "ollama" or profile_name == "local":
+    total_cost = (
+        (total_input_tokens * model_cfg.input_price_per_mtok + total_output_tokens * model_cfg.output_price_per_mtok)
+        / 1_000_000
+        if model_cfg is not None
+        else 0.0
+    )
+    if total_cost == 0.0:
         console.print("- Custo estimado: [green]$0.00 USD[/green] (Inferência 100% local)")
     else:
-        total_cost = (total_input_tokens * 0.15 + total_output_tokens * 0.60) / 1_000_000
         console.print(
             f"- Custo total estimado: [yellow]${total_cost:.4f} USD[/yellow] "
             f"(Limite configurado: ${cfg.llm.max_cost_usd:.2f} USD)"

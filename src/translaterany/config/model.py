@@ -20,6 +20,8 @@ class ModelConfig(_Strict):
     model: str
     num_ctx: int = 4096
     temperature: float = 0.3
+    input_price_per_mtok: float = 0.0  # USD por milhão de tokens de entrada
+    output_price_per_mtok: float = 0.0  # USD por milhão de tokens de saída
 
 
 class ProfileConfig(_Strict):
@@ -76,11 +78,23 @@ class TranslationConfig(_Strict):
     profanity: Literal["faithful", "soften", "raw"] = "faithful"
 
 
+class ChecksConfig(_Strict):
+    """Limites das checagens (M5). Padrão Netflix PT-BR para velocidade de leitura."""
+
+    max_cps: float = 17.0
+    max_cpl: int = 42
+    max_lines: int = 2
+    length_ratio: tuple[float, float] = (0.5, 2.0)
+    length_ratio_min_chars: int = 10
+    disabled: list[str] = Field(default_factory=list)
+
+
 class AppConfig(_Strict):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     translation: TranslationConfig = Field(default_factory=TranslationConfig)
+    checks: ChecksConfig = Field(default_factory=ChecksConfig)
     pipeline: PipelineConfig | None = None
     stages: dict[str, StageConfig] = Field(default_factory=dict)
 
