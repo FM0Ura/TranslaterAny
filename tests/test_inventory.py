@@ -47,6 +47,8 @@ def test_builtin_stages_registered_and_default_pipeline() -> None:
         "translate_dialogue",
         "translate_signs",
         "translate_songs",
+        "review_meaning",
+        "colloquial",
         "redistribute_sentences",
         "write",
         "publish",

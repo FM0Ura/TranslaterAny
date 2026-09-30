@@ -40,6 +40,8 @@ DEFAULT_PIPELINE: tuple[str, ...] = (
     "translate_dialogue",
     "translate_signs",
     "translate_songs",
+    "review_meaning",
+    "colloquial",
     "redistribute_sentences",
     "write",
     "publish",

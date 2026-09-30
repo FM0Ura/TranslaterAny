@@ -25,6 +25,10 @@ from translaterany.subtitles.texts import UnitTexts
 logger = logging.getLogger(__name__)
 
 
+_FIXED = ("normalize", "classify", "translation_memory", "merge_sentences")
+_OTHER_TEXTS = ("translate_signs", "translate_songs")
+
+
 class RedistributeSentencesOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
     auto_feed_tm: bool = True
@@ -33,32 +37,29 @@ class RedistributeSentencesOptions(BaseModel):
 @register_stage
 class RedistributeSentencesStage(Stage):
     name: ClassVar[str] = "redistribute_sentences"
-    version: ClassVar[str] = "2"  # 2: quebra de linha pelo CPL; músicas só via translate_songs
+    version: ClassVar[str] = "3"  # 3: diálogo da última etapa com produces_dialogue
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
-    inputs: ClassVar[tuple[str, ...]] = (
-        "normalize",
-        "classify",
-        "translation_memory",
-        "merge_sentences",
-        "translate_dialogue",
-        "translate_signs",
-        "translate_songs",
-    )
     enabled_by_default: ClassVar[bool] = True
     Options: ClassVar[type[BaseModel]] = RedistributeSentencesOptions
 
     def __init__(self, options: BaseModel | None = None) -> None:
         super().__init__(options)
         self.max_cpl = 42  # padrão Netflix; o loader aplica o [checks] via bind_pipeline
+        self.dialogue_input = "translate_dialogue"
+        self.inputs = (*_FIXED, self.dialogue_input, *_OTHER_TEXTS)
 
     def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
         if app is not None:
             self.max_cpl = app.checks.max_cpl
+        dialogue = [s.name for s in previous if s.produces_dialogue]
+        if dialogue:
+            self.dialogue_input = dialogue[-1]
+        self.inputs = (*_FIXED, self.dialogue_input, *_OTHER_TEXTS)
 
     def cache_payload(self, series: Series | None, episode: Episode | None) -> Any:
-        return {"max_cpl": self.max_cpl}
+        return {"max_cpl": self.max_cpl, "dialogue_input": self.dialogue_input}
 
     def run(self, ctx: StageContext) -> None:
         doc = ctx.inputs.json("normalize", NormalizedDoc)
@@ -79,7 +80,7 @@ class RedistributeSentencesStage(Stage):
 
         dialogue_texts: dict[str, str] = {}
         try:
-            dialogue_texts = ctx.inputs.json("translate_dialogue", UnitTexts).texts
+            dialogue_texts = ctx.inputs.json(self.dialogue_input, UnitTexts).texts
         except Exception:
             pass
 
