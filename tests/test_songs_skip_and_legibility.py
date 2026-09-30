@@ -16,7 +16,8 @@ def test_songs_are_skipped_by_default() -> None:
 
 
 def test_flatten_breaks_joins_lines() -> None:
-    assert flatten_breaks("When the rain stopped,\\NI walked home alone.") == "When the rain stopped, I walked home alone."
+    flat = flatten_breaks("When the rain stopped,\\NI walked home alone.")
+    assert flat == "When the rain stopped, I walked home alone."
     assert flatten_breaks("a \\N b\\nc") == "a b c"
 
 
