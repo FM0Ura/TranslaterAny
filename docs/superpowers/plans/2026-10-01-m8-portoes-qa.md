@@ -118,7 +118,7 @@ git commit -m "feat(config): adiciona configuracao de gates e qa_loop para o M8"
 - Consumes: `CheckEnv`, `Finding`, `run_line_checks`.
 - Produces: `StageGate`, `GateDecision`, `filter_blocking_findings`, `severity_score`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_stage_gate.py
@@ -158,12 +158,12 @@ def test_oscillation_detection() -> None:
     assert gate.is_oscillating("u1", "Texto A") is True
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_stage_gate.py -v`
 Expected: FAIL (`translaterany.pipeline.gates` não existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Criar `src/translaterany/pipeline/gates.py`:
 - `BLOCKING_CHECKS = frozenset({"prompt_leak", "markers_broken", "format_mismatch", "untranslated", "glossary_violation", "cpl_lines_exceeded"})`
@@ -171,12 +171,12 @@ Criar `src/translaterany/pipeline/gates.py`:
 - `severity_score(findings: Sequence[Finding]) -> int` (error = 10, warning = 1)
 - `class StageGate`: mantém `seen_hashes: dict[str, set[str]]` para oscilação, método `evaluate(lines, env)` e gerador de feedback pontual.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_stage_gate.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/pipeline/gates.py tests/test_stage_gate.py
