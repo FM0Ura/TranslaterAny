@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 from typing import ClassVar
 
+from translaterany.config.model import TreatmentConsistencyOptions
 from translaterany.pipeline.registry import register_stage
 from translaterany.refine.treatment import scan_treatment_consistency
 from translaterany.stages.refine_base import DialogueRefineStage, RefineData
@@ -20,6 +21,7 @@ class TreatmentConsistencyStage(DialogueRefineStage):
     name: ClassVar[str] = "treatment_consistency"
     version: ClassVar[str] = "1"
     default_dialogue_input: ClassVar[str] = "colloquial"
+    Options: ClassVar[type] = TreatmentConsistencyOptions
 
     def instructions(self) -> str:
         return INSTRUCTIONS

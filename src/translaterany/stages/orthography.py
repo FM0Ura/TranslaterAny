@@ -12,6 +12,7 @@ from translaterany.orthography.client import LanguageToolClient
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.stage_metrics import count
 from translaterany.pipeline.units import Episode, Series
+from translaterany.pipeline.registry import register_stage
 from translaterany.subtitles.texts import UnitTexts
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 _OPTIONAL = ("consolidate_memory",)
 
 
+@register_stage
 class OrthographyStage(Stage):
     """Revisão ortográfica determinística com LanguageTool sem IA."""
 

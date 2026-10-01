@@ -100,10 +100,15 @@ class ChecksConfig(_Strict):
 class TreatmentConsistencyOptions(_Strict):
     """Opções da etapa treatment_consistency (M7)."""
 
+    model: str = "review"
+    max_lines_per_block: int = 30
+
 
 class AdaptOptions(_Strict):
     """Opções da etapa adapt (M7)."""
 
+    model: str = "review"
+    max_lines_per_block: int = 30
     max_cps: float = Field(17.0, gt=0)
 
 
@@ -117,6 +122,9 @@ class OrthographyOptions(_Strict):
 
 class FinalReadthroughOptions(_Strict):
     """Opções da etapa final_readthrough (M7)."""
+
+    model: str = "review"
+    max_lines_per_block: int = 30
 
 
 class AppConfig(_Strict):
