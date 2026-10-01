@@ -25,7 +25,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
 | M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
 | M5 — Verificações e métricas | ✅ | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | integrado ao master (510 testes); aceite com 1 episódio (Charlotte S01E01) — temporada inteira pendente |
-| M6 — Refinamento I | 🔨 | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | implementado; aceite real pendente (553 testes) |
+| M6 — Refinamento I | 🔨 | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | implementado; aceite real feito (Charlotte S01E01) — 553 testes |
 | M7 — Refinamento II | ⬜ | — | — | |
 | M8 — Portões e laço do QA | ⬜ | — | — | fim da v1 |
 
@@ -80,6 +80,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-09-30 | **Primeiro uso real** (Charlotte S01E01, modelos locais): (1) camada Ollama migrada para a API nativa `/api/chat` — o `/v1` ignorava `num_ctx` (tudo em 4096, prompts truncados em silêncio), não desligava o raciocínio do gemma4 e exigia *tools*, que o TranslateGemma não tem; `think` por modelo (desligado), gemma4 `num_ctx` 16384, translategemma 8192. (2) Tradução passa a ser **uma fala por chamada** (`max_lines_per_batch=1`): em lotes o TranslateGemma desalinhava IDs e deslocava traduções. (3) `scene_analysis` **por cena** (blocos de até 40 falas) — antes mandava o episódio inteiro e estourava o contexto | run final: 24,8 min/episódio (cena 11 min, diálogo 11 min); alinhamento corrigido; 346 falas, 95 com falante de alta confiança |
 | 2026-09-30 | Músicas **puladas por padrão** (`[stages.translate_songs.options] translate = true` para traduzir); legibilidade: diálogo vai ao modelo sem `\N` e com orçamento de caracteres (max_cps × duração), quebra de linha refeita pelo CPL | Charlotte S01E01: linhas com problema de leitura 34,3% → **8,7%** (original EN: 12%), CPS p95 24 → 19; 0 de 30 unidades de música traduzidas; ~11 min de tradução com a análise de cena em cache |
 | 2026-09-30 | **M6 — Refinamento I:** etapas `review_meaning` (todas as falas, blocos por cena, só fidelidade) e `colloquial` (só falas triadas) no papel `review` (Gemma4), antes da redistribuição, sobre frases inteiras; resposta só com edições validadas (`apply_edits`: id, vazio, inalterado, marcadores/tags, reversão, piora pelas checagens de sentido; texto aceito normalizado); triagem por regras; nova checagem `profanity_added`; `redistribute_sentences` lê a última etapa com `produces_dialogue` | 553 testes; aceite real pendente |
+| 2026-10-01 | **Aceite real do M6** (Charlotte S01E01, tradução em cache = mesma entrada do M5): `review_meaning` 80 s (16 edições aplicadas, 2 recusadas) e `colloquial` 44 s (23 falas triadas, 17 aplicadas, 6 recusadas) — **+2 min/episódio**. Corrigiu 4 palavrões inventados, "cúmplice"→"culpado", fala truncada, fala em inglês e concordâncias. Auditoria de 60 falas sorteadas (semente 42): M5 ≈ 80% corretas / 5% erro grave → M6 **85% corretas / 11,7% deslizes / 3,3% erro grave** | amostra pequena (IC amplo); restam erros de sentido não detectados ("Que barulho é esse?", "Me ajudar a quê?") |
 
 ---
 
@@ -87,6 +88,9 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 
 | Pergunta | Quando decidir |
 |---|---|
+| `report`: instantâneos de `review_meaning`/`colloquial` aparecem duplicados na tabela | corrigir |
+| `translate_dialogue` não subiu de versão quando o orçamento de compostos mudou (cache reaproveitou tradução antiga) | corrigir (subir versão) |
+| Revisão de sentido deixa passar erros sem sinal (sentido trocado, pessoa errada, título do episódio alucinado em fala) | M7/M8 (leitura corrida, QA) |
 | Uso real: o orçamento de caracteres às vezes faz o modelo trocar sentido ("What's this I hear?" → "Que barulho é esse?") ou **inventar palavrão** ("colar em tudo, seu merda.") — reforçar no prompt: não acrescentar ofensas nem mudar o sentido ao condensar | M6 (revisão de sentido) |
 | Uso real: 17 placas com muitas tags por letra ficam em inglês (marcadores perdidos → fallback) | avaliar |
 | Desempenho: 24,8 min/episódio; `scene_analysis` gera ~22 mil tokens de saída (6 campos por fala) — enxugar campos | M6 |
