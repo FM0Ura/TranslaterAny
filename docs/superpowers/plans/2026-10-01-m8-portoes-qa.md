@@ -376,7 +376,7 @@ git commit -m "feat(quality): implementa algoritmo de blame retroativo para o QA
 - Consumes: Artefatos do episódio, `DEFAULT_PIPELINE`, `StageContext`.
 - Produces: `qa_report.json`, diálogo corrigido entregue a `quality_checks`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_stage_qa_loop.py
@@ -399,12 +399,12 @@ def test_qa_report_serialization() -> None:
     assert data["blame_summary"]["colloquial"] == 1
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_stage_qa_loop.py -v`
 Expected: FAIL (`translaterany.stages.qa_loop` não existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Criar `src/translaterany/stages/qa_loop.py`:
 - `class QAReport`: modelo de dados com serialização para JSON.
@@ -415,12 +415,12 @@ Criar `src/translaterany/stages/qa_loop.py`:
   - Para cada falha: atribui *blame*, reexecuta a linha pontual com feedback, passa pelas etapas posteriores ativas e revalida.
   - Grava `qa_report.json` no store do episódio.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_stage_qa_loop.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/stages/qa_loop.py tests/test_stage_qa_loop.py
