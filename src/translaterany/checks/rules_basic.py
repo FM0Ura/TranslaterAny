@@ -1,5 +1,6 @@
 """Checagens básicas de linha: marcadores, não traduzida, tamanho, números e negação."""
 
+import re
 from collections import Counter
 
 from translaterany.checks import lexicon
@@ -43,6 +44,22 @@ def untranslated(line: LineInput, env: CheckEnv) -> list[Finding]:
                 )
             ]
     return []
+
+
+_LEAK_RE = re.compile(r"\(\s*máx\.?\s*\d+\s*\)|\bno máximo \d+ caracteres\b|\[(?:u|CTX-)\d+\]", re.IGNORECASE)
+_EMOJI_RE = re.compile("[\U0001f300-\U0001faff]")
+
+
+@line_check("prompt_leak", {"dialogue", "sign"})
+def prompt_leak(line: LineInput, env: CheckEnv) -> list[Finding]:
+    """Instrução do prompt (limite de caracteres, IDs de fala) ou emoji de enchimento devolvido como tradução."""
+    if match := _LEAK_RE.search(line.target):
+        message = f"trecho do prompt na tradução: {match.group(0)!r}"
+    elif _EMOJI_RE.search(line.target) and not _EMOJI_RE.search(line.source):
+        message = "emoji acrescentado pela tradução"
+    else:
+        return []
+    return [Finding(check="prompt_leak", unit_id=line.id, severity="error", message=message)]
 
 
 @line_check("length_ratio", {"dialogue"})

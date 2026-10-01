@@ -77,6 +77,7 @@ def merge_dialogue_units(
 
     # Filtra apenas unidades do tipo dialogue
     dialogue_units: list[tuple[Unit, int, int]] = []
+    shortest_ms: dict[str, int] = {}  # menor ocorrência: o orçamento de caracteres tem de caber na mais curta
     for u in doc.units:
         ucls = classes.get(u.id)
         if not ucls or ucls.type != "dialogue":
@@ -86,6 +87,7 @@ def merge_dialogue_units(
             continue
         start_ms = min(ev.start_ms for ev in evs)
         end_ms = max(ev.end_ms for ev in evs)
+        shortest_ms[u.id] = min(max(0, ev.end_ms - ev.start_ms) for ev in evs)
         dialogue_units.append((u, start_ms, end_ms))
 
     # Ordena cronologicamente
@@ -100,12 +102,12 @@ def merge_dialogue_units(
         if not current_group:
             return
         if len(current_group) == 1:
-            u, s, e = current_group[0]
+            u = current_group[0][0]
             composite_list.append(
                 CompositeUnit(
                     composite_id=u.id,
                     unit_ids=[u.id],
-                    durations_ms=[max(0, e - s)],
+                    durations_ms=[shortest_ms[u.id]],
                     clean_text=_clean(u.text),
                     text_with_markers=u.text,
                 )
@@ -113,7 +115,7 @@ def merge_dialogue_units(
         else:
             comp_id = "+".join(u.id for u, _, _ in current_group)
             u_ids = [u.id for u, _, _ in current_group]
-            durs = [max(0, e - s) for _, s, e in current_group]
+            durs = [shortest_ms[u.id] for u, _, _ in current_group]
             clean_parts = [_clean(u.text) for u, _, _ in current_group]
             marker_parts = [u.text for u, _, _ in current_group]
             composite_list.append(

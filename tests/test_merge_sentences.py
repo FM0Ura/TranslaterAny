@@ -101,3 +101,35 @@ def test_merge_dialogue_skips_tm_resolved():
 
     merged = merge_dialogue_units(doc, classes, tm_resolved_ids={"u1"}, max_gap_ms=1500)
     assert len(merged.units) == 2
+
+
+def _event(index: int, start_ms: int, end_ms: int, text: str, unit: str) -> EventInfo:
+    return EventInfo(
+        index=index,
+        line_no=index + 1,
+        kind="dialogue",
+        style="Default",
+        start_ms=start_ms,
+        end_ms=end_ms,
+        layer=0,
+        name="",
+        prefix="",
+        text=text,
+        markers=[],
+        suffix="",
+        drawing=False,
+        unit=unit,
+    )
+
+
+def test_merge_duration_of_repeated_text_is_shortest_occurrence():
+    """Fala repetida ao longo do episódio é uma só unidade: a duração não pode ser o intervalo entre as
+    ocorrências (minutos), senão o orçamento de caracteres deixa de limitar a tradução."""
+    events = [_event(0, 10_000, 10_900, "Safe!", "u1"), _event(1, 500_000, 500_700, "Safe!", "u1")]
+    unit = Unit(id="u1", style="Default", text="Safe!", markers=0, events=[0, 1])
+    doc = NormalizedDoc(encoding=Encoding(bom=False, newline="\n"), format=[], events=events, units=[unit])
+    classes = {"u1": UnitClass(type="dialogue", uncertain=False, rule="")}
+
+    merged = merge_dialogue_units(doc, classes, tm_resolved_ids=set())
+
+    assert merged.units[0].durations_ms == [700]

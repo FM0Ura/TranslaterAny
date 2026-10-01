@@ -1,0 +1,560 @@
+{
+  "schema": 1,
+  "series": "Charlotte (2015)",
+  "generated_at": "2026-10-01T11:10:29.724612",
+  "episodes": 4,
+  "lines": 1580,
+  "stages": {
+    "inventory": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.026999999999999996,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "metadata": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 2.622,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "select_track": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.40199999999999997,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "extract": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 1.665,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "normalize": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 2.434,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "classify": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.48000000000000004,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "extract_terms": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 75.639,
+      "llm": {
+        "calls": 4,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 4,
+            "input_tokens": 19782,
+            "output_tokens": 1550,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {}
+    },
+    "consolidate_memory": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.066,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "translation_memory": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 43.413,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "tm_candidates": 1790,
+        "tm_hits": 98
+      }
+    },
+    "merge_sentences": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.634,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "merged_groups": 67,
+        "merged_units": 139
+      }
+    },
+    "scene_analysis": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 2751.3849999999998,
+      "llm": {
+        "calls": 87,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 87,
+            "input_tokens": 92954,
+            "output_tokens": 89215,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {}
+    },
+    "translate_dialogue": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 2676.834,
+      "llm": {
+        "calls": 1390,
+        "errors": {},
+        "by_model": {
+          "translategemma:12b": {
+            "calls": 1390,
+            "input_tokens": 945656,
+            "output_tokens": 62110,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines": 1390,
+        "markers_lost": 4
+      }
+    },
+    "translate_signs": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 175.273,
+      "llm": {
+        "calls": 114,
+        "errors": {},
+        "by_model": {
+          "translategemma:12b": {
+            "calls": 114,
+            "input_tokens": 36593,
+            "output_tokens": 4507,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines": 114,
+        "fallback_original": 3,
+        "markers_lost": 36
+      }
+    },
+    "translate_songs": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.005,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "review_meaning": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 337.645,
+      "llm": {
+        "calls": 94,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 94,
+            "input_tokens": 125332,
+            "output_tokens": 5811,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines_read": 1390,
+        "lines_targeted": 1390,
+        "blocks": 94,
+        "edits_proposed": 90,
+        "edits_applied": 81,
+        "rejected_worse": 7,
+        "rejected_unchanged": 2
+      }
+    },
+    "colloquial": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 233.87399999999997,
+      "llm": {
+        "calls": 50,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 50,
+            "input_tokens": 59841,
+            "output_tokens": 5217,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines_read": 1390,
+        "lines_targeted": 120,
+        "blocks": 50,
+        "edits_proposed": 117,
+        "edits_applied": 91,
+        "rejected_worse": 17,
+        "rejected_unchanged": 9
+      }
+    },
+    "redistribute_sentences": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 4.582000000000001,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "redistributed": 67,
+        "tm_fed": 67
+      }
+    },
+    "write": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 1.227,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "publish": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.46399999999999997,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "quality_checks": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 3.704,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    }
+  },
+  "models": {
+    "gemma4:12b": {
+      "calls": 235,
+      "input_tokens": 297909,
+      "output_tokens": 101793,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.0
+    },
+    "translategemma:12b": {
+      "calls": 1504,
+      "input_tokens": 982249,
+      "output_tokens": 66617,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.0
+    }
+  },
+  "final_checks": {
+    "reading_speed": {
+      "counts": {
+        "info": 0,
+        "warn": 0,
+        "error": 204
+      },
+      "lines": {
+        "info": 0,
+        "warn": 0,
+        "error": 191
+      },
+      "affected_lines": 191,
+      "rate": 0.1209
+    },
+    "negation": {
+      "counts": {
+        "info": 0,
+        "warn": 24,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 24,
+        "error": 0
+      },
+      "affected_lines": 24,
+      "rate": 0.0152
+    },
+    "length_ratio": {
+      "counts": {
+        "info": 0,
+        "warn": 10,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 10,
+        "error": 0
+      },
+      "affected_lines": 10,
+      "rate": 0.0063
+    },
+    "untranslated": {
+      "counts": {
+        "info": 0,
+        "warn": 0,
+        "error": 46
+      },
+      "lines": {
+        "info": 0,
+        "warn": 0,
+        "error": 46
+      },
+      "affected_lines": 46,
+      "rate": 0.0291
+    },
+    "glossary": {
+      "counts": {
+        "info": 0,
+        "warn": 17,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 15,
+        "error": 0
+      },
+      "affected_lines": 15,
+      "rate": 0.0095
+    },
+    "profanity_added": {
+      "counts": {
+        "info": 0,
+        "warn": 3,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 3,
+        "error": 0
+      },
+      "affected_lines": 3,
+      "rate": 0.0019
+    },
+    "names": {
+      "counts": {
+        "info": 0,
+        "warn": 3,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 3,
+        "error": 0
+      },
+      "affected_lines": 3,
+      "rate": 0.0019
+    },
+    "numbers": {
+      "counts": {
+        "info": 0,
+        "warn": 3,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 3,
+        "error": 0
+      },
+      "affected_lines": 3,
+      "rate": 0.0019
+    }
+  },
+  "reading_speed": {
+    "cps_p50": 13.0,
+    "cps_p95": 20.0,
+    "cps_max": 35.21,
+    "over_limit": 177,
+    "cps_histogram": [
+      0,
+      1,
+      2,
+      5,
+      19,
+      56,
+      57,
+      64,
+      112,
+      116,
+      127,
+      154,
+      153,
+      127,
+      105,
+      106,
+      78,
+      55,
+      35,
+      25,
+      21,
+      16,
+      6,
+      3,
+      7,
+      1,
+      1,
+      1,
+      1,
+      2,
+      3,
+      1,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "snapshots": {
+    "translate_dialogue": {
+      "episodes": 4,
+      "changed": 1390,
+      "new": 494,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "translate_signs": {
+      "episodes": 4,
+      "changed": 118,
+      "new": 37,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "translate_songs": {
+      "episodes": 4,
+      "changed": 0,
+      "new": 0,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "review_meaning": {
+      "episodes": 4,
+      "changed": 81,
+      "new": 12,
+      "resolved": 24,
+      "edit_ratio_mean": 0.0181
+    },
+    "colloquial": {
+      "episodes": 4,
+      "changed": 91,
+      "new": 2,
+      "resolved": 21,
+      "edit_ratio_mean": 0.0187
+    },
+    "redistribute_sentences": {
+      "episodes": 4,
+      "changed": 448,
+      "new": 21,
+      "resolved": 226,
+      "edit_ratio_mean": 0.0059
+    }
+  },
+  "worst_episodes": [
+    {
+      "episode": "S01E04",
+      "lines": 382,
+      "error_lines": 68,
+      "error_rate": 0.178
+    },
+    {
+      "episode": "S01E01",
+      "lines": 437,
+      "error_lines": 66,
+      "error_rate": 0.151
+    },
+    {
+      "episode": "S01E03",
+      "lines": 402,
+      "error_lines": 60,
+      "error_rate": 0.1493
+    },
+    {
+      "episode": "S01E02",
+      "lines": 359,
+      "error_lines": 43,
+      "error_rate": 0.1198
+    }
+  ],
+  "missing_metrics": [],
+  "warnings": []
+}
