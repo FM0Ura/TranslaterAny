@@ -54,6 +54,7 @@ def test_builtin_stages_registered_and_default_pipeline() -> None:
         "orthography",
         "final_readthrough",
         "redistribute_sentences",
+        "qa_loop",
         "write",
         "publish",
         "remux",
