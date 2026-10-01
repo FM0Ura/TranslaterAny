@@ -97,6 +97,28 @@ class ChecksConfig(_Strict):
         return self
 
 
+class TreatmentConsistencyOptions(_Strict):
+    """Opções da etapa treatment_consistency (M7)."""
+
+
+class AdaptOptions(_Strict):
+    """Opções da etapa adapt (M7)."""
+
+    max_cps: float = Field(17.0, gt=0)
+
+
+class OrthographyOptions(_Strict):
+    """Opções da etapa orthography (M7)."""
+
+    url: str = "http://localhost:8010/v2/check"
+    timeout_s: float = Field(5.0, gt=0)
+    language: str = "pt-BR"
+
+
+class FinalReadthroughOptions(_Strict):
+    """Opções da etapa final_readthrough (M7)."""
+
+
 class AppConfig(_Strict):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
