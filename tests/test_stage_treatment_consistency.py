@@ -27,6 +27,16 @@ def test_scan_skips_low_confidence_or_unknown() -> None:
     assert report == {}
 
 
+def test_scan_skips_medium_confidence() -> None:
+    lines = [
+        {"id": "u1", "speaker": "Alice", "listener": "Bob", "text": "Você viu isso?", "confidence": "high"},
+        {"id": "u2", "speaker": "Alice", "listener": "Bob", "text": "Você não sabe?", "confidence": "high"},
+        {"id": "u3", "speaker": "Alice", "listener": "Bob", "text": "Tu disseste a verdade?", "confidence": "medium"},
+    ]
+    report = scan_treatment_consistency(lines, character_gender={"Alice": "female", "Bob": "male"})
+    assert report == {}
+
+
 def test_scan_identifies_gender_mismatch_for_speaker() -> None:
     lines = [
         {"id": "u1", "speaker": "Alice", "listener": "Bob", "text": "Eu estou cansado demais.", "confidence": "high"},

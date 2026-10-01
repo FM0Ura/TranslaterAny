@@ -41,7 +41,7 @@ def scan_treatment_consistency(
         spk = d.get("speaker") or "Unknown"
         lis = d.get("listener") or "Unknown"
         conf = d.get("confidence") or "low"
-        if spk == "Unknown" or lis == "Unknown" or conf == "low":
+        if spk == "Unknown" or lis == "Unknown" or conf != "high":
             continue
         pair_lines[(spk, lis)].append(d)
 

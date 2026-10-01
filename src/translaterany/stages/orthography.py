@@ -6,18 +6,25 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
-from translaterany.config.model import AppConfig, OrthographyOptions
+from translaterany.checks import CheckEnv
+from translaterany.checks.snapshots import LineSource, build_sources
+from translaterany.config.model import AppConfig, ChecksConfig, OrthographyOptions
 from translaterany.memory.matching import load_memory_for_text
 from translaterany.orthography.client import LanguageToolClient
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.stage_metrics import count
 from translaterany.pipeline.units import Episode, Series
 from translaterany.pipeline.registry import register_stage
+from translaterany.refine.edits import LineEdit, apply_edits
+from translaterany.subtitles.classify import Classification
+from translaterany.subtitles.merge import MergedUnitsDoc
+from translaterany.subtitles.normalize import NormalizedDoc
+from translaterany.subtitles.segments import marker_ids
 from translaterany.subtitles.texts import UnitTexts
 
 logger = logging.getLogger(__name__)
 
-_OPTIONAL = ("consolidate_memory",)
+_OPTIONAL = ("merge_sentences", "consolidate_memory")
 
 
 @register_stage
@@ -35,7 +42,7 @@ class OrthographyStage(Stage):
     def __init__(self, options: BaseModel | None = None) -> None:
         super().__init__(options)
         self.dialogue_input = self.default_dialogue_input
-        self.inputs = (*_OPTIONAL, self.dialogue_input)
+        self.inputs = ("normalize", "classify", *_OPTIONAL, self.dialogue_input)
         self.client = self.make_client()
 
     def make_client(self, transport: Any = None) -> LanguageToolClient:
@@ -53,7 +60,8 @@ class OrthographyStage(Stage):
         if dialogue:
             self.dialogue_input = dialogue[-1]
         optional = tuple(n for n in _OPTIONAL if n in names)
-        self.inputs = (*optional, self.dialogue_input)
+        base = [n for n in ("normalize", "classify") if n in names]
+        self.inputs = (*base, *optional, self.dialogue_input)
 
     def cache_payload(self, series: Series | None, episode: Episode | None) -> Any:
         opts: OrthographyOptions = self.options  # type: ignore[assignment]
@@ -62,23 +70,50 @@ class OrthographyStage(Stage):
     def process_texts(
         self,
         texts: Mapping[str, str],
+        sources: Mapping[str, LineSource] | None = None,
         exemptions: Set[str] | None = None,
+        limits: ChecksConfig | None = None,
     ) -> tuple[dict[str, str], bool, int]:
-        """Corrige os textos linha a linha usando LanguageToolClient."""
-        result = dict(texts)
-        total_applied = 0
-        clean_exemptions = {e.lower() for e in (exemptions or set())}
+        """Corrige os textos linha a linha usando LanguageToolClient com validação de integridade."""
+        clean_exemptions = {e.lower() for e in (exemptions or set()) if e}
+        edits: list[LineEdit] = []
 
         for uid, text in texts.items():
-            corrected, applied = self.client.correct_text(text, exemptions=clean_exemptions)
+            corrected, num_corr = self.client.correct_text(text, exemptions=clean_exemptions)
             if self.client.is_offline:
                 logger.warning("LanguageTool offline detectado durante o processamento da linha %s.", uid)
                 return dict(texts), True, 0
-            if applied > 0:
-                result[uid] = corrected
-                total_applied += applied
+            if num_corr > 0 and corrected != text:
+                edits.append(LineEdit(id=uid, new=corrected, reason="LanguageTool"))
 
-        return result, False, total_applied
+        if not edits:
+            return dict(texts), False, 0
+
+        if sources:
+            env = CheckEnv(
+                glossary=[],
+                names=[],
+                limits=limits or ChecksConfig(),
+            )
+            outcome = apply_edits(
+                texts=texts,
+                edits=edits,
+                targets=set(texts.keys()),
+                sources=sources,
+                env=env,
+            )
+            return outcome.texts, False, len(outcome.applied)
+
+        # Fallback determinístico quando sources não está disponível: valida marcadores e tags
+        result = dict(texts)
+        applied = 0
+        for edit in edits:
+            current = texts[edit.id]
+            if "{" in edit.new or "}" in edit.new or marker_ids(edit.new) != marker_ids(current):
+                continue
+            result[edit.id] = edit.new
+            applied += 1
+        return result, False, applied
 
     def run(self, ctx: StageContext) -> None:
         dialogue = ctx.inputs.json(self.dialogue_input, UnitTexts)
@@ -87,22 +122,35 @@ class OrthographyStage(Stage):
             ctx.output.json(UnitTexts(texts={}, used_terms=dialogue.used_terms))
             return
 
-        # Carrega glossário e nomes para isenção
+        doc = ctx.inputs.json("normalize", NormalizedDoc) if "normalize" in self.inputs else None
+        classes = ctx.inputs.json("classify", Classification) if "classify" in self.inputs else None
+        merged = ctx.inputs.json("merge_sentences", MergedUnitsDoc) if "merge_sentences" in self.inputs else None
+        sources = build_sources(doc, classes, merged) if doc and classes else {}
+
+        # Carrega glossário e nomes para isenção pesquisando no texto fonte em EN e no texto em PT-BR
+        src_block = "\n".join(sources[i].source for i in texts if i in sources)
+        pt_block = "\n".join(texts.values())
+        search_block = f"{src_block}\n{pt_block}" if src_block else pt_block
+
         glossary, characters = load_memory_for_text(
             getattr(ctx, "store", None),
             ctx.series.key,
-            "\n".join(texts.values()),
+            search_block,
         )
         exemptions: set[str] = set()
         for term in glossary:
-            exemptions.add(term.source)
-            exemptions.add(term.target)
+            exemptions.add(term.term)
+            exemptions.add(term.translation)
             exemptions.update(term.aliases)
         for char in characters:
             exemptions.add(char.name)
             exemptions.update(char.aliases)
 
-        outcome_texts, offline, applied = self.process_texts(texts, exemptions=exemptions)
+        outcome_texts, offline, applied = self.process_texts(
+            texts,
+            sources=sources,
+            exemptions=exemptions,
+        )
 
         count(ctx, "lines_read", len(texts))
         if offline:
