@@ -56,7 +56,7 @@
 - Consumes: `pydantic.BaseModel`, `AppConfig`.
 - Produces: `GatesConfig`, `QALoopOptions` integrados ao modelo de configuração.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_config_m8.py
@@ -81,12 +81,12 @@ def test_m8_default_configs() -> None:
     assert qa_opt.options["warn_edit_rate_threshold"] == 0.25
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_config_m8.py -v`
 Expected: FAIL (campos `gates` ou `qa_loop` ausentes).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Em `src/translaterany/config/model.py`:
 1. Definir `class GatesConfig(BaseModel): enabled: bool = True; max_retries: int = 2`.
@@ -94,12 +94,12 @@ Em `src/translaterany/config/model.py`:
 3. Adicionar valores padrão para `qa_loop` em `_STAGE_OPTION_DEFAULTS`:
    `"qa_loop": {"max_rounds": 2, "max_extra_calls": 30, "warn_edit_rate_threshold": 0.25}`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_config_m8.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/config/model.py tests/test_config_m8.py
