@@ -46,7 +46,7 @@ class TranslateDialogueOptions(BaseModel):
 @register_stage
 class StageTranslateDialogue(Stage):
     name: ClassVar[str] = "translate_dialogue"
-    version: ClassVar[str] = "2"  # 2: frase sem \N para o modelo + orçamento de caracteres
+    version: ClassVar[str] = "3"  # 3: orçamento de compostos proporcional ao nº de eventos (2: sem \N + orçamento)
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True

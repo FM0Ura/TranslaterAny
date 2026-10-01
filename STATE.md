@@ -88,8 +88,6 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 
 | Pergunta | Quando decidir |
 |---|---|
-| `report`: instantâneos de `review_meaning`/`colloquial` aparecem duplicados na tabela | corrigir |
-| `translate_dialogue` não subiu de versão quando o orçamento de compostos mudou (cache reaproveitou tradução antiga) | corrigir (subir versão) |
 | Revisão de sentido deixa passar erros sem sinal (sentido trocado, pessoa errada, título do episódio alucinado em fala) | M7/M8 (leitura corrida, QA) |
 | Uso real: o orçamento de caracteres às vezes faz o modelo trocar sentido ("What's this I hear?" → "Que barulho é esse?") ou **inventar palavrão** ("colar em tudo, seu merda.") — reforçar no prompt: não acrescentar ofensas nem mudar o sentido ao condensar | M6 (revisão de sentido) |
 | Uso real: 17 placas com muitas tags por letra ficam em inglês (marcadores perdidos → fallback) | avaliar |
