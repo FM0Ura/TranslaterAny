@@ -1,0 +1,85 @@
+"""Cliente HTTP para o serviço local do LanguageTool com filtros de regras e isenções (M7)."""
+
+import logging
+from collections.abc import Set
+from typing import Any
+
+import httpx
+
+logger = logging.getLogger(__name__)
+
+ALLOWED_CATEGORIES = {"TYPOS", "CASING", "GRAMMAR"}
+BLOCKED_CATEGORIES = {"STYLE", "COLLOQUIALISMS"}
+
+
+class LanguageToolClient:
+    """Cliente HTTP com degradação graciosa para o LanguageTool."""
+
+    def __init__(
+        self,
+        url: str = "http://localhost:8010/v2/check",
+        timeout_s: float = 5.0,
+        language: str = "pt-BR",
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        self.url = url
+        self.timeout_s = timeout_s
+        self.language = language
+        self.transport = transport
+        self.is_offline = False
+
+    def correct_text(self, text: str, exemptions: Set[str] | None = None) -> tuple[str, int]:
+        """Envia o texto ao LanguageTool e aplica correções seguras em ordem inversa."""
+        if not text.strip() or self.is_offline:
+            return text, 0
+
+        clean_exemptions = {e.strip().lower() for e in (exemptions or set()) if e}
+
+        try:
+            with httpx.Client(timeout=self.timeout_s, transport=self.transport) as client:
+                resp = client.post(
+                    self.url,
+                    data={"text": text, "language": self.language},
+                )
+                if resp.status_code != 200:
+                    logger.warning("LanguageTool retornou status %s", resp.status_code)
+                    return text, 0
+                data = resp.json()
+        except Exception as exc:
+            logger.warning("LanguageTool indisponível (%s); degradando com elegância.", exc)
+            self.is_offline = True
+            return text, 0
+
+        matches: list[dict[str, Any]] = data.get("matches", [])
+        if not matches:
+            return text, 0
+
+        # Ordena de trás para frente para não invalidar offsets
+        matches.sort(key=lambda m: m.get("offset", 0), reverse=True)
+
+        applied = 0
+        result = text
+        for match in matches:
+            cat = match.get("rule", {}).get("category", {}).get("id", "")
+            if cat in BLOCKED_CATEGORIES or (cat and cat not in ALLOWED_CATEGORIES):
+                continue
+
+            offset = match.get("offset", 0)
+            length = match.get("length", 0)
+            original = result[offset : offset + length]
+
+            if original.lower() in clean_exemptions:
+                continue
+
+            replacements = match.get("replacements", [])
+            if not replacements:
+                continue
+
+            sub = replacements[0].get("value")
+            if not sub or sub == original:
+                continue
+
+            result = result[:offset] + sub + result[offset + length :]
+            applied += 1
+
+        return result, applied
