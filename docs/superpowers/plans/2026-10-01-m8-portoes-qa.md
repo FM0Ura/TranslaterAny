@@ -320,7 +320,7 @@ git commit -m "feat(stages): integra StageGate em translate_dialogue e etapas de
 - Consumes: Histórico cronológico de instantâneos `(stage_name, dict[unit_id, text])`, `Finding`.
 - Produces: `attribute_blame(unit_id: str, finding: Finding, history: Sequence[tuple[str, Mapping[str, str]]]) -> str`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_blame.py
@@ -342,22 +342,22 @@ def test_attribute_blame_finds_origin_stage() -> None:
     assert blamed == "colloquial"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_blame.py -v`
 Expected: FAIL (`translaterany.quality.blame` não existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Criar `src/translaterany/quality/blame.py`:
 - Função `attribute_blame`: percorre a lista de snapshots do mais antigo para o mais novo. Avalia a checagem do finding em cada versão do texto. A primeira etapa em que a checagem falhar é retornada como a causadora. Se não falhar em nenhuma etapa intermediária (ex: defeito exclusivo de redistribuição/timing), retorna a última etapa (`redistribute_sentences`).
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_blame.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/quality/blame.py tests/test_blame.py
