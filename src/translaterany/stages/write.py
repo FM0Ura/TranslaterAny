@@ -38,7 +38,7 @@ class WriteStage(Stage):
         self.inputs = ("extract", ORIGINAL) if source == ORIGINAL else ("extract", ORIGINAL, source)
 
     def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
-        if self.options.text_source in (DEFAULT_SOURCE, "qa_loop"):
+        if "text_source" not in self.options.model_fields_set:
             texts = [s.name for s in previous if s.produces_texts]
             if texts:
                 self.options.text_source = texts[-1]

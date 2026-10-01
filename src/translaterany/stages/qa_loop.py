@@ -16,7 +16,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from translaterany.checks.final_qa import check_ass_syntax, check_timing_bounds
+from translaterany.checks.final_qa import check_ass_syntax, check_event_integrity, check_timing_bounds
 from translaterany.checks.models import CheckEnv, Finding
 from translaterany.checks.registry import run_line_checks
 from translaterany.checks.snapshots import LineSource, build_sources, lines_for
@@ -138,6 +138,7 @@ class QALoopStage(Stage):
         }
 
     def run(self, ctx: StageContext) -> None:
+        self.gate.reset()
         try:
             doc = ctx.inputs.json("normalize", NormalizedDoc)
         except Exception:
@@ -220,6 +221,14 @@ class QALoopStage(Stage):
                 findings.extend(f for f in line_findings if is_blocking(f) or f.severity == "error")
             return findings
 
+        all_findings: list[Finding] = []
+        integrity_findings = check_event_integrity(
+            expected_count=len(sources),
+            actual_count=len(current_texts),
+            env=env,
+        )
+        all_findings.extend(integrity_findings)
+
         rounds_executed = 0
         extra_calls_used = 0
         blame_summary: dict[str, int] = {}
@@ -232,6 +241,7 @@ class QALoopStage(Stage):
                 findings = _audit_unit(uid, txt)
                 if findings:
                     failing_units[uid] = findings
+                    all_findings.extend(findings)
 
             if not failing_units:
                 break
@@ -419,6 +429,15 @@ class QALoopStage(Stage):
             )
 
         final_unresolved: list[dict[str, Any]] = []
+        for f in integrity_findings:
+            final_unresolved.append(
+                {
+                    "unit_id": f.unit_id or "",
+                    "check": f.check,
+                    "severity": f.severity,
+                    "message": f.message,
+                }
+            )
         for uid, txt in current_texts.items():
             rem = _audit_unit(uid, txt)
             for f in rem:

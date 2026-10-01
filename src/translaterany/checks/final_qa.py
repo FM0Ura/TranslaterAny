@@ -19,7 +19,7 @@ _TAG_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^(?:pos|move|org|fad|fade|clip|iclip|t)\(.*\)$"),
     # Valores numéricos e dimensões
     re.compile(
-        r"^(?:fs|fscx|fscy|fsp|frx|fry|frz|fr|fe|xbord|ybord|bord|xshad|yshad|shad|be|blur|pbo|p|k[fo]?|K)\s*[-+]?(?:\d+(?:\.\d*)?|\.\d+)?$"
+        r"^(?:fs|fscx|fscy|fsp|frx|fry|frz|fr|fax|fay|fe|xbord|ybord|bord|xshad|yshad|shad|be|blur|pbo|p|k[fo]?|K)\s*[-+]?(?:\d+(?:\.\d*)?|\.\d+)?$"
     ),
     # Flags e seleções inteiras
     re.compile(r"^(?:b|i|u|s)\s*\d*$"),
@@ -121,14 +121,14 @@ def check_ass_syntax(
     # 4. Validar comandos dentro dos blocos {...}
     for _, _, content in brace_blocks:
         content_stripped = content.strip()
-        if not content_stripped:
+        if not content_stripped or not content_stripped.lstrip("\\"):
             findings.append(
                 Finding(
                     check="ass_syntax",
                     unit_id=unit_id,
                     severity="error",
-                    message="bloco de formatação ASS vazio '{}'",
-                    excerpt="{}",
+                    message=f"bloco de formatação ASS vazio '{{{content}}}'",
+                    excerpt=f"{{{content}}}",
                 )
             )
             continue

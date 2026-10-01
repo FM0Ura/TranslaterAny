@@ -95,3 +95,18 @@ def test_check_event_integrity_disabled_in_env() -> None:
     env = CheckEnv(limits=ChecksConfig(disabled=["event_integrity"]))
     findings = check_event_integrity(expected_count=50, actual_count=40, env=env)
     assert len(findings) == 0
+
+
+def test_check_ass_syntax_fax_fay() -> None:
+    findings = check_ass_syntax("u1", r"{\fax-0.5\fay0.2}Texto inclinado")
+    assert len(findings) == 0
+
+
+def test_check_ass_syntax_empty_slash_block() -> None:
+    findings = check_ass_syntax("u2", r"{\}Texto")
+    assert any(f.check == "ass_syntax" and "vazio" in f.message for f in findings)
+
+
+def test_check_ass_syntax_empty_braces() -> None:
+    findings = check_ass_syntax("u3", r"{}Texto")
+    assert any(f.check == "ass_syntax" and "vazio" in f.message for f in findings)

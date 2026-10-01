@@ -187,6 +187,7 @@ class DialogueRefineStage(Stage):
 
     # --- execução ------------------------------------------------------------------------------
     def run(self, ctx: StageContext) -> None:
+        self.gate.reset()
         dialogue = ctx.inputs.json(self.dialogue_input, UnitTexts)
         texts = dict(dialogue.texts)
         if not texts:

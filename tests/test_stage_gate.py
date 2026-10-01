@@ -20,6 +20,7 @@ def test_filter_blocking_findings() -> None:
     blocking = filter_blocking_findings(findings)
     assert len(blocking) == 2
     assert {f.check for f in blocking} == {"prompt_leak", "markers_broken"}
+    assert "prompt_leak" in BLOCKING_CHECKS
 
 
 def test_filter_blocking_findings_with_real_check_names() -> None:

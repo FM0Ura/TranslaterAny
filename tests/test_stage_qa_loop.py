@@ -1,5 +1,6 @@
 """Testes da etapa QALoopStage e relatório qa_report.json."""
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -502,5 +503,68 @@ def test_qa_loop_orthography_graceful_pass(tmp_path: Path) -> None:
     assert ctx.output.doc.texts["u1"] == "Olá mundo."
     report_file = tmp_path / "qa_report.json"
     assert '"outcome": "fixed"' in report_file.read_text(encoding="utf-8")
+
+
+def test_qa_loop_event_integrity_reported(tmp_path: Path) -> None:
+    def _ev(idx: int, unit: str, text: str) -> EventInfo:
+        return EventInfo(
+            index=idx,
+            line_no=idx,
+            kind="dialogue",
+            style="Default",
+            start_ms=idx * 2000,
+            end_ms=(idx + 1) * 2000,
+            layer=0,
+            name="",
+            prefix="",
+            text=text,
+            markers=[],
+            suffix="",
+            drawing=False,
+            unit=unit,
+        )
+
+    doc = NormalizedDoc(
+        encoding=Encoding(bom=False, newline="\n"),
+        format=[],
+        events=[_ev(0, "u1", "Line 1"), _ev(1, "u2", "Line 2")],
+        units=[
+            Unit(id="u1", style="Default", text="Line 1", markers=0, events=[0]),
+            Unit(id="u2", style="Default", text="Line 2", markers=0, events=[1]),
+        ],
+    )
+    classes = Classification(
+        main_style="Default",
+        counts={},
+        units={
+            "u1": UnitClass(type="dialogue", uncertain=False, rule="r"),
+            "u2": UnitClass(type="dialogue", uncertain=False, rule="r"),
+        },
+        scenes=[],
+    )
+
+    # redistribute_sentences apenas contém u1 (u2 foi perdida)
+    inputs = {
+        "normalize": doc,
+        "classify": classes,
+        "redistribute_sentences": UnitTexts(texts={"u1": "Linha 1"}),
+    }
+
+    llm = FakeLLM([])
+    ctx = _build_context(tmp_path, inputs, llm)
+
+    stage = QALoopStage()
+    stage.bind_pipeline(
+        [SimpleNamespace(name="redistribute_sentences", produces_texts=True, produces_dialogue=False)],
+        None,
+    )
+    stage.run(ctx)
+
+    report_file = tmp_path / "qa_report.json"
+    assert report_file.exists()
+    content = json.loads(report_file.read_text(encoding="utf-8"))
+    unresolved = content["unresolved_findings"]
+    assert any(f["check"] == "event_integrity" and f["severity"] == "error" for f in unresolved)
+
 
 

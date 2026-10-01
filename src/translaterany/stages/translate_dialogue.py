@@ -124,6 +124,7 @@ class StageTranslateDialogue(Stage):
         return ClassifiedUnitCollection(units=new_units)
 
     def run(self, ctx: StageContext) -> None:
+        self.gate.reset()
         client = self.client or ctx.llm
         normalized = ctx.inputs.json("normalize", NormalizedDoc)
         classification = ctx.inputs.json("classify", Classification)
@@ -207,6 +208,11 @@ class StageTranslateDialogue(Stage):
         units_to_verify: dict[str, str] = {}
         durations: dict[str, int] = {}
         event_counts: dict[str, int] = {}
+        composite_ids = (
+            {comp.composite_id for comp in merged_doc.units if len(comp.unit_ids) > 1 or "+" in comp.composite_id}
+            if merged_doc and merged_doc.units
+            else set()
+        )
 
         if merged_doc and merged_doc.units:
             for comp in merged_doc.units:
@@ -280,6 +286,7 @@ class StageTranslateDialogue(Stage):
                         source=orig_text,
                         target=tr,
                         duration_ms=durations.get(line_id, 0),
+                        composite=("+" in line_id or line_id in composite_ids),
                     )
                     decision = gate.evaluate([line_input], env)
                     gate.is_oscillating(line_id, tr)
@@ -348,6 +355,7 @@ class StageTranslateDialogue(Stage):
                                 source=orig_text,
                                 target=new_text,
                                 duration_ms=durations.get(line_id, 0),
+                                composite=("+" in line_id or line_id in composite_ids),
                             )
                             decision = gate.evaluate([new_line_input], env)
                             candidates.append((new_text, decision.findings))

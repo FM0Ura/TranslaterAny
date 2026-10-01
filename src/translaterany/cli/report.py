@@ -183,13 +183,13 @@ def report(
             except Exception as exc:
                 logger.warning("Falha ao ler qa_report.json em %s: %s", episode, exc)
     else:
+        qa_stage = next((s for s in cfg.stages if s.name == "qa_loop"), None)
+        threshold = getattr(getattr(qa_stage, "options", None), "warn_edit_rate_threshold", 0.25)
         for ep_key in store.episode_keys(series.key):
             qa_file = store.artifact_dir(series.key, ep_key) / "qa_report.json"
             if qa_file.exists():
                 try:
                     qa_rep = QAReport.model_validate_json(qa_file.read_text(encoding="utf-8"))
-                    qa_stage = next((s for s in cfg.stages if s.name == "qa_loop"), None)
-                    threshold = getattr(getattr(qa_stage, "options", None), "warn_edit_rate_threshold", 0.25)
                     console.print(f"\n[bold]{escape(ep_key)}[/bold]:")
                     console.print(format_qa_summary(qa_rep, threshold=threshold))
                 except Exception as exc:
