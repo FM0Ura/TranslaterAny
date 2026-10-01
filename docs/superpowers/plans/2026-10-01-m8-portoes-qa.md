@@ -440,7 +440,7 @@ git commit -m "feat(stages): implementa etapa qa_loop com reprocessamento e qa_r
 - Consumes: `QALoopStage`, `AppConfig`.
 - Produces: Pipeline padrão contendo `qa_loop`, comando `report` exibindo resumo de QA e aviso de modelo.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_report_m8.py
@@ -463,12 +463,12 @@ def test_format_qa_summary_with_warning() -> None:
     assert "translate_dialogue: 3" in output
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_report_m8.py -v`
 Expected: FAIL (`format_qa_summary` não existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 1. Em `src/translaterany/stages/__init__.py`:
    - Registrar `QALoopStage` no `DEFAULT_PIPELINE` entre `redistribute_sentences` e `quality_checks`.
@@ -476,12 +476,12 @@ Expected: FAIL (`format_qa_summary` não existe).
 2. Em `src/translaterany/cli/report.py`:
    - Adicionar `format_qa_summary` e exibir a seção de QA quando `qa_report.json` estiver presente.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_report_m8.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/stages/__init__.py src/translaterany/cli/report.py tests/test_report_m8.py
