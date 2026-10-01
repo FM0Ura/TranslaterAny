@@ -48,6 +48,8 @@ class RefineData:
     env: CheckEnv
     speaker_of: dict[str, str]
     characters: list[CharacterEntry] = field(default_factory=list)
+    listener_of: dict[str, str] = field(default_factory=dict)
+    confidence_of: dict[str, str] = field(default_factory=dict)
 
 
 class DialogueRefineStage(Stage):
@@ -115,8 +117,18 @@ class DialogueRefineStage(Stage):
         env = CheckEnv(glossary=glossary, names=[[c.name, *c.aliases] for c in characters], limits=self.limits)
         contexts = scene_doc.lines if scene_doc else {}
         speaker_of = {i: contexts[i].speaker for i in ids if i in contexts}
+        listener_of = {i: contexts[i].listener for i in ids if i in contexts}
+        confidence_of = {i: contexts[i].confidence for i in ids if i in contexts}
         lines, _ = lines_for({i: texts[i] for i in ids}, sources)
-        data = RefineData(sources=sources, lines=lines, env=env, speaker_of=speaker_of, characters=characters)
+        data = RefineData(
+            sources=sources,
+            lines=lines,
+            env=env,
+            speaker_of=speaker_of,
+            characters=characters,
+            listener_of=listener_of,
+            confidence_of=confidence_of,
+        )
         targets = self.select_targets(ids, data)
         if "translation_memory" in self.inputs:  # falas resolvidas pela memória de tradução não são revisadas
             tm = ctx.inputs.json("translation_memory", TranslationMemoryArtifact)
