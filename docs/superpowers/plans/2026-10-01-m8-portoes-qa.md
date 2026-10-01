@@ -265,7 +265,7 @@ git commit -m "feat(checks): implementa checagens exclusivas finais de sintaxe A
 - Consumes: `StageGate`, `AppConfig.gates`.
 - Produces: `translate_dialogue` e etapas de refinamento executando retentativas sob erro severo.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_stage_gate_integration.py
@@ -286,22 +286,22 @@ def test_apply_edits_with_gate_rejects_severe_degradation() -> None:
     assert result["u1"] == "Olá mundo."
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_stage_gate_integration.py -v`
 Expected: FAIL (`apply_edits_with_gate` não existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 1. Em `src/translaterany/stages/refine_base.py`, adicionar suporte a `StageGate` em `apply_edits_with_gate` para filtrar edições que introduzam achados bloqueantes.
 2. Em `src/translaterany/stages/translate_dialogue.py`, integrar o portão ao final da tradução para re-tentar falas unitárias com feedback antes de entregar o `UnitTexts`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_stage_gate_integration.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/stages/refine_base.py src/translaterany/stages/translate_dialogue.py tests/test_stage_gate_integration.py
