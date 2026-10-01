@@ -98,6 +98,9 @@ class DialogueRefineStage(Stage):
     def cache_payload(self, series: Series | None, episode: Episode | None) -> Any:
         return {"input": self.dialogue_input, "limits": self.limits.model_dump(mode="json")}
 
+    def render_prompt(self, review: Sequence[ReviewLine]) -> str:
+        return render_block_prompt(review)
+
     # --- execução ------------------------------------------------------------------------------
     def run(self, ctx: StageContext) -> None:
         dialogue = ctx.inputs.json(self.dialogue_input, UnitTexts)
@@ -165,7 +168,7 @@ class DialogueRefineStage(Stage):
                     LLMRequest(
                         model=self.options.model,
                         instructions=self.instructions(),
-                        prompt=render_block_prompt(review),
+                        prompt=self.render_prompt(review),
                         output_type=EditsResponse,
                         tag=self.name,
                     )
