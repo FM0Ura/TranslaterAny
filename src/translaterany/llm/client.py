@@ -53,3 +53,11 @@ class LLMResponse[T: BaseModel]:
 @runtime_checkable
 class LLMClient(Protocol):
     def generate[T: BaseModel](self, request: LLMRequest[T]) -> LLMResponse[T]: ...
+
+
+def __getattr__(name: str) -> object:
+    if name == "FakeLLM":
+        from translaterany.llm.fake import FakeLLM
+
+        return FakeLLM
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

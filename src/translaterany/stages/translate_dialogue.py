@@ -4,19 +4,21 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel
 
-from translaterany.config.model import AppConfig, ProviderConfig
-from translaterany.llm.client import LLMClient
+from translaterany.checks import CheckEnv, Finding, LineInput
+from translaterany.config.model import AppConfig, ChecksConfig, ProviderConfig
+from translaterany.llm.client import LLMClient, LLMRequest
 from translaterany.memory.artifacts import ConsolidatedMemoryArtifact
 from translaterany.memory.matching import select_for_text
 from translaterany.memory.models import CharacterEntry, GlossaryEntry
 from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.artifacts import ArtifactStore
+from translaterany.pipeline.gates import StageGate
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.stage_metrics import StageMetrics, count
 from translaterany.pipeline.units import Episode, Series
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
-from translaterany.subtitles.chunking import DialogueLine
+from translaterany.subtitles.chunking import DialogueLine, format_batch_prompt
 from translaterany.subtitles.classify import Classification, ClassifiedUnit, ClassifiedUnitCollection
 from translaterany.subtitles.linebreak import char_budget, flatten_breaks
 from translaterany.subtitles.merge import MergedUnitsDoc
@@ -24,7 +26,7 @@ from translaterany.subtitles.normalize import NormalizedDoc
 from translaterany.subtitles.scene_analysis import SceneAnalysisDoc
 from translaterany.subtitles.segments import marker_ids
 from translaterany.subtitles.texts import UnitTexts
-from translaterany.subtitles.translator import DialogueBatchTranslator
+from translaterany.subtitles.translator import DialogueBatchTranslator, TranslationBatch, _normalize_id
 from translaterany.util.doctor import Check, ollama_check, ollama_models_check
 
 if TYPE_CHECKING:
@@ -81,10 +83,13 @@ class StageTranslateDialogue(Stage):
         if inputs is not None:
             self.inputs = inputs
         self.max_cps, self.max_cpl = 17.0, 42  # padrão Netflix; o loader aplica o [checks] via bind_pipeline
+        self.gate = StageGate()
 
     def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
         if app is not None:
             self.max_cps, self.max_cpl = app.checks.max_cps, app.checks.max_cpl
+            if hasattr(app, "gates"):
+                self.gate = StageGate(config=app.gates)
 
     def cache_payload(self, series: Series | None, episode: Episode | None) -> Any:
         return {"max_cps": self.max_cps, "max_cpl": self.max_cpl}
@@ -255,19 +260,118 @@ class StageTranslateDialogue(Stage):
             )
             translated_texts = translator.translate_lines(lines)
 
+            gate = getattr(self, "gate", None)
+            if gate is None:
+                app_cfg = getattr(ctx, "config", None)
+                gate = StageGate(config=getattr(app_cfg, "gates", None) if app_cfg else None)
+
+            env = CheckEnv(
+                glossary=matched_glossary,
+                names=[[c.name, *c.aliases] for c in matched_characters],
+                limits=ChecksConfig(max_cps=self.max_cps, max_cpl=self.max_cpl),
+            )
+
             for line_id, orig_text in units_to_verify.items():
                 tr = translated_texts.get(line_id, orig_text)
+                if gate.enabled:
+                    line_input = LineInput(
+                        id=line_id,
+                        line_type="dialogue",
+                        source=orig_text,
+                        target=tr,
+                        duration_ms=durations.get(line_id, 0),
+                    )
+                    decision = gate.evaluate([line_input], env)
+                    gate.is_oscillating(line_id, tr)
+                    candidates: list[tuple[str, Sequence[Finding]]] = [(tr, decision.findings)]
+
+                    if not decision.passed:
+                        for _attempt in range(1, gate.max_retries + 1):
+                            count(ctx, "gate_retries")
+                            count(ctx, "extra_calls")
+                            feedback = decision.feedback or gate.generate_feedback(decision.blocking)
+                            single_prompt = format_batch_prompt(
+                                [DialogueLine(id=line_id, text=orig_text)],
+                                context=[],
+                                glossary=matched_glossary,
+                                characters=matched_characters,
+                                line_contexts=line_contexts,
+                                char_budgets={line_id: budgets[line_id]} if line_id in budgets else None,
+                            )
+                            full_prompt = f"{single_prompt}\n\nATENÇÃO - CORREÇÃO OBRIGATÓRIA:\n{feedback}"
+                            req = LLMRequest(
+                                model=self.options.model,
+                                instructions=translator.system_instructions,
+                                prompt=full_prompt,
+                                output_type=TranslationBatch,
+                                tag=f"{self.name}:gate_retry",
+                            )
+                            try:
+                                res = client.generate(req)
+                            except Exception as exc:
+                                logger.warning(
+                                    "Retentativa no portão falhou para unidade %s (%s).",
+                                    line_id,
+                                    exc,
+                                )
+                                break
+
+                            new_text = ""
+                            if res.output and getattr(res.output, "items", None):
+                                for it in res.output.items:
+                                    if _normalize_id(it.id) == line_id:
+                                        new_text = it.text
+                                        break
+                                ignored_headers = ("FALAS A TRADUZIR", "ATENÇÃO - CORREÇÃO OBRIGATÓRIA")
+                                if (
+                                    not new_text
+                                    and len(res.output.items) == 1
+                                    and _normalize_id(res.output.items[0].id) not in ignored_headers
+                                ):
+                                    new_text = res.output.items[0].text
+                            elif hasattr(res.output, "text"):
+                                new_text = res.output.text
+
+                            if not new_text.strip():
+                                break
+
+                            if gate.is_oscillating(line_id, new_text):
+                                logger.info(
+                                    "Oscilação detectada no portão para a unidade %s; interrompendo retentativas.",
+                                    line_id,
+                                )
+                                break
+
+                            new_line_input = LineInput(
+                                id=line_id,
+                                line_type="dialogue",
+                                source=orig_text,
+                                target=new_text,
+                                duration_ms=durations.get(line_id, 0),
+                            )
+                            decision = gate.evaluate([new_line_input], env)
+                            candidates.append((new_text, decision.findings))
+                            if decision.passed:
+                                tr = new_text
+                                break
+
+                        if not decision.passed:
+                            best_text, _ = gate.pick_best(candidates)
+                            tr = best_text
+
                 expected = marker_ids(orig_text)
                 if expected:
                     if sorted(marker_ids(tr)) != sorted(expected):
                         logger.warning(
-                            "Unidade %s: tradução perdeu marcadores %s (obtido %s). Fazendo fallback para texto original.",
+                            "Unidade %s: tradução perdeu marcadores %s (obtido %s). "
+                            "Fazendo fallback para texto original.",
                             line_id,
                             expected,
                             marker_ids(tr),
                         )
                         tr = orig_text
                         count(ctx, "markers_lost")
+
                 final_texts[line_id] = tr
 
         ctx.output.json(UnitTexts(texts=final_texts, used_terms=used_terms_dict))

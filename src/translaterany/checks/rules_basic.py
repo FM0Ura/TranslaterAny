@@ -46,7 +46,11 @@ def untranslated(line: LineInput, env: CheckEnv) -> list[Finding]:
     return []
 
 
-_LEAK_RE = re.compile(r"\(\s*máx\.?\s*\d+\s*\)|\bno máximo \d+ caracteres\b|\[(?:u|CTX-)\d+\]", re.IGNORECASE)
+_LEAK_RE = re.compile(
+    r"\(?\s*máx\.?\s*\d+(?:\s*caracteres)?\s*\)?|\bno máximo \d+ caracteres\b|\[(?:u|CTX-)\d+\]",
+    re.IGNORECASE,
+)
+
 _EMOJI_RE = re.compile("[\U0001f300-\U0001faff]")
 
 

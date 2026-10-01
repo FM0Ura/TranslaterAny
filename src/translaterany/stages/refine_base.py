@@ -1,7 +1,7 @@
 """Base das etapas de refinamento do diálogo (M6): blocos por cena, resposta só com edições validadas."""
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -13,11 +13,12 @@ from translaterany.config.model import AppConfig, ChecksConfig
 from translaterany.llm.client import LLMRequest
 from translaterany.memory.matching import load_memory_for_text
 from translaterany.memory.models import CharacterEntry
+from translaterany.pipeline.gates import StageGate
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.stage_metrics import count
 from translaterany.pipeline.units import Episode, Series
 from translaterany.refine.blocks import ReviewLine, build_blocks, render_block_prompt
-from translaterany.refine.edits import REJECT_REASONS, EditsResponse, apply_edits
+from translaterany.refine.edits import REJECT_REASONS, EditsResponse, LineEdit, apply_edits
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.linebreak import char_budget
@@ -31,6 +32,86 @@ logger = logging.getLogger(__name__)
 
 _OPTIONAL = ("merge_sentences", "scene_analysis", "consolidate_memory", "translation_memory")
 CONTEXT_WINDOW = 3  # falas de contexto por lado de cada alvo
+
+
+class EditOutcomeDict(dict[str, str]):
+    def __init__(
+        self,
+        texts: Mapping[str, str],
+        applied: dict[str, str] | None = None,
+        rejected: dict[str, int] | None = None,
+    ) -> None:
+        super().__init__(texts)
+        self.applied = applied or {}
+        self.rejected = rejected or dict.fromkeys(REJECT_REASONS, 0)
+
+    @property
+    def texts(self) -> dict[str, str]:
+        return dict(self)
+
+
+def apply_edits_with_gate(
+    texts: Mapping[str, str],
+    edits: Iterable[LineEdit],
+    gate: StageGate | None = None,
+    editable: set[str] | None = None,
+    sources: Mapping[str, LineSource] | None = None,
+    env: CheckEnv | None = None,
+    forbidden: Mapping[str, str] | None = None,
+    targets: set[str] | None = None,
+) -> EditOutcomeDict:
+
+    if gate is None:
+        gate = StageGate()
+    if targets is None:
+        targets = editable if editable is not None else set(texts.keys())
+    if sources is None:
+        sources = {
+            uid: LineSource(source=txt, duration_ms=2000, line_type="dialogue", style="") for uid, txt in texts.items()
+        }
+    if env is None:
+        env = CheckEnv()
+
+    outcome = apply_edits(texts, edits, targets, sources, env, forbidden=forbidden)
+    if not gate.enabled:
+        return EditOutcomeDict(outcome.texts, applied=outcome.applied, rejected=outcome.rejected)
+
+    for item in list(outcome.applied.keys()):
+        new_text = outcome.texts[item]
+        src = sources[item]
+        new_line = LineInput(
+            id=item,
+            source=src.source,
+            target=new_text,
+            line_type=src.line_type,
+            style=src.style,
+            duration_ms=src.duration_ms,
+            composite=src.composite,
+        )
+        decision = gate.evaluate([new_line], env)
+        orig_line = LineInput(
+            id=item,
+            source=src.source,
+            target=texts[item],
+            line_type=src.line_type,
+            style=src.style,
+            duration_ms=src.duration_ms,
+            composite=src.composite,
+        )
+        orig_decision = gate.evaluate([orig_line], env)
+        best_text, _ = gate.never_worsen(texts[item], orig_decision.findings, new_text, decision.findings)
+
+        if decision.blocking or best_text != new_text or gate.is_oscillating(item, new_text):
+            logger.info(
+                "StageGate rejeitou edição de %s: introduz achados bloqueantes (%s). Mantendo original.",
+                item,
+                decision.blocking,
+            )
+            outcome.texts[item] = texts[item]
+            outcome.applied.pop(item, None)
+            outcome.rejected["worse"] += 1
+
+    return EditOutcomeDict(outcome.texts, applied=outcome.applied, rejected=outcome.rejected)
 
 
 class RefineOptions(BaseModel):
@@ -64,6 +145,7 @@ class DialogueRefineStage(Stage):
         self.dialogue_input = self.default_dialogue_input
         self.max_cps, self.max_cpl = 17.0, 42
         self.limits = ChecksConfig()
+        self.gate = StageGate()
         self.inputs = ("normalize", "classify", *_OPTIONAL, *self._extra_inputs(), self.dialogue_input)
 
     # --- a sobrescrever -------------------------------------------------------------------------
@@ -88,6 +170,8 @@ class DialogueRefineStage(Stage):
         if app is not None:
             self.limits = app.checks
             self.max_cps, self.max_cpl = app.checks.max_cps, app.checks.max_cpl
+            if hasattr(app, "gates"):
+                self.gate = StageGate(config=app.gates)
         self._bind_extra(previous)
         optional = tuple(n for n in _OPTIONAL if n in names)
         self.inputs = ("normalize", "classify", *optional, *self._extra_inputs(), self.dialogue_input)
@@ -179,9 +263,19 @@ class DialogueRefineStage(Stage):
                 continue
             count(ctx, "edits_proposed", len(response.edits))
             editable = {i for i in block if i in targets}
-            outcome = apply_edits(texts, response.edits, editable, sources, env, forbidden=forbidden)
+            gate = getattr(self, "gate", None) or StageGate()
+            outcome = apply_edits_with_gate(
+                texts,
+                response.edits,
+                gate=gate,
+                editable=editable,
+                sources=sources,
+                env=env,
+                forbidden=forbidden,
+            )
             texts = outcome.texts
             count(ctx, "edits_applied", len(outcome.applied))
+
             for reason in REJECT_REASONS:
                 if outcome.rejected[reason]:
                     count(ctx, f"rejected_{reason}", outcome.rejected[reason])
