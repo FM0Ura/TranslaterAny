@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from translaterany.config.model import ChecksConfig
 from translaterany.memory.models import GlossaryEntry
 
-type Severity = Literal["info", "warn", "error"]
+type Severity = Literal["info", "warn", "warning", "error"]
 
 
 class LineInput(BaseModel):
