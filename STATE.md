@@ -9,9 +9,9 @@
 
 ## Onde estamos
 
-- **Fase:** M7 implementado e validado.
-- **Marco atual:** **M7 — Refinamento II** — concluído (583 testes).
-- **Próxima ação:** merge da branch `m7-refinamento-ii` e validação com episódio real.
+- **Fase:** M8 implementado e validado. **Fim da v1!**
+- **Marco atual:** **M8 — Portões e laço do QA** — concluído (650 testes).
+- **Próxima ação:** merge da branch `m8-portoes-qa` no `master` e aceite real com episódio.
 
 ## Progresso dos marcos
 
@@ -26,8 +26,8 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
 | M5 — Verificações e métricas | ✅ | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | integrado ao master (510 testes); aceite com 1 episódio (Charlotte S01E01) — temporada inteira pendente |
 | M6 — Refinamento I | ✅ | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | integrado ao master; aceite real feito (Charlotte S01E01) — 558 testes |
-| M7 — Refinamento II | ✅ | [spec](docs/superpowers/specs/2026-10-01-m7-refinamento-ii-design.md) | [plano](docs/superpowers/plans/2026-10-01-m7-refinamento-ii.md) | concluído (583 testes); pronto para integração |
-| M8 — Portões e laço do QA | ⬜ | — | — | fim da v1 |
+| M7 — Refinamento II | ✅ | [spec](docs/superpowers/specs/2026-10-01-m7-refinamento-ii-design.md) | [plano](docs/superpowers/plans/2026-10-01-m7-refinamento-ii.md) | integrado ao master (583 testes) |
+| M8 — Portões e laço do QA | ✅ | [spec](docs/superpowers/specs/2026-10-01-m8-portoes-qa-design.md) | [plano](docs/superpowers/plans/2026-10-01-m8-portoes-qa.md) | concluído (650 testes); fim da v1, pronto para integração |
 
 ---
 
@@ -83,6 +83,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-10-01 | **Aceite real do M6** (Charlotte S01E01, tradução em cache = mesma entrada do M5): `review_meaning` 80 s (16 edições aplicadas, 2 recusadas) e `colloquial` 44 s (23 falas triadas, 17 aplicadas, 6 recusadas) — **+2 min/episódio**. Corrigiu 4 palavrões inventados, "cúmplice"→"culpado", fala truncada, fala em inglês e concordâncias. Auditoria de 60 falas sorteadas (semente 42): M5 ≈ 80% corretas / 5% erro grave → M6 **85% corretas / 11,7% deslizes / 3,3% erro grave** | amostra pequena (IC amplo); restam erros de sentido não detectados ("Que barulho é esse?", "Me ajudar a quê?") |
 | 2026-10-01 | **Baseline M6 (Charlotte S01E01–04) e correções:** (1) checagem `prompt_leak` adicionada para barrar instruções do prompt (`máx. N`, `[u...]`) e emojis espúrios; (2) `merge_dialogue_units` passa a adotar a menor duração individual (`shortest_ms`) nas falas repetidas para não inflar o orçamento de caracteres; baseline salva em `docs/baselines/2026-10-01-m6-charlotte-s01e01-04.json` | 558 testes passando |
 | 2026-10-01 | **M7 — Refinamento II:** 4 etapas sequenciais (`treatment_consistency`, `adapt`, `orthography`, `final_readthrough`) entre `colloquial` e `redistribute_sentences`; cliente LanguageTool HTTP com degradação graciosa e isenções (nomes de personagens e termos do glossário); triagem pronominal/gênero por pares de alta confiança; condensação de CPS > 17 com orçamento de caracteres; leitura corrida final em PT-BR por cena; checagem `doctor` do LanguageTool; revisão final tratou isenções e integridade de marcadores | 583 testes passando |
+| 2026-10-01 | **M8 — Portões e laço do QA (Fim da v1):** StageGate com escada de escalonamento local (feedback + redução unitária) e detecção de oscilação; checagens finais exclusivas (sintaxe ASS, integridade de eventos, timing); algoritmo de blame retroativo no histórico de artefatos; etapa QALoopStage com reprocessamento em cascata pontual e integração determinística com orthography; artefato qa_report.json e aviso de modelo no report; WriteStage respeita text_source explícito; gate.reset() previne vazamento de estado | 650 testes passando; conclusão da v1 |
 
 ---
 
