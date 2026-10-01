@@ -499,7 +499,7 @@ git commit -m "feat(pipeline): registra qa_loop no pipeline padrao e adiciona se
 - Consumes: Runner completo, `DEFAULT_PIPELINE`, `FakeLLM`.
 - Produces: Validação E2E com simulação de erro sanado pelo QA loop e gravação do `.pt-BR.ass` e `qa_report.json`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_m8_pipeline.py
@@ -529,17 +529,17 @@ def test_qa_loop_in_default_config(tmp_path: Path) -> None:
     assert stages["quality_checks"].inputs is not None
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_m8_pipeline.py -v`
 Expected: FAIL (ordem em `DEFAULT_PIPELINE` sem `qa_loop`).
 
-- [ ] **Step 3: Run test to verify it passes**
+- [x] **Step 3: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_m8_pipeline.py -v`
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/test_m8_pipeline.py
