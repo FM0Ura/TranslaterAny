@@ -195,7 +195,7 @@ git commit -m "feat(gates): implementa motor StageGate com deteccao de oscilacao
 - Consumes: Linhas/Eventos ASS finais, `CheckEnv`.
 - Produces: `check_ass_syntax`, `check_event_integrity`, `check_timing_bounds`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_final_qa_checks.py
@@ -228,24 +228,24 @@ def test_check_timing_bounds_invalid() -> None:
     assert any(f.check == "timing_bounds" for f in findings)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/test_final_qa_checks.py -v`
 Expected: FAIL (`translaterany.checks.final_qa` não existe).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Criar `src/translaterany/checks/final_qa.py`:
 - `check_ass_syntax(unit_id: str, text: str) -> list[Finding]`: valida balanceamento de `{` e `}`, detecção de `\N\N`, validação de comandos ASS básicos.
 - `check_timing_bounds(unit_id: str, start_ms: int, end_ms: int) -> list[Finding]`: assegura `start_ms < end_ms` e duração mínima > 0.
 - `check_event_integrity(expected_count: int, actual_count: int) -> list[Finding]`: compara quantidade de falas para alertar se houver perda.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_final_qa_checks.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/checks/final_qa.py tests/test_final_qa_checks.py
