@@ -65,6 +65,10 @@ class DiscoveryConfig(_Strict):
     min_file_age: float = 120
 
 
+class LibraryConfig(_Strict):
+    path: Path | None = None
+
+
 class PipelineConfig(_Strict):
     stages: list[str]
 
@@ -127,12 +131,68 @@ class FinalReadthroughOptions(_Strict):
     max_lines_per_block: int = 30
 
 
+class GatesConfig(_Strict):
+    """Configuração dos portões de etapa (M8)."""
+
+    enabled: bool = True
+    max_retries: int = Field(2, ge=0)
+
+
+class QALoopOptions(_Strict):
+    """Opções da etapa qa_loop (M8)."""
+
+    max_rounds: int = Field(2, ge=1)
+    max_extra_calls: int = Field(30, ge=0)
+    warn_edit_rate_threshold: float = Field(0.25, ge=0.0, le=1.0)
+
+
+_STAGE_OPTION_DEFAULTS: dict[str, dict[str, Any]] = {
+    "qa_loop": {
+        "max_rounds": 2,
+        "max_extra_calls": 30,
+        "warn_edit_rate_threshold": 0.25,
+    },
+}
+
+
+class StagesDict(dict[str, StageConfig]):
+    """Dicionário de configurações de etapas com padrões embutidos."""
+
+    def __getitem__(self, key: str) -> StageConfig:
+        if super().__contains__(key):
+            cfg = super().__getitem__(key)
+            if key in _STAGE_OPTION_DEFAULTS:
+                for k, v in _STAGE_OPTION_DEFAULTS[key].items():
+                    cfg.options.setdefault(k, v)
+            return cfg
+        if key in _STAGE_OPTION_DEFAULTS:
+            return StageConfig(options=dict(_STAGE_OPTION_DEFAULTS[key]))
+        raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __contains__(self, key: object) -> bool:
+        return super().__contains__(key) or key in _STAGE_OPTION_DEFAULTS
+
+
 class AppConfig(_Strict):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
+    library: LibraryConfig = Field(default_factory=LibraryConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     translation: TranslationConfig = Field(default_factory=TranslationConfig)
     checks: ChecksConfig = Field(default_factory=ChecksConfig)
+    gates: GatesConfig = Field(default_factory=GatesConfig)
     pipeline: PipelineConfig | None = None
-    stages: dict[str, StageConfig] = Field(default_factory=dict)
+    stages: dict[str, StageConfig] = Field(default_factory=StagesDict)
+
+    @model_validator(mode="after")
+    def _wrap_stages(self) -> AppConfig:
+        if not isinstance(self.stages, StagesDict):
+            self.stages = StagesDict(self.stages)
+        return self
 
