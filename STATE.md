@@ -9,9 +9,9 @@
 
 ## Onde estamos
 
-- **Fase:** M6 implementado na branch `m6-refinamento-i`.
-- **Marco atual:** **M6 — Refinamento I** — implementação concluída; aguardando revisão final e aceite real.
-- **Próxima ação:** aceite real (Charlotte S01E01 + `report --baseline docs/baselines/2026-09-30-m5-charlotte-s01e01.json`).
+- **Fase:** M6 integrado ao master.
+- **Marco atual:** **M7 — Refinamento II** — não iniciado.
+- **Próxima ação:** spec do M7 (coerência de tratamento, adaptação, ortografia e leitura corrida final).
 
 ## Progresso dos marcos
 
@@ -25,7 +25,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
 | M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
 | M5 — Verificações e métricas | ✅ | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | integrado ao master (510 testes); aceite com 1 episódio (Charlotte S01E01) — temporada inteira pendente |
-| M6 — Refinamento I | 🔨 | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | implementado; aceite real feito (Charlotte S01E01) — 553 testes |
+| M6 — Refinamento I | ✅ | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | integrado ao master; aceite real feito (Charlotte S01E01) — 553 testes |
 | M7 — Refinamento II | ⬜ | — | — | |
 | M8 — Portões e laço do QA | ⬜ | — | — | fim da v1 |
 
