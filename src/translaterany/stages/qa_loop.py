@@ -108,11 +108,9 @@ class QALoopStage(Stage):
         self.gate = StageGate()
         self.snapshot_stages: list[str] = list(DEFAULT_SNAPSHOT_STAGES)
         self.dialogue_input: str = "redistribute_sentences"
-        self.previous_stages: list[Stage] = []
         self.inputs = ("normalize", "classify", *_OPTIONAL, *self.snapshot_stages)
 
     def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
-        self.previous_stages = list(previous)
         names = [s.name for s in previous]
         self.snapshot_stages = [s.name for s in previous if s.produces_texts]
         if app is not None:
@@ -168,6 +166,14 @@ class QALoopStage(Stage):
             names=[[c.name, *c.aliases] for c in characters],
             limits=self.limits,
         )
+        exemptions: set[str] = set()
+        for term in glossary:
+            exemptions.add(term.term)
+            exemptions.add(term.translation)
+            exemptions.update(term.aliases)
+        for char in characters:
+            exemptions.add(char.name)
+            exemptions.update(char.aliases)
 
         history: list[tuple[str, Mapping[str, str]]] = []
         for name in self.snapshot_stages:
@@ -230,6 +236,7 @@ class QALoopStage(Stage):
             if not failing_units:
                 break
 
+            budget_depleted = False
             for uid, unit_findings in failing_units.items():
                 if extra_calls_used >= self.options.max_extra_calls:
                     logger.warning(
@@ -244,6 +251,7 @@ class QALoopStage(Stage):
                             "outcome": "exhausted",
                         }
                     )
+                    budget_depleted = True
                     continue
 
                 f_primary = unit_findings[0]
@@ -258,16 +266,22 @@ class QALoopStage(Stage):
                     idx = stage_names.index(blamed_stage)
                     if idx > 0:
                         prev_text = history[idx - 1][1].get(uid, "")
-                if not prev_text:
+                if not prev_text and blamed_stage != "translate_dialogue":
                     prev_text = current_texts.get(uid, "")
 
-                prompt = (
-                    f"FALA A CORRIGIR:\n"
-                    f"[{uid}] {source_text or prev_text}\n\n"
-                    f"TEXTO ATUAL COM DEFEITO:\n"
-                    f"{current_texts.get(uid, '')}\n\n"
-                    f"{feedback}"
-                )
+                prompt_parts: list[str] = []
+                if source_text:
+                    prompt_parts.append(f"TEXTO ORIGINAL (EN):\n[{uid}] {source_text}")
+                else:
+                    prompt_parts.append(f"FALA:\n[{uid}]")
+
+                if prev_text and prev_text != current_texts.get(uid, ""):
+                    prompt_parts.append(f"ÚLTIMA TRADUÇÃO VÁLIDA (PT-BR):\n{prev_text}")
+
+                prompt_parts.append(f"TEXTO ATUAL COM DEFEITO:\n{current_texts.get(uid, '')}")
+                prompt_parts.append(feedback)
+
+                prompt = "\n\n".join(prompt_parts)
                 instructions = (
                     "Você é um revisor especialista de legendas em português do Brasil (PT-BR). "
                     "Sua tarefa é corrigir a fala indicada eliminando estritamente os erros apontados no feedback. "
@@ -334,6 +348,22 @@ class QALoopStage(Stage):
                     )
                     continue
 
+                if "orthography" in self.snapshot_stages:
+                    try:
+                        from translaterany.stages.orthography import OrthographyStage
+
+                        ortho = OrthographyStage()
+                        ortho_result, _, _ = ortho.process_texts(
+                            {uid: candidate},
+                            sources=sources,
+                            exemptions=exemptions,
+                            limits=self.limits,
+                        )
+                        if uid in ortho_result:
+                            candidate = ortho_result[uid]
+                    except Exception as exc:
+                        logger.debug("qa_loop: orthography ignorada para %s (%s)", uid, exc)
+
                 wrapped_candidate = wrap_line(candidate, self.max_cpl)
 
                 new_findings = _audit_unit(uid, wrapped_candidate)
@@ -373,6 +403,9 @@ class QALoopStage(Stage):
                             "outcome": "reverted",
                         }
                     )
+
+            if budget_depleted or extra_calls_used >= self.options.max_extra_calls:
+                break
 
         changed = sum(1 for uid, txt in current_texts.items() if original_texts.get(uid) != txt)
         total = len(original_texts)

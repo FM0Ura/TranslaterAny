@@ -443,3 +443,64 @@ def test_qa_loop_bind_pipeline() -> None:
     assert "colloquial" in stage.snapshot_stages
     assert "redistribute_sentences" in stage.inputs
 
+
+def test_qa_loop_orthography_graceful_pass(tmp_path: Path) -> None:
+    doc = NormalizedDoc(
+        encoding=Encoding(bom=False, newline="\n"),
+        format=[],
+        events=[
+            EventInfo(
+                index=0,
+                line_no=0,
+                kind="dialogue",
+                style="Default",
+                start_ms=0,
+                end_ms=2000,
+                layer=0,
+                name="",
+                prefix="",
+                text="Hello world.",
+                markers=[],
+                suffix="",
+                drawing=False,
+                unit="u1",
+            )
+        ],
+        units=[Unit(id="u1", style="Default", text="Hello world.", markers=0, events=[0])],
+    )
+    classes = Classification(
+        main_style="Default",
+        counts={},
+        units={"u1": UnitClass(type="dialogue", uncertain=False, rule="r")},
+        scenes=[],
+    )
+
+    inputs = {
+        "normalize": doc,
+        "classify": classes,
+        "translate_dialogue": UnitTexts(texts={"u1": "Olá mundo."}),
+        "orthography": UnitTexts(texts={"u1": "máx. 10 Olá mundo."}),
+        "redistribute_sentences": UnitTexts(texts={"u1": "máx. 10 Olá mundo."}),
+    }
+
+    resp = TranslationBatch(items=[TranslationItem(id="u1", text="Olá mundo.")])
+    llm = FakeLLM([resp])
+    ctx = _build_context(tmp_path, inputs, llm)
+
+    stage = QALoopStage()
+    stage.bind_pipeline(
+        [
+            SimpleNamespace(name="translate_dialogue", produces_texts=True, produces_dialogue=True),
+            SimpleNamespace(name="orthography", produces_texts=True, produces_dialogue=True),
+            SimpleNamespace(name="redistribute_sentences", produces_texts=True, produces_dialogue=False),
+        ],
+        None,
+    )
+    stage.run(ctx)
+
+    assert ctx.output.doc is not None
+    assert ctx.output.doc.texts["u1"] == "Olá mundo."
+    report_file = tmp_path / "qa_report.json"
+    assert '"outcome": "fixed"' in report_file.read_text(encoding="utf-8")
+
+
