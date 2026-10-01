@@ -1,7 +1,10 @@
 """Etapa write: remonta o .ass com os textos da etapa indicada em text_source."""
 
+from collections.abc import Sequence
+
 from pydantic import BaseModel, ConfigDict
 
+from translaterany.config.model import AppConfig
 from translaterany.pipeline.registry import REGISTRY, register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.subtitles.ass import parse_ass, render_ass
@@ -33,6 +36,14 @@ class WriteStage(Stage):
         super().__init__(options)
         source = self.options.text_source
         self.inputs = ("extract", ORIGINAL) if source == ORIGINAL else ("extract", ORIGINAL, source)
+
+    def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
+        if self.options.text_source in (DEFAULT_SOURCE, "qa_loop"):
+            texts = [s.name for s in previous if s.produces_texts]
+            if texts:
+                self.options.text_source = texts[-1]
+                source = self.options.text_source
+                self.inputs = ("extract", ORIGINAL) if source == ORIGINAL else ("extract", ORIGINAL, source)
 
     def run(self, ctx: StageContext) -> None:
         source = self.options.text_source
