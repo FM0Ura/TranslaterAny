@@ -100,6 +100,24 @@ def check_ollama_status(url: str = "http://localhost:11434") -> tuple[bool, str]
 check_ollama_service = check_ollama_status
 
 
+def check_languagetool_service(
+    url: str = "http://localhost:8010/v2/check",
+    transport: Any = None,
+) -> CheckResult:
+    """Verifica se o servidor LanguageTool está acessível via HTTP."""
+    import httpx
+
+    base = url.split("/v2")[0] if "/v2" in url else url.rstrip("/")
+    try:
+        with httpx.Client(timeout=3.0, transport=transport) as client:
+            resp = client.get(f"{base}/v2/languages")
+            if resp.status_code == 200:
+                return CheckResult("ok", f"LanguageTool acessível em {base}")
+            return CheckResult("warn", f"LanguageTool em {base} retornou status HTTP {resp.status_code}")
+    except Exception as exc:
+        return CheckResult("warn", f"LanguageTool indisponível em {url}: {exc}")
+
+
 def check_ollama_models(
     url: str = "http://localhost:11434",
     required_models: list[str] | None = None,

@@ -25,10 +25,29 @@ def test_default_pipeline_order() -> None:
 
 def test_redistribute_reads_last_dialogue_stage(tmp_path: Path) -> None:
     cfg = tmp_path / "c.toml"
-    cfg.write_text("", encoding="utf-8")
+    m7_disabled = """
+[stages.treatment_consistency]
+enabled = false
+[stages.adapt]
+enabled = false
+[stages.orthography]
+enabled = false
+[stages.final_readthrough]
+enabled = false
+"""
+    cfg.write_text(m7_disabled, encoding="utf-8")
     stages = {s.name: s for s in load_config(cfg, tmp_path / "d").stages}
     assert stages["redistribute_sentences"].dialogue_input == "colloquial"
-    cfg.write_text("[stages.colloquial]\nenabled = false\n[stages.review_meaning]\nenabled = false\n", encoding="utf-8")
+    cfg.write_text(
+        m7_disabled
+        + """
+[stages.colloquial]
+enabled = false
+[stages.review_meaning]
+enabled = false
+""",
+        encoding="utf-8",
+    )
     stages = {s.name: s for s in load_config(cfg, tmp_path / "d").stages}
     assert stages["redistribute_sentences"].dialogue_input == "translate_dialogue"
     assert "review_meaning" not in stages

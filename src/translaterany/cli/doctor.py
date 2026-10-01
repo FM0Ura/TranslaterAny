@@ -9,6 +9,7 @@ from translaterany.config import ConfigError, ResolvedConfig, load_config
 from translaterany.config.model import ProviderConfig
 from translaterany.util.doctor import (
     CheckResult,
+    check_languagetool_service,
     check_nvidia_gpu,
     check_ollama_models,
     check_ollama_status,
@@ -87,6 +88,7 @@ def doctor(ctx: typer.Context) -> None:
     raw_results = [
         ("config", CheckResult("ok", f"configuração válida ({where})")),
         *run_checks(all_checks(cfg)),
+        ("languagetool", check_languagetool_service()),
         *llm_doctor_checks(cfg),
     ]
     seen_names: set[str] = set()

@@ -1,15 +1,18 @@
 """Etapas embutidas. Importar este pacote registra todas elas no REGISTRY."""
 
 from translaterany.stages import (  # noqa: F401
+    adapt,
     classify,
     colloquial,
     consolidate_memory,
     extract,
     extract_terms,
+    final_readthrough,
     inventory,
     merge_sentences,
     metadata,
     normalize,
+    orthography,
     publish,
     quality_checks,
     redistribute_sentences,
@@ -21,6 +24,7 @@ from translaterany.stages import (  # noqa: F401
     translate_signs,
     translate_songs,
     translation_memory,
+    treatment_consistency,
     write,
 )
 
@@ -42,6 +46,10 @@ DEFAULT_PIPELINE: tuple[str, ...] = (
     "translate_songs",
     "review_meaning",
     "colloquial",
+    "treatment_consistency",
+    "adapt",
+    "orthography",
+    "final_readthrough",
     "redistribute_sentences",
     "write",
     "publish",
