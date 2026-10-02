@@ -38,7 +38,17 @@ class TreatmentConsistencyStage(DialogueRefineStage):
             for line in data.lines
             if line.id in ids
         ]
-        char_gender = {c.name: c.gender for c in data.characters if c.gender}
+        char_gender: dict[str, str] = {}
+        for c in data.characters:
+            if not c.gender:
+                continue
+            g_val = c.gender.value if hasattr(c.gender, "value") else str(c.gender)
+            if g_val.lower() in ("gender.unknown", "unknown"):
+                continue
+            char_gender[c.name] = g_val
+            for alias in getattr(c, "aliases", []) or []:
+                if alias and alias not in char_gender:
+                    char_gender[alias] = g_val
         report = scan_treatment_consistency(lines_info, character_gender=char_gender)
 
         targets: dict[str, list[str]] = {}

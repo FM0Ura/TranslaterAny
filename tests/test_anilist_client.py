@@ -326,3 +326,53 @@ def test_anilist_parse_invalid_id_mal(tmp_path: Path, monkeypatch):
     assert match is not None
     assert match.anilist_id == 12345
     assert match.mal_id is None
+
+
+def test_anilist_search_normalizes_cross_symbol(tmp_path: Path, monkeypatch):
+    client = AniListClient(cache_dir=tmp_path / "cache")
+    searches_attempted = []
+
+    def mock_post(*a, **kw):
+        json_body = kw.get("json", {})
+        search_term = json_body.get("variables", {}).get("search")
+        searches_attempted.append(search_term)
+        if search_term == "High School D×D":
+            return httpx.Response(404)
+        if search_term == "High School DxD":
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "Media": {
+                            "id": 11617,
+                            "idMal": 11617,
+                            "title": {"romaji": "High School DxD", "english": "High School DxD"},
+                            "seasonYear": 2012,
+                            "genres": ["Action", "Comedy", "Ecchi"],
+                            "characters": {
+                                "edges": [
+                                    {
+                                        "role": "MAIN",
+                                        "node": {
+                                            "name": {"full": "Rias Gremory", "native": "リアス・グレモリー"},
+                                            "gender": "Female",
+                                        },
+                                    }
+                                ]
+                            },
+                        }
+                    }
+                },
+            )
+        return httpx.Response(404)
+
+    monkeypatch.setattr(httpx, "post", mock_post)
+    match = client.search_anime("High School D×D", 2012)
+    assert match is not None
+    assert match.anilist_id == 11617
+    assert len(match.characters) == 1
+    assert match.characters[0].name == "Rias Gremory"
+    assert match.characters[0].gender == Gender.FEMALE
+    assert "High School D×D" in searches_attempted
+    assert "High School DxD" in searches_attempted
+

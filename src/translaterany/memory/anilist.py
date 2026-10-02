@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import re
 from pathlib import Path
 
 import httpx
@@ -238,8 +239,7 @@ class AniListClient:
         if anilist_id is not None:
             (self.anilist_dir / f"id_{anilist_id}.json").unlink(missing_ok=True)
 
-    def search_anime(self, title: str, year: int | None = None) -> AniListMatch | None:
-        """Busca metadados de anime no AniList com fallback para cache em disco."""
+    def _fetch_search(self, title: str, year: int | None) -> AniListMatch | None:
         cache_file = self._get_cache_path(title, year)
         if cache_file.exists():
             try:
@@ -294,6 +294,39 @@ class AniListClient:
             logger.warning("Falha ao salvar cache do AniList em %s: %s", cache_file, exc)
 
         return match
+
+    def search_anime(self, title: str, year: int | None = None) -> AniListMatch | None:
+        """Busca metadados de anime no AniList com fallback para cache em disco."""
+        match = self._fetch_search(title, year)
+        if match is not None:
+            return match
+
+        # Normaliza símbolos especiais (como o × comum em títulos japoneses: Hunter × Hunter, High School D×D)
+        norm_title = re.sub(r"[×✕✖]", "x", title)
+        norm_title = re.sub(r"\s+", " ", norm_title).strip()
+        if norm_title != title:
+            match = self._fetch_search(norm_title, year)
+            if match is not None:
+                orig_cache = self._get_cache_path(title, year)
+                try:
+                    orig_cache.write_text(match.model_dump_json(indent=2), encoding="utf-8")
+                except Exception:
+                    pass
+                return match
+
+        # Se a busca com ano falhar, tenta sem ano como fallback de tolerância
+        if year is not None:
+            search_title = norm_title if norm_title != title else title
+            match = self._fetch_search(search_title, None)
+            if match is not None:
+                orig_cache = self._get_cache_path(title, year)
+                try:
+                    orig_cache.write_text(match.model_dump_json(indent=2), encoding="utf-8")
+                except Exception:
+                    pass
+                return match
+
+        return None
 
     def get_anime_by_id(self, anilist_id: int) -> AniListMatch | None:
         """Busca metadados de anime no AniList pelo ID com fallback para cache em disco."""

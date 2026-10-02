@@ -352,3 +352,25 @@ episodes:
     assert "# Título original" in saved_text
     assert "# Episódio Piloto" in saved_text
     assert "Jovens desenvolvem habilidades" in saved_text
+
+
+def test_merge_characters_reversed_name_order_and_gender_inheritance(tmp_path: Path):
+    store = MemoryStore(tmp_path)
+    # 1. Existing extracted character with Eastern name order and unknown gender
+    c1 = CharacterEntry(name="Hyoudou Issei", gender=Gender.UNKNOWN, aliases=["Issei"], source=EntrySource.EXTRACTED)
+    store.save_characters([c1])
+
+    # 2. Incoming metadata character with Western name order and known male gender
+    c2 = CharacterEntry(
+        name="Issei Hyoudou",
+        gender=Gender.MALE,
+        role=CharacterRole.MAIN,
+        source=EntrySource.METADATA,
+    )
+    merged = store.merge_characters([c2])
+
+    assert len(merged) == 1
+    assert merged[0].gender == Gender.MALE
+    assert "Issei" in merged[0].aliases
+    assert ("Hyoudou Issei" in merged[0].aliases) or (merged[0].name == "Hyoudou Issei")
+

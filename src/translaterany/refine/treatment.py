@@ -10,14 +10,14 @@ _TU_RE = re.compile(r"\b(tu|te|ti|teu|teus|tua|tuas)\b|\b\w+(?:ste|stes)\b", re.
 _VOCE_RE = re.compile(r"\b(você|vocês|cê|cês|seu|seus|sua|suas)\b", re.IGNORECASE)
 _SENHOR_RE = re.compile(r"\b(?:o senhor|a senhora|os senhores|as senhoras)\b", re.IGNORECASE)
 
-_MASC_PREDICATES = r"(?:cansado|preocupado|pronto|grato|obrigado|sozinho|animado|chateado|perdido|seguro|surpreso|confuso|satisfeito)"
-_FEM_PREDICATES = r"(?:cansada|preocupada|pronta|grata|obrigada|sozinha|animada|chateada|perdida|segura|surpresa|confusa|satisfeita)"
+_MASC_PREDICATES = r"(?:cansado|preocupado|pronto|grato|obrigado|sozinho|animado|chateado|perdido|seguro|surpreso|confuso|satisfeito|vazio|furioso|bravo|louco)"
+_FEM_PREDICATES = r"(?:cansada|preocupada|pronta|grata|obrigada|sozinha|animada|chateada|perdida|segura|surpresa|confusa|satisfeita|vazia|furiosa|brava|louca)"
 
 _FEM_SPEAKER_MASC_ERROR = re.compile(
-    rf"\b(?:eu\s+)?(?:estou|tô|fiquei|sou|fui|me\s+sinto)\s+{_MASC_PREDICATES}\b", re.IGNORECASE
+    rf"\b(?:eu\s+)?(?:estou|tô|fiquei|sou|fui|me\s+sinto|me\s+deixa(?:ndo)?)\s+{_MASC_PREDICATES}\b", re.IGNORECASE
 )
 _MASC_SPEAKER_FEM_ERROR = re.compile(
-    rf"\b(?:eu\s+)?(?:estou|tô|fiquei|sou|fui|me\s+sinto)\s+{_FEM_PREDICATES}\b", re.IGNORECASE
+    rf"\b(?:eu\s+)?(?:estou|tô|fiquei|sou|fui|me\s+sinto|me\s+deixa(?:ndo)?)\s+{_FEM_PREDICATES}\b", re.IGNORECASE
 )
 
 
@@ -33,7 +33,8 @@ def scan_treatment_consistency(
     character_gender: Mapping[str, str] | None = None,
 ) -> dict[tuple[str, str], PairTreatment]:
     """Identifica falas divergentes do padrão pronominal e de gênero de cada par."""
-    gender_map = {k.lower(): v.lower() for k, v in (character_gender or {}).items()}
+    gender_map = {k: v.lower() for k, v in (character_gender or {}).items()}
+    spk_gender_map = {k.lower(): v.lower() for k, v in (character_gender or {}).items()}
 
     pair_lines: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for item in lines:
@@ -74,13 +75,24 @@ def scan_treatment_consistency(
                 line_pronoun[lid] = "senhor"
 
             # Gênero do falante
-            spk_gen = gender_map.get(spk.lower())
+            spk_gen = spk_gender_map.get(spk.lower())
             if spk_gen in ("female", "f"):
                 if _FEM_SPEAKER_MASC_ERROR.search(text):
                     gender_mismatches[lid].append("gênero masculino usado por falante feminina")
             elif spk_gen in ("male", "m"):
                 if _MASC_SPEAKER_FEM_ERROR.search(text):
                     gender_mismatches[lid].append("gênero feminino usado por falante masculino")
+
+            # Artigos com personagens ou alcunhas mencionados na fala
+            for name, gen in gender_map.items():
+                if len(name) < 3:
+                    continue
+                if gen in ("female", "f"):
+                    if re.search(rf"\b(?:o|do|no|pelo|ao|nosso)\s+{re.escape(name)}\b", text, re.IGNORECASE):
+                        gender_mismatches[lid].append(f"artigo masculino usado para personagem feminina '{name}'")
+                elif gen in ("male", "m"):
+                    if re.search(rf"\b(?:a|da|na|pela|à|nossa)\s+{re.escape(name)}\b", text, re.IGNORECASE):
+                        gender_mismatches[lid].append(f"artigo feminino usado para personagem masculino '{name}'")
 
         # Define maioria
         if tu_count > voce_count and tu_count > senhor_count:

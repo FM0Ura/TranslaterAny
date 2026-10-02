@@ -86,6 +86,8 @@ def format_batch_prompt(
         for c in characters:
             gender_val = c.gender.value if hasattr(c.gender, "value") else str(c.gender)
             details: list[str] = []
+            if getattr(c, "aliases", None):
+                details.append(f"alcunhas/títulos: {', '.join(c.aliases[:4])}")
             if c.speech_style:
                 details.append(c.speech_style)
             if c.notes:

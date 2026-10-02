@@ -56,3 +56,32 @@ def test_treatment_consistency_stage_attributes() -> None:
     assert stage.produces_dialogue is True
     assert "COERÊNCIA DE TRATAMENTO" in stage.instructions()
 
+
+def test_scan_identifies_article_mismatch_for_character_or_alias() -> None:
+    lines = [
+        {"id": "u1", "speaker": "Issei", "listener": "Bob", "text": "O presidente só está preocupado com você.", "confidence": "high"},
+        {"id": "u2", "speaker": "Bob", "listener": "Issei", "text": "A Issei chegou agora.", "confidence": "high"},
+    ]
+    report = scan_treatment_consistency(lines, character_gender={"Presidente": "female", "Issei": "male", "Bob": "male"})
+    pair1 = report.get(("Issei", "Bob"))
+    assert pair1 is not None
+    assert "u1" in pair1.divergent_ids
+    assert any("artigo masculino usado para personagem feminina 'Presidente'" in r for r in pair1.divergent_reasons["u1"])
+
+    pair2 = report.get(("Bob", "Issei"))
+    assert pair2 is not None
+    assert "u2" in pair2.divergent_ids
+    assert any("artigo feminino usado para personagem masculino 'Issei'" in r for r in pair2.divergent_reasons["u2"])
+
+
+def test_scan_identifies_expanded_predicates() -> None:
+    lines = [
+        {"id": "u1", "speaker": "Motohama", "listener": "Issei", "text": "Você tá me deixando vazia.", "confidence": "high"},
+    ]
+    report = scan_treatment_consistency(lines, character_gender={"Motohama": "male", "Issei": "male"})
+    pair = report.get(("Motohama", "Issei"))
+    assert pair is not None
+    assert "u1" in pair.divergent_ids
+    assert any("gênero feminino usado por falante masculino" in r for r in pair.divergent_reasons["u1"])
+
+

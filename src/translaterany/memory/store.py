@@ -40,19 +40,21 @@ def should_overwrite(existing_source: EntrySource, incoming_source: EntrySource)
 def merge_character_entry(existing: CharacterEntry, incoming: CharacterEntry) -> CharacterEntry:
     """Funde duas entradas do mesmo personagem respeitando precedência."""
     if not should_overwrite(existing.source, incoming.source):
-        return existing
+        gender = incoming.gender if existing.gender == Gender.UNKNOWN and incoming.gender != Gender.UNKNOWN else existing.gender
+        all_aliases = list(dict.fromkeys(existing.aliases + incoming.aliases + ([incoming.name] if incoming.name != existing.name else [])))
+        return existing.model_copy(update={"gender": gender, "aliases": all_aliases})
 
     native_name = incoming.native_name if incoming.native_name is not None else existing.native_name
     speech_style = incoming.speech_style if incoming.speech_style is not None else existing.speech_style
     notes = incoming.notes if incoming.notes is not None else existing.notes
-    aliases = list(dict.fromkeys(existing.aliases + incoming.aliases))
+    all_aliases = list(dict.fromkeys(existing.aliases + incoming.aliases + ([existing.name] if existing.name != incoming.name else [])))
     gender = incoming.gender if incoming.gender != Gender.UNKNOWN else existing.gender
     role = incoming.role
 
     return CharacterEntry(
         name=incoming.name,
         native_name=native_name,
-        aliases=aliases,
+        aliases=all_aliases,
         gender=gender,
         role=role,
         speech_style=speech_style,
@@ -214,13 +216,28 @@ class MemoryStore:
         merged: list[CharacterEntry] = list(existing_list)
         name_to_index: dict[str, int] = {c.name.strip().lower(): idx for idx, c in enumerate(merged)}
 
-        for inc in incoming:
+        def find_existing_index(inc: CharacterEntry) -> int | None:
             key = inc.name.strip().lower()
             if key in name_to_index:
-                idx = name_to_index[key]
+                return name_to_index[key]
+            inc_tokens = set(key.split())
+            for idx, c in enumerate(merged):
+                c_key = c.name.strip().lower()
+                c_tokens = set(c_key.split())
+                # Se ambos têm 2+ tokens e exatamente os mesmos tokens (ex.: "Hyoudou Issei" vs "Issei Hyoudou")
+                if len(inc_tokens) >= 2 and inc_tokens == c_tokens:
+                    return idx
+                # Se o nome de um está nos aliases do outro
+                if key in [a.lower() for a in c.aliases] or c_key in [a.lower() for a in inc.aliases]:
+                    return idx
+            return None
+
+        for inc in incoming:
+            idx = find_existing_index(inc)
+            if idx is not None:
                 merged[idx] = merge_character_entry(merged[idx], inc)
             else:
-                name_to_index[key] = len(merged)
+                name_to_index[inc.name.strip().lower()] = len(merged)
                 merged.append(inc)
 
         self.save_characters(merged)
