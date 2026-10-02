@@ -1,6 +1,8 @@
 """Etapa write: remonta o .ass com os textos da etapa indicada em text_source."""
 
+import re
 from collections.abc import Sequence
+
 
 from pydantic import BaseModel, ConfigDict
 
@@ -57,7 +59,7 @@ class WriteStage(Stage):
                 continue
             text = texts[ev.unit]
             expected = list(range(1, markers_by_unit[ev.unit] + 1))
-            if sorted(marker_ids(text)) != expected:
+            if sorted(marker_ids(text)) != expected or "⟦" in re.sub(r"⟦\d+⟧", "", text) or "⟧" in re.sub(r"⟦\d+⟧", "", text):
                 raise TextError(f"unidade {ev.unit}: o texto precisa conter exatamente os marcadores {expected}")
             new_texts[ev.index] = ev.prefix + fill(text, ev.markers) + ev.suffix
         translates = source in REGISTRY and REGISTRY.get(source).translates

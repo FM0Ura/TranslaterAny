@@ -85,7 +85,13 @@ def apply_edits(
             reason = "empty"
         elif _norm(new) == _norm(current):
             reason = "unchanged"
-        elif "{" in new or "}" in new or marker_ids(new) != marker_ids(src.source):
+        elif (
+            "{" in new
+            or "}" in new
+            or "⟦" in re.sub(r"⟦\d+⟧", "", new)
+            or "⟧" in re.sub(r"⟦\d+⟧", "", new)
+            or marker_ids(new) != marker_ids(src.source)
+        ):
             reason = "markers"
         elif forbidden and item in forbidden and _norm(new) == _norm(forbidden[item]):
             reason = "reversal"

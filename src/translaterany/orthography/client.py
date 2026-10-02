@@ -68,7 +68,12 @@ class LanguageToolClient:
             length = match.get("length", 0)
             original = result[offset : offset + length]
 
-            if original.lower() in clean_exemptions:
+            cleaned_orig = original.strip("-,.?!:; ").lower()
+            if (
+                original.lower() in clean_exemptions
+                or cleaned_orig in clean_exemptions
+                or any(part in clean_exemptions for part in cleaned_orig.split("-") if part)
+            ):
                 continue
 
             replacements = match.get("replacements", [])

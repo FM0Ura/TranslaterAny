@@ -369,6 +369,15 @@ class StageTranslateDialogue(Stage):
 
                 expected = marker_ids(orig_text)
                 if expected:
+                    missing = [m for m in expected if m not in marker_ids(tr)]
+                    if missing:
+                        if missing == [1, 2] and not marker_ids(tr):
+                            tr = f"⟦1⟧{tr}⟦2⟧"
+                        else:
+                            for m in missing:
+                                tr = f"{tr}⟦{m}⟧"
+                        count(ctx, "markers_recovered")
+
                     if sorted(marker_ids(tr)) != sorted(expected):
                         logger.warning(
                             "Unidade %s: tradução perdeu marcadores %s (obtido %s). "
@@ -381,6 +390,7 @@ class StageTranslateDialogue(Stage):
                         count(ctx, "markers_lost")
 
                 final_texts[line_id] = tr
+
 
         ctx.output.json(UnitTexts(texts=final_texts, used_terms=used_terms_dict))
 

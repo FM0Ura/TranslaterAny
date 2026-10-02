@@ -83,3 +83,16 @@ def test_edit_id_inner_whitespace_is_removed() -> None:
     from translaterany.refine.edits import normalize_edit_id
 
     assert normalize_edit_id(" [u2 + u3] ") == "u2+u3"
+
+
+def test_synthetic_or_malformed_markers_are_rejected() -> None:
+    # u1 original não tem marcadores; nova edição introduz marcador sintético ⟦n⟧
+    out = run(LineEdit(id="u1", new="Ai! ⟦n⟧"))
+    assert out.rejected["markers"] == 1
+    assert out.applied == {}
+
+    # Marcador não fechado ou texto inválido entre colchetes
+    out2 = run(LineEdit(id="u1", new="Ai! ⟦invalido"))
+    assert out2.rejected["markers"] == 1
+    assert out2.applied == {}
+

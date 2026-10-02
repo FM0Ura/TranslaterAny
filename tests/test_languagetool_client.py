@@ -85,3 +85,38 @@ def test_languagetool_graceful_on_connection_error() -> None:
     assert corrected == "Qualquer texto."
     assert applied == 0
     assert client.is_offline is True
+
+
+def test_languagetool_ignores_honorifics_and_token_exemptions() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "matches": [
+                    {
+                        "message": "Palavra desconhecida",
+                        "offset": 15,
+                        "length": 7,
+                        "rule": {"category": {"id": "TYPOS"}},
+                        "replacements": [{"value": "Violou"}],
+                    },
+                    {
+                        "message": "Palavra desconhecida",
+                        "offset": 29,
+                        "length": 3,
+                        "rule": {"category": {"id": "TYPOS"}},
+                        "replacements": [{"value": "cum"}],
+                    },
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = LanguageToolClient(url="http://localhost:8010/v2/check", timeout_s=5.0, transport=transport)
+
+    text = "Concordo com o Hyoudou Issei-kun!"
+    # Exenções contendo tokens de nomes e honorífico
+    corrected, applied = client.correct_text(text, exemptions={"hyoudou", "issei", "kun"})
+    assert corrected == "Concordo com o Hyoudou Issei-kun!"
+    assert applied == 0
+

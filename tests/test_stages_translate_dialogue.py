@@ -167,10 +167,11 @@ def test_translate_dialogue_fallback_when_markers_lost() -> None:
     stage.run(ctx)  # type: ignore[arg-type]
 
     assert captured_output is not None
-    # u1 perdeu marcadores -> fallback para o texto original
-    assert captured_output.texts["u1"] == "Hello ⟦1⟧world⟦2⟧!"
+    # u1 perdeu marcadores -> marcadores recuperados preservando a tradução em português
+    assert captured_output.texts["u1"] == "⟦1⟧Olá mundo!⟦2⟧"
     # u2 não tinha marcadores -> traduzido com sucesso
     assert captured_output.texts["u2"] == "Texto normal"
+
 
 
 def test_translate_dialogue_bubbles_up_transient_error(monkeypatch) -> None:

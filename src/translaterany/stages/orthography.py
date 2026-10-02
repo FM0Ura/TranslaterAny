@@ -26,8 +26,30 @@ logger = logging.getLogger(__name__)
 
 _OPTIONAL = ("merge_sentences", "consolidate_memory")
 
+HONORIFICS: frozenset[str] = frozenset({
+    "kun",
+    "chan",
+    "san",
+    "sama",
+    "senpai",
+    "sempai",
+    "sensei",
+    "dono",
+    "kouhai",
+    "shishou",
+    "tan",
+    "hakase",
+    "niisan",
+    "neesan",
+    "onii-san",
+    "onee-san",
+    "onii-chan",
+    "onee-chan",
+})
+
 
 @register_stage
+
 class OrthographyStage(Stage):
     """Revisão ortográfica determinística com LanguageTool sem IA."""
 
@@ -73,6 +95,7 @@ class OrthographyStage(Stage):
         sources: Mapping[str, LineSource] | None = None,
         exemptions: Set[str] | None = None,
         limits: ChecksConfig | None = None,
+        env: CheckEnv | None = None,
     ) -> tuple[dict[str, str], bool, int]:
         """Corrige os textos linha a linha usando LanguageToolClient com validação de integridade."""
         clean_exemptions = {e.lower() for e in (exemptions or set()) if e}
@@ -90,7 +113,7 @@ class OrthographyStage(Stage):
             return dict(texts), False, 0
 
         if sources:
-            env = CheckEnv(
+            check_env = env or CheckEnv(
                 glossary=[],
                 names=[],
                 limits=limits or ChecksConfig(),
@@ -100,7 +123,7 @@ class OrthographyStage(Stage):
                 edits=edits,
                 targets=set(texts.keys()),
                 sources=sources,
-                env=env,
+                env=check_env,
             )
             return outcome.texts, False, len(outcome.applied)
 
@@ -137,19 +160,38 @@ class OrthographyStage(Stage):
             ctx.series.key,
             search_block,
         )
-        exemptions: set[str] = set()
+        exemptions: set[str] = set(HONORIFICS)
         for term in glossary:
-            exemptions.add(term.term)
-            exemptions.add(term.translation)
-            exemptions.update(term.aliases)
+            for val in (term.term, term.translation, *term.aliases):
+                if val:
+                    exemptions.add(val)
+                    for word in val.split():
+                        cleaned = word.strip("-,.?!:; ")
+                        if cleaned:
+                            exemptions.add(cleaned)
         for char in characters:
-            exemptions.add(char.name)
-            exemptions.update(char.aliases)
+            for val in (char.name, *char.aliases):
+                if val:
+                    exemptions.add(val)
+                    for word in val.split():
+                        cleaned = word.strip("-,.?!:; ")
+                        if cleaned:
+                            exemptions.add(cleaned)
+
+        app_obj = getattr(ctx, "app", None)
+        checks_cfg = getattr(app_obj, "checks", None)
+        limits = checks_cfg if isinstance(checks_cfg, ChecksConfig) else ChecksConfig()
+        env = CheckEnv(
+            glossary=glossary,
+            names=[[c.name, *c.aliases] for c in characters],
+            limits=limits,
+        )
 
         outcome_texts, offline, applied = self.process_texts(
             texts,
             sources=sources,
             exemptions=exemptions,
+            env=env,
         )
 
         count(ctx, "lines_read", len(texts))
