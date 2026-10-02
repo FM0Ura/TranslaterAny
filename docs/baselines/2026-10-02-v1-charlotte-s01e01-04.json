@@ -1,0 +1,698 @@
+{
+  "schema": 1,
+  "series": "Charlotte (2015)",
+  "generated_at": "2026-10-02T01:30:12.805550",
+  "episodes": 4,
+  "lines": 1580,
+  "stages": {
+    "inventory": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.026000000000000002,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "metadata": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 2.946,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "select_track": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.39799999999999996,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "extract": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 1.6689999999999998,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "normalize": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 2.323,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "classify": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.485,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "extract_terms": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 53.858,
+      "llm": {
+        "calls": 4,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 4,
+            "input_tokens": 20166,
+            "output_tokens": 961,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {}
+    },
+    "consolidate_memory": {
+      "units_done": 1,
+      "units_failed": 0,
+      "duration_s": 0.022,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "translation_memory": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.41,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "tm_candidates": 1790,
+        "tm_hits": 0
+      }
+    },
+    "merge_sentences": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.438,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "merged_groups": 67,
+        "merged_units": 139
+      }
+    },
+    "scene_analysis": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 2829.574,
+      "llm": {
+        "calls": 87,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 87,
+            "input_tokens": 122534,
+            "output_tokens": 91060,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {}
+    },
+    "translate_dialogue": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 3767.743,
+      "llm": {
+        "calls": 1937,
+        "errors": {},
+        "by_model": {
+          "translategemma:12b": {
+            "calls": 1937,
+            "input_tokens": 1138523,
+            "output_tokens": 90088,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines": 1390,
+        "gate_retries": 547,
+        "extra_calls": 547,
+        "markers_lost": 3
+      }
+    },
+    "translate_signs": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 183.674,
+      "llm": {
+        "calls": 118,
+        "errors": {},
+        "by_model": {
+          "translategemma:12b": {
+            "calls": 118,
+            "input_tokens": 37831,
+            "output_tokens": 4732,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines": 118,
+        "fallback_original": 1,
+        "markers_lost": 35
+      }
+    },
+    "translate_songs": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.008,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "review_meaning": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 334.84999999999997,
+      "llm": {
+        "calls": 94,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 94,
+            "input_tokens": 125942,
+            "output_tokens": 5727,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines_read": 1390,
+        "lines_targeted": 1390,
+        "blocks": 94,
+        "edits_proposed": 99,
+        "edits_applied": 54,
+        "rejected_worse": 42,
+        "rejected_unchanged": 3
+      }
+    },
+    "colloquial": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 207.979,
+      "llm": {
+        "calls": 49,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 49,
+            "input_tokens": 55977,
+            "output_tokens": 4533,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines_read": 1390,
+        "lines_targeted": 109,
+        "blocks": 49,
+        "edits_proposed": 103,
+        "edits_applied": 66,
+        "rejected_worse": 29,
+        "rejected_unchanged": 8
+      }
+    },
+    "treatment_consistency": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 28.551000000000002,
+      "llm": {
+        "calls": 5,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 5,
+            "input_tokens": 4715,
+            "output_tokens": 698,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines_read": 1390,
+        "lines_targeted": 7,
+        "blocks": 5,
+        "edits_proposed": 7,
+        "edits_applied": 0,
+        "rejected_unchanged": 7
+      }
+    },
+    "adapt": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 315.923,
+      "llm": {
+        "calls": 48,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 48,
+            "input_tokens": 61399,
+            "output_tokens": 7874,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines_read": 1390,
+        "lines_targeted": 143,
+        "blocks": 48,
+        "edits_proposed": 137,
+        "edits_applied": 90,
+        "rejected_unchanged": 10,
+        "rejected_worse": 36
+      }
+    },
+    "orthography": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.749,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "lines_read": 1390,
+        "offline": 4
+      }
+    },
+    "final_readthrough": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 541.604,
+      "llm": {
+        "calls": 94,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 94,
+            "input_tokens": 72023,
+            "output_tokens": 15048,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "lines_read": 1390,
+        "lines_targeted": 1390,
+        "blocks": 94,
+        "edits_proposed": 190,
+        "edits_applied": 92,
+        "rejected_unchanged": 28,
+        "rejected_worse": 70
+      }
+    },
+    "redistribute_sentences": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 3.037,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {
+        "redistributed": 67,
+        "tm_fed": 69
+      }
+    },
+    "qa_loop": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 190.152,
+      "llm": {
+        "calls": 120,
+        "errors": {},
+        "by_model": {
+          "gemma4:12b": {
+            "calls": 120,
+            "input_tokens": 26014,
+            "output_tokens": 4571,
+            "cached_input_tokens": 0,
+            "cost_usd": 0.0
+          }
+        }
+      },
+      "counters": {
+        "qa_extra_calls": 120
+      }
+    },
+    "write": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 1.3319999999999999,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "publish": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 0.40700000000000003,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    },
+    "quality_checks": {
+      "units_done": 4,
+      "units_failed": 0,
+      "duration_s": 4.38,
+      "llm": {
+        "calls": 0,
+        "errors": {},
+        "by_model": {}
+      },
+      "counters": {}
+    }
+  },
+  "models": {
+    "gemma4:12b": {
+      "calls": 501,
+      "input_tokens": 488770,
+      "output_tokens": 130472,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.0
+    },
+    "translategemma:12b": {
+      "calls": 2055,
+      "input_tokens": 1176354,
+      "output_tokens": 94820,
+      "cached_input_tokens": 0,
+      "cost_usd": 0.0
+    }
+  },
+  "final_checks": {
+    "reading_speed": {
+      "counts": {
+        "info": 0,
+        "warn": 0,
+        "error": 95
+      },
+      "lines": {
+        "info": 0,
+        "warn": 0,
+        "error": 90
+      },
+      "affected_lines": 90,
+      "rate": 0.057
+    },
+    "length_ratio": {
+      "counts": {
+        "info": 0,
+        "warn": 15,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 15,
+        "error": 0
+      },
+      "affected_lines": 15,
+      "rate": 0.0095
+    },
+    "untranslated": {
+      "counts": {
+        "info": 0,
+        "warn": 0,
+        "error": 44
+      },
+      "lines": {
+        "info": 0,
+        "warn": 0,
+        "error": 44
+      },
+      "affected_lines": 44,
+      "rate": 0.0278
+    },
+    "profanity_added": {
+      "counts": {
+        "info": 0,
+        "warn": 6,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 6,
+        "error": 0
+      },
+      "affected_lines": 6,
+      "rate": 0.0038
+    },
+    "negation": {
+      "counts": {
+        "info": 0,
+        "warn": 27,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 27,
+        "error": 0
+      },
+      "affected_lines": 27,
+      "rate": 0.0171
+    },
+    "glossary": {
+      "counts": {
+        "info": 0,
+        "warn": 10,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 9,
+        "error": 0
+      },
+      "affected_lines": 9,
+      "rate": 0.0057
+    },
+    "numbers": {
+      "counts": {
+        "info": 0,
+        "warn": 4,
+        "error": 0
+      },
+      "lines": {
+        "info": 0,
+        "warn": 4,
+        "error": 0
+      },
+      "affected_lines": 4,
+      "rate": 0.0025
+    }
+  },
+  "reading_speed": {
+    "cps_p50": 12.0,
+    "cps_p95": 17.0,
+    "cps_max": 43.43,
+    "over_limit": 72,
+    "cps_histogram": [
+      0,
+      1,
+      2,
+      6,
+      24,
+      43,
+      57,
+      63,
+      124,
+      114,
+      155,
+      151,
+      176,
+      128,
+      134,
+      136,
+      75,
+      23,
+      13,
+      15,
+      8,
+      7,
+      4,
+      0,
+      0,
+      0,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  "snapshots": {
+    "translate_dialogue": {
+      "episodes": 4,
+      "changed": 1390,
+      "new": 438,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "translate_signs": {
+      "episodes": 4,
+      "changed": 118,
+      "new": 34,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "translate_songs": {
+      "episodes": 4,
+      "changed": 0,
+      "new": 0,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "review_meaning": {
+      "episodes": 4,
+      "changed": 54,
+      "new": 0,
+      "resolved": 12,
+      "edit_ratio_mean": 0.0129
+    },
+    "colloquial": {
+      "episodes": 4,
+      "changed": 66,
+      "new": 0,
+      "resolved": 14,
+      "edit_ratio_mean": 0.0147
+    },
+    "treatment_consistency": {
+      "episodes": 4,
+      "changed": 0,
+      "new": 0,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "adapt": {
+      "episodes": 4,
+      "changed": 90,
+      "new": 3,
+      "resolved": 68,
+      "edit_ratio_mean": 0.0127
+    },
+    "orthography": {
+      "episodes": 4,
+      "changed": 0,
+      "new": 0,
+      "resolved": 0,
+      "edit_ratio_mean": 0.0
+    },
+    "final_readthrough": {
+      "episodes": 4,
+      "changed": 92,
+      "new": 0,
+      "resolved": 3,
+      "edit_ratio_mean": 0.0135
+    },
+    "redistribute_sentences": {
+      "episodes": 4,
+      "changed": 388,
+      "new": 19,
+      "resolved": 190,
+      "edit_ratio_mean": 0.0047
+    },
+    "qa_loop": {
+      "episodes": 4,
+      "changed": 14,
+      "new": 1,
+      "resolved": 13,
+      "edit_ratio_mean": 0.0034
+    }
+  },
+  "worst_episodes": [
+    {
+      "episode": "S01E01",
+      "lines": 437,
+      "error_lines": 42,
+      "error_rate": 0.0961
+    },
+    {
+      "episode": "S01E04",
+      "lines": 382,
+      "error_lines": 35,
+      "error_rate": 0.0916
+    },
+    {
+      "episode": "S01E03",
+      "lines": 402,
+      "error_lines": 33,
+      "error_rate": 0.0821
+    },
+    {
+      "episode": "S01E02",
+      "lines": 359,
+      "error_lines": 24,
+      "error_rate": 0.0669
+    }
+  ],
+  "missing_metrics": [],
+  "warnings": []
+}
