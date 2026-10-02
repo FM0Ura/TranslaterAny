@@ -101,11 +101,14 @@ def apply_edits_with_gate(
         orig_decision = gate.evaluate([orig_line], env)
         best_text, _ = gate.never_worsen(texts[item], orig_decision.findings, new_text, decision.findings)
 
-        if decision.blocking or best_text != new_text or gate.is_oscillating(item, new_text):
+        orig_blocking_keys = {f.check for f in orig_decision.blocking}
+        new_blocking = [f for f in decision.blocking if f.check not in orig_blocking_keys]
+
+        if new_blocking or best_text != new_text or gate.is_oscillating(item, new_text):
             logger.info(
                 "StageGate rejeitou edição de %s: introduz achados bloqueantes (%s). Mantendo original.",
                 item,
-                decision.blocking,
+                new_blocking,
             )
             outcome.texts[item] = texts[item]
             outcome.applied.pop(item, None)
@@ -203,10 +206,18 @@ class DialogueRefineStage(Stage):
             getattr(ctx, "store", None), ctx.series.key, "\n".join(sources[i].source for i in ids)
         )
         env = CheckEnv(glossary=glossary, names=[[c.name, *c.aliases] for c in characters], limits=self.limits)
+        members = composite_members(merged)
         contexts = scene_doc.lines if scene_doc else {}
-        speaker_of = {i: contexts[i].speaker for i in ids if i in contexts}
-        listener_of = {i: contexts[i].listener for i in ids if i in contexts}
-        confidence_of = {i: contexts[i].confidence for i in ids if i in contexts}
+        speaker_of = {}
+        listener_of = {}
+        confidence_of = {}
+        for i in ids:
+            ctx_key = i if i in contexts else (members.get(i, [i])[0] if members.get(i) and members[i][0] in contexts else None)
+            if ctx_key and ctx_key in contexts:
+                speaker_of[i] = contexts[ctx_key].speaker
+                listener_of[i] = contexts[ctx_key].listener
+                confidence_of[i] = contexts[ctx_key].confidence
+
         lines, _ = lines_for({i: texts[i] for i in ids}, sources)
         data = RefineData(
             sources=sources,
@@ -223,7 +234,6 @@ class DialogueRefineStage(Stage):
             targets = {i: s for i, s in targets.items() if i not in tm.matched_units}
         count(ctx, "lines_read", len(ids))
         count(ctx, "lines_targeted", len(targets))
-        members = composite_members(merged)
         scene_of = scene_index_of(ids, members, {u.id: u.events for u in doc.units}, classes.scenes)
         forbidden = self.forbidden_texts(ctx, texts)
         for block in build_blocks(
@@ -235,8 +245,8 @@ class DialogueRefineStage(Stage):
                     id=i,
                     source=sources[i].source,
                     target=texts[i],
-                    speaker=contexts[i].speaker if i in contexts else "Unknown",
-                    tone=contexts[i].tone if i in contexts else "neutral",
+                    speaker=speaker_of.get(i, "Unknown"),
+                    tone=contexts[i].tone if i in contexts else (contexts[members[i][0]].tone if members.get(i) and members[i][0] in contexts else "neutral"),
                     budget=char_budget(
                         sources[i].duration_ms,
                         max_cps=self.max_cps,

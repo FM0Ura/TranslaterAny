@@ -125,4 +125,36 @@ def scan_treatment_consistency(
                 divergent_reasons=divergent_reasons,
             )
 
+    # Verifica artigos discordantes para personagens conhecidos em falas fora de pares consolidáveis
+    checked_ids = {lid for p in result.values() for lid in p.divergent_ids}
+    for item in lines:
+        d = item if isinstance(item, dict) else item.__dict__
+        lid = d.get("id")
+        if not lid or lid in checked_ids:
+            continue
+        text = d.get("text", "")
+        reasons = []
+        for name, gen in gender_map.items():
+            if len(name) < 3:
+                continue
+            if gen in ("female", "f"):
+                if re.search(rf"\b(?:o|do|no|pelo|ao|nosso)\s+{re.escape(name)}\b", text, re.IGNORECASE):
+                    reasons.append(f"artigo masculino usado para personagem feminina '{name}'")
+            elif gen in ("male", "m"):
+                if re.search(rf"\b(?:a|da|na|pela|à|nossa)\s+{re.escape(name)}\b", text, re.IGNORECASE):
+                    reasons.append(f"artigo feminino usado para personagem masculino '{name}'")
+
+        if reasons:
+            spk = d.get("speaker") or "Unknown"
+            lis = d.get("listener") or "Unknown"
+            pair_key = (spk, lis)
+            if pair_key not in result:
+                result[pair_key] = PairTreatment(
+                    canonical_pronoun="voce",
+                    divergent_ids=[],
+                    divergent_reasons={},
+                )
+            result[pair_key].divergent_ids.append(lid)
+            result[pair_key].divergent_reasons[lid] = reasons
+
     return result
