@@ -5,7 +5,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from translaterany.checks import CheckEnv, LineInput, run_line_checks
 from translaterany.checks.snapshots import LineSource
@@ -22,8 +22,12 @@ MIN_LENGTH_CHECKED = 10
 
 class LineEdit(BaseModel):
     id: str
-    new: str
+    new: str = Field(default="", validation_alias=AliasChoices("new", "text"))
     reason: str = ""
+
+    @property
+    def text(self) -> str:
+        return self.new
 
 
 class EditsResponse(BaseModel):
@@ -85,8 +89,10 @@ def apply_edits(
             reason = "markers"
         elif forbidden and item in forbidden and _norm(new) == _norm(forbidden[item]):
             reason = "reversal"
-        elif _is_fragment(current, new) or _norm(plain(new)).casefold() == _norm(plain(src.source)).casefold() or (
-            _meaning_findings(item, new, src, env) - _meaning_findings(item, current, src, env)
+        elif (
+            _is_fragment(current, new)
+            or _norm(plain(new)).casefold() == _norm(plain(src.source)).casefold()
+            or (_meaning_findings(item, new, src, env) - _meaning_findings(item, current, src, env))
         ):
             reason = "worse"
         if reason is not None:

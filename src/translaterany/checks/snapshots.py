@@ -96,14 +96,16 @@ def summarize(findings: Iterable[Finding]) -> dict[str, SeverityCounts]:
     summary: dict[str, SeverityCounts] = {}
     for f in findings:
         counts = summary.setdefault(f.check, SeverityCounts())
-        setattr(counts, f.severity, getattr(counts, f.severity) + 1)
+        sev = "warn" if f.severity == "warning" else f.severity
+        setattr(counts, sev, getattr(counts, sev) + 1)
     return summary
 
 
 def flagged(findings: Iterable[Finding]) -> SeverityCounts:
     units: dict[str, set[str | None]] = {"info": set(), "warn": set(), "error": set()}
     for f in findings:
-        units[f.severity].add(f.unit_id)
+        sev = "warn" if f.severity == "warning" else f.severity
+        units[sev].add(f.unit_id)
     return SeverityCounts(**{sev: len(ids) for sev, ids in units.items()})
 
 

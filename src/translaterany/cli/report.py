@@ -1,5 +1,6 @@
 """Comando report: processo por etapa, por modelo, indicadores finais e instantâneos."""
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -20,12 +21,37 @@ from translaterany.pipeline.report import (
     compare_reports,
     load_episode_metrics,
 )
+from translaterany.stages.qa_loop import QAReport
+
+logger = logging.getLogger(__name__)
 
 
 def _arrow(delta: float) -> str:
     if abs(delta) < 1e-9:
         return "="
     return "[red]▲[/red]" if delta > 0 else "[green]▼[/green]"
+
+
+def format_qa_summary(report: QAReport, threshold: float = 0.25) -> str:
+    """Formata o resumo do relatório do QA Loop com aviso se a taxa de edição for alta."""
+    lines: list[str] = [
+        "Resumo do QA Loop:",
+        f"  Rodadas executadas: {report.rounds_executed}",
+        f"  Chamadas extras usadas: {report.extra_calls_used}",
+        f"  Taxa de edição: {report.edit_rate:.1%}",
+    ]
+    if report.edit_rate > threshold:
+        lines.append(
+            f"  [yellow]Aviso: Taxa de edição alta no QA Loop: {report.edit_rate:.1%} "
+            f"(limiar: {threshold:.1%}). Considere avaliar os modelos das etapas anteriores.[/yellow]"
+        )
+    if report.blame_summary:
+        lines.append("  Origem dos defeitos (blame):")
+        for stage, count in sorted(report.blame_summary.items()):
+            lines.append(f"    {stage}: {count}")
+    if report.unresolved_findings:
+        lines.append(f"  Achados não resolvidos: {len(report.unresolved_findings)}")
+    return "\n".join(lines)
 
 
 def _render(report: SeriesReport) -> None:
@@ -147,6 +173,27 @@ def report(
                     escape(f.unit_id or "—"), escape(f.check), f.severity, escape(f.message), escape(f.excerpt or "")
                 )
             console.print(table)
+        qa_file = store.artifact_dir(series.key, episode) / "qa_report.json"
+        if qa_file.exists():
+            try:
+                qa_rep = QAReport.model_validate_json(qa_file.read_text(encoding="utf-8"))
+                qa_stage = next((s for s in cfg.stages if s.name == "qa_loop"), None)
+                threshold = getattr(getattr(qa_stage, "options", None), "warn_edit_rate_threshold", 0.25)
+                console.print(format_qa_summary(qa_rep, threshold=threshold))
+            except Exception as exc:
+                logger.warning("Falha ao ler qa_report.json em %s: %s", episode, exc)
+    else:
+        qa_stage = next((s for s in cfg.stages if s.name == "qa_loop"), None)
+        threshold = getattr(getattr(qa_stage, "options", None), "warn_edit_rate_threshold", 0.25)
+        for ep_key in store.episode_keys(series.key):
+            qa_file = store.artifact_dir(series.key, ep_key) / "qa_report.json"
+            if qa_file.exists():
+                try:
+                    qa_rep = QAReport.model_validate_json(qa_file.read_text(encoding="utf-8"))
+                    console.print(f"\n[bold]{escape(ep_key)}[/bold]:")
+                    console.print(format_qa_summary(qa_rep, threshold=threshold))
+                except Exception as exc:
+                    logger.warning("Falha ao ler qa_report.json em %s: %s", ep_key, exc)
     if base is not None:
         if base.episodes != result.episodes:
             console.print(
