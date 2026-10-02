@@ -3,15 +3,15 @@
 > Fotografia atual do desenvolvimento. O plano completo está em [`ROADMAP.md`](ROADMAP.md).
 > Atualize este arquivo ao concluir cada etapa de um marco (spec, plano, implementação) e sempre que uma decisão for tomada.
 
-**Última atualização:** 2026-10-01
+**Última atualização:** 2026-10-02
 
 ---
 
 ## Onde estamos
 
-- **Fase:** M8 implementado e validado. **Fim da v1!**
-- **Marco atual:** **M8 — Portões e laço do QA** — concluído (650 testes).
-- **Próxima ação:** merge da branch `m8-portoes-qa` no `master` e aceite real com episódio.
+- **Fase:** v1.0.0 lançada e validada em produção (659 testes passando).
+- **Marco atual:** **v1.1 — OCR e Suporte Universal a Idiomas** (em planejamento).
+- **Próxima ação:** elaboração de spec e plano de arquitetura para a v1.1.
 
 ## Progresso dos marcos
 
@@ -24,10 +24,11 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M2 — Camada de IA e tradução básica | ✅ | [spec](docs/superpowers/specs/2026-09-26-m2-camada-ia-traducao-design.md) | [plano](docs/superpowers/plans/2026-09-26-m2-camada-ia-traducao.md) | concluído (289 testes) |
 | M3 — Memória da série | ✅ | [spec](docs/superpowers/specs/2026-09-26-m3-memoria-serie-design.md) | [plano](docs/superpowers/plans/2026-09-26-m3-memoria-serie.md) | concluído (374 testes) |
 | M4 — Tradução contextual | ✅ | [spec](docs/superpowers/specs/2026-09-27-m4-traducao-contextual-design.md) | [plano](docs/superpowers/plans/2026-09-27-m4-traducao-contextual.md) | concluído (396 testes) |
-| M5 — Verificações e métricas | ✅ | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | integrado ao master (510 testes); aceite com 1 episódio (Charlotte S01E01) — temporada inteira pendente |
-| M6 — Refinamento I | ✅ | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | integrado ao master; aceite real feito (Charlotte S01E01) — 558 testes |
-| M7 — Refinamento II | ✅ | [spec](docs/superpowers/specs/2026-10-01-m7-refinamento-ii-design.md) | [plano](docs/superpowers/plans/2026-10-01-m7-refinamento-ii.md) | integrado ao master (583 testes) |
-| M8 — Portões e laço do QA | ✅ | [spec](docs/superpowers/specs/2026-10-01-m8-portoes-qa-design.md) | [plano](docs/superpowers/plans/2026-10-01-m8-portoes-qa.md) | concluído (650 testes); fim da v1, pronto para integração |
+| M5 — Verificações e métricas | ✅ | [spec](docs/superpowers/specs/2026-09-30-m5-verificacoes-metricas-design.md) | [plano](docs/superpowers/plans/2026-09-30-m5-verificacoes-metricas.md) | integrado ao master (510 testes); baseline concluída |
+| M6 — Refinamento I | ✅ | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | integrado ao master; aceite real feito — 558 testes |
+| M7 — Refinamento II | ✅ | [spec](docs/superpowers/specs/2026-10-01-m7-refinamento-ii-design.md) | [plano](docs/superpowers/plans/2026-10-01-m7-refinamento-ii.md) | integrado ao master (583 testes); LanguageTool e gênero |
+| M8 — Portões e laço do QA | ✅ | [spec](docs/superpowers/specs/2026-10-01-m8-portoes-qa-design.md) | [plano](docs/superpowers/plans/2026-10-01-m8-portoes-qa.md) | concluído (659 testes); release v1.0.0 |
+| v1.1 — OCR e Suporte Universal a Idiomas | ⬜ | | | extração PGS/VobSub via OCR + source_language e target_language arbitrários |
 
 ---
 
@@ -84,6 +85,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-10-01 | **Baseline M6 (Charlotte S01E01–04) e correções:** (1) checagem `prompt_leak` adicionada para barrar instruções do prompt (`máx. N`, `[u...]`) e emojis espúrios; (2) `merge_dialogue_units` passa a adotar a menor duração individual (`shortest_ms`) nas falas repetidas para não inflar o orçamento de caracteres; baseline salva em `docs/baselines/2026-10-01-m6-charlotte-s01e01-04.json` | 558 testes passando |
 | 2026-10-01 | **M7 — Refinamento II:** 4 etapas sequenciais (`treatment_consistency`, `adapt`, `orthography`, `final_readthrough`) entre `colloquial` e `redistribute_sentences`; cliente LanguageTool HTTP com degradação graciosa e isenções (nomes de personagens e termos do glossário); triagem pronominal/gênero por pares de alta confiança; condensação de CPS > 17 com orçamento de caracteres; leitura corrida final em PT-BR por cena; checagem `doctor` do LanguageTool; revisão final tratou isenções e integridade de marcadores | 583 testes passando |
 | 2026-10-01 | **M8 — Portões e laço do QA (Fim da v1):** StageGate com escada de escalonamento local (feedback + redução unitária) e detecção de oscilação; checagens finais exclusivas (sintaxe ASS, integridade de eventos, timing); algoritmo de blame retroativo no histórico de artefatos; etapa QALoopStage com reprocessamento em cascata pontual e integração determinística com orthography; artefato qa_report.json e aviso de modelo no report; WriteStage respeita text_source explícito; gate.reset() previne vazamento de estado | 650 testes passando; conclusão da v1 |
+| 2026-10-02 | **Lançamento v1.0.0 & Definição da v1.1:** v1.0.0 concluída e validada em produção nos eps 1-4 de High School DxD (659 testes passando); definida a v1.1 com OCR de legendas em imagem (PGS/VobSub) e suporte universal a qualquer idioma de entrada/saída (`source_language` e `target_language`) | expansão para mídias físicas e pares multilíngues arbitrários |
 
 ---
 

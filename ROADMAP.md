@@ -11,7 +11,8 @@ O progresso corrente, decisões e pendências ficam em [`STATE.md`](STATE.md).
 - O projeto é dividido em **marcos** (M0, M1, …). Cada marco tem **o seu próprio spec** em `docs/superpowers/specs/`, seguido de um plano de implementação e só então código.
 - Cada marco entrega algo **utilizável e testável sozinho** e tem critérios de "pronto" verificáveis.
 - Um marco só começa quando o anterior está pronto. Descobertas durante um marco que afetem os seguintes são registradas em `STATE.md` e refletidas aqui.
-- A **v1** está completa ao fim do M8.
+- A **v1** está completa ao fim do M8 (versão estável lançada: `v1.0.0`).
+- A **v1.1** introduz OCR de legendas em imagem (PGS/VobSub) e suporte universal a qualquer idioma de entrada e saída.
 
 ---
 
@@ -82,7 +83,8 @@ extrair → normalizar → classificar → memória de tradução → unir frase
 | **M5** | Verificações e métricas | Checagens automáticas, métricas por etapa e `report` — linha de base de qualidade |
 | **M6** | Refinamento I | Triagem + edições parciais; revisão de sentido e coloquialidade |
 | **M7** | Refinamento II | Coerência de tratamento, adaptação, ortografia e leitura corrida final |
-| **M8** | Portões e laço do QA | Correção automática guiada por métricas, com escalonamento e *blame* |
+| **M8** | Portões e laço do QA | Correção automática guiada por métricas, com escalonamento e *blame* (Fim da v1.0.0) |
+| **v1.1** | OCR & Suporte Universal a Idiomas | Extração OCR de PGS/VobSub e tradução entre quaisquer idiomas configuráveis (source_lang → target_lang) |
 
 ---
 
@@ -234,11 +236,45 @@ extrair → normalizar → classificar → memória de tradução → unir frase
 - Checagens exclusivas do final: tags reinseridas, redistribuição, timing no arquivo gravado.
 - `qa_report.json`; taxa de edição alta vira **aviso** ("considere trocar o modelo de tradução").
 
-**Pronto quando:** regressões introduzidas por etapas posteriores são detectadas e corrigidas automaticamente em testes; os limites de tentativa e orçamento são respeitados; o `report` mostra o efeito dos portões. **Fim da v1.**
+**Pronto quando:** regressões introduzidas por etapas posteriores são detectadas e corrigidas automaticamente em testes; os limites de tentativa e orçamento são respeitados; o `report` mostra o efeito dos portões. **Fim da v1.0.0.**
 
 ---
 
-## Depois da v1 (backlog)
+### v1.1 — OCR e Suporte Universal a Idiomas
+
+**Objetivo:** Permitir que o TranslaterAny processe mídias físicas com legendas gráficas (Blu-ray/DVD) e traduza entre quaisquer idiomas de entrada e saída, desacoplando o pipeline da dependência estrita de EN → PT-BR.
+
+**Escopo:**
+
+1. **Inserção de OCR para Legendas em Imagem (PGS / VobSub)**
+   - **Extração gráfica:** Suporte à extração de faixas PGS (`.sup`) e VobSub (`.sub`/`.idx`) via `mkvextract`.
+   - **Motor de OCR local:** Integração com motor de OCR leve e determinístico (ex.: Tesseract OCR / `pytesseract` ou PaddleOCR) com suporte a múltiplos idiomas e execução local paralela.
+   - **Normalização e alinhamento:** Conversão dos bitmaps e timestamps para texto estruturado (`NormalizedDoc`), preservando tempos exatos de início e fim.
+   - **Detecção de estilos e posições:** Inferência de diálogos, quebras de linha e formatações básicas (itálico/posição na tela) a partir dos bounding boxes do OCR.
+   - **Fluxo transparente:** Uma vez reconhecidas pelo OCR, as legendas entram diretamente nas etapas existentes (`classify`, `scene_analysis`, `translate`, etc.) sem distinção de legendas textuais normais.
+
+2. **Suporte Universal a Idiomas de Entrada e Saída**
+   - **Configuração dinâmica de pares linguísticos:**
+     - `source_language`: idioma de origem configurável globalmente ou por série (ex.: `ja`, `en`, `es`, `fr`, `de`, `zh`, `ko`, etc. — padrão: `en`).
+     - `target_language`: idioma de destino configurável (ex.: `pt-BR`, `es`, `en`, `fr`, `de`, `it`, `ja`, etc. — padrão: `pt-BR`).
+   - **Seleção inteligente de faixa:** O seletor de faixas (`select_track`) passa a buscar e priorizar a faixa correspondente ao `source_language` configurado.
+   - **Prompts multilíngues parametrizados:**
+     - Injeção dinâmica de `{source_language}` e `{target_language}` em todos os templates de prompt (`translate_dialogue`, `translate_signs`, `translate_songs`, `review_meaning`, `final_readthrough`).
+   - **LanguageTool parametrizado:**
+     - O cliente do LanguageTool passa a enviar o parâmetro `language` correspondente ao `target_language` configurado (ex.: `pt-BR`, `es`, `en-US`, `fr`, `de-DE`, etc.).
+   - **Regras gramaticais e de gênero extensíveis:**
+     - Desacoplamento das regras em `treatment_consistency` e `checks` para comportar perfis linguísticos específicos do idioma alvo.
+   - **Gravação e publicação adaptadas:**
+     - Nomenclatura automática do arquivo de legenda com base no idioma de saída: `.{target_language}.ass` (ex.: `.pt-BR.ass`, `.es.ass`, `.en.ass`).
+
+**Pronto quando:**
+1. Um MKV contendo apenas faixa PGS/VobSub é processado pelo OCR e gera legendas traduzidas de qualidade comparável a faixas de texto;
+2. Configurar `source_language = "ja"` ou `target_language = "es"` traduz corretamente os episódios no par linguístico solicitado sem intervenção manual;
+3. Testes sintéticos e de integração cobrem a extração OCR e a tradução com diferentes pares de idiomas.
+
+---
+
+## Depois da v1.1 (backlog)
 
 - `eval` com conjunto de ouro + **métricas camada 3** (COMETKiwi, IA como juiz).
 - **Guia de estilo por série** (`style.yaml`) — adiado ("por enquanto não").
@@ -246,7 +282,6 @@ extrair → normalizar → classificar → memória de tradução → unir frase
 - Troca automática para fonte de fallback quando a fonte do fansub não tiver acentos.
 - Portões de etapa anterior (retraduzir o episódio quando a taxa de edição da revisão for alta).
 - Diarização de áudio para elevar a confiança da atribuição de falantes.
-- OCR para legendas em imagem (PGS/VobSub).
 - UI web e/ou serviço automático (observar pasta, webhook Sonarr/Jellyfin).
 
 ## Descartado
