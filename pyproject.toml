@@ -1,6 +1,6 @@
 [project]
 name = "translaterany"
-version = "0.1.0"
+version = "1.0.0"
 description = "Tradução de legendas de anime EN → PT-BR com IA, em múltiplas etapas"
 readme = "README.md"
 requires-python = ">=3.14"

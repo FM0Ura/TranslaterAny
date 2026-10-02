@@ -249,22 +249,26 @@ class QALoopStage(Stage):
                 break
 
             budget_depleted = False
+            recorded_uids = {item["unit_id"] for item in interventions}
             for uid, unit_findings in failing_units.items():
                 if extra_calls_used >= self.options.max_extra_calls:
                     logger.warning(
                         "qa_loop: teto de chamadas extras (%d) atingido. Interrompendo intervenções.",
                         self.options.max_extra_calls,
                     )
-                    interventions.append(
-                        {
-                            "unit_id": uid,
-                            "blamed_stage": "budget_exhausted",
-                            "error": unit_findings[0].message,
-                            "outcome": "exhausted",
-                        }
-                    )
+                    for rem_uid, rem_findings in failing_units.items():
+                        if rem_uid not in recorded_uids:
+                            interventions.append(
+                                {
+                                    "unit_id": rem_uid,
+                                    "blamed_stage": "budget_exhausted",
+                                    "error": rem_findings[0].message,
+                                    "outcome": "exhausted",
+                                }
+                            )
+                            recorded_uids.add(rem_uid)
                     budget_depleted = True
-                    continue
+                    break
 
                 f_primary = unit_findings[0]
                 blamed_stage = attribute_blame(uid, f_primary, history, env=env, sources=sources)
