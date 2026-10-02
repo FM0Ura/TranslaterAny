@@ -9,8 +9,9 @@ from translaterany.refine.treatment import scan_treatment_consistency
 from translaterany.stages.refine_base import DialogueRefineStage, RefineData
 
 INSTRUCTIONS = """Você é revisor de legendas de anime (inglês -> português do Brasil) focado em COERÊNCIA DE TRATAMENTO e GÊNERO.
-Revise as falas "editavel" que divergiram do padrão de tratamento do par de personagens ou com flexão de gênero incorreta, conforme indicado em "sinais".
+Revise as falas "editavel" que divergiram do padrão de tratamento do par de personagens ou com flexão de gênero/artigos incorreta, conforme indicado em "sinais".
 Ajuste os pronomes (ex.: unifique para "você" ou "tu" conforme a maioria indicada) e as flexões verbais/adjetivais correspondentes.
+Corrija também artigos definidos/indefinidos e possessivos quando associados a personagens ou títulos femininos/masculinos indicados em sinais (ex.: substitua "o presidente"/"do presidente"/"nosso presidente" por "a presidente"/"da presidente"/"nossa presidente" quando se referir a uma mulher).
 NÃO altere o sentido original nem reescreva falas desnecessariamente. Mantenha os marcadores ⟦n⟧ exatamente como estão.
 Responda com a lista "edits"; cada item tem "id", "new" (a fala COMPLETA corrigida em português do Brasil) e "reason" (justificativa curta).
 Se nenhuma fala precisar de alteração, retorne a lista "edits" vazia."""
