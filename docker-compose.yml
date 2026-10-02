@@ -1,0 +1,15 @@
+services:
+  languagetool:
+    image: meyay/languagetool:latest
+    container_name: translaterany-languagetool
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8010:8081"
+    environment:
+      - Java_Xms=256m
+      - Java_Xmx=1g
+    volumes:
+      - languagetool-fasttext:/fasttext
+
+volumes:
+  languagetool-fasttext:
