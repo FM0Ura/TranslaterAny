@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from translaterany.memory.matching import load_memory_for_text
+from translaterany.memory.matching import load_all_characters, load_memory_for_text
 from translaterany.memory.models import CharacterEntry, GlossaryEntry
 from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.artifacts import ArtifactStore
@@ -34,3 +34,14 @@ def test_load_memory_for_text(tmp_path: Path) -> None:
     mem.save_characters([CharacterEntry(name="Yu"), CharacterEntry(name="Nao")])
     glossary, chars = load_memory_for_text(store, "s", "Yu used an Ability")
     assert [g.term for g in glossary] == ["Ability"] and [c.name for c in chars] == ["Yu"]
+
+
+def test_load_all_characters(tmp_path: Path) -> None:
+    store = ArtifactStore(tmp_path)
+    assert load_all_characters(None, "s") == []
+    assert load_all_characters(store, "s") == []
+    mem = MemoryStore(store.series_dir("s") / "memory")
+    mem.save_characters([CharacterEntry(name="Yu"), CharacterEntry(name="Nao")])
+    all_chars = load_all_characters(store, "s")
+    assert [c.name for c in all_chars] == ["Yu", "Nao"]
+

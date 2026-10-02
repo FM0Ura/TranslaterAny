@@ -13,6 +13,9 @@ _SENHOR_RE = re.compile(r"\b(?:o senhor|a senhora|os senhores|as senhoras)\b", r
 _MASC_PREDICATES = r"(?:cansado|preocupado|pronto|grato|obrigado|sozinho|animado|chateado|perdido|seguro|surpreso|confuso|satisfeito|vazio|furioso|bravo|louco)"
 _FEM_PREDICATES = r"(?:cansada|preocupada|pronta|grata|obrigada|sozinha|animada|chateada|perdida|segura|surpresa|confusa|satisfeita|vazia|furiosa|brava|louca)"
 
+_MASC_DETERMINERS = r"(?:o|do|no|pelo|ao|pro|um|dum|num|este|deste|neste|esse|desse|nesse|aquele|daquele|naquele|meu|nosso|seu)(?:\s+(?:meu|nosso|seu|mesmo|próprio|novo))?"
+_FEM_DETERMINERS = r"(?:a|da|na|pela|à|pra|uma|duma|numa|esta|desta|nesta|essa|dessa|nessa|aquela|daquela|naquela|minha|nossa|sua)(?:\s+(?:minha|nossa|sua|mesma|própria|nova))?"
+
 _FEM_SPEAKER_MASC_ERROR = re.compile(
     rf"\b(?:eu\s+)?(?:estou|tô|fiquei|sou|fui|me\s+sinto|me\s+deixa(?:ndo)?)\s+{_MASC_PREDICATES}\b", re.IGNORECASE
 )
@@ -88,10 +91,10 @@ def scan_treatment_consistency(
                 if len(name) < 3:
                     continue
                 if gen in ("female", "f"):
-                    if re.search(rf"\b(?:o|do|no|pelo|ao|nosso)\s+{re.escape(name)}\b", text, re.IGNORECASE):
+                    if re.search(rf"\b{_MASC_DETERMINERS}\s+{re.escape(name)}\b", text, re.IGNORECASE):
                         gender_mismatches[lid].append(f"artigo masculino usado para personagem feminina '{name}'")
                 elif gen in ("male", "m"):
-                    if re.search(rf"\b(?:a|da|na|pela|à|nossa)\s+{re.escape(name)}\b", text, re.IGNORECASE):
+                    if re.search(rf"\b{_FEM_DETERMINERS}\s+{re.escape(name)}\b", text, re.IGNORECASE):
                         gender_mismatches[lid].append(f"artigo feminino usado para personagem masculino '{name}'")
 
         # Define maioria
@@ -138,10 +141,10 @@ def scan_treatment_consistency(
             if len(name) < 3:
                 continue
             if gen in ("female", "f"):
-                if re.search(rf"\b(?:o|do|no|pelo|ao|nosso)\s+{re.escape(name)}\b", text, re.IGNORECASE):
+                if re.search(rf"\b{_MASC_DETERMINERS}\s+{re.escape(name)}\b", text, re.IGNORECASE):
                     reasons.append(f"artigo masculino usado para personagem feminina '{name}'")
             elif gen in ("male", "m"):
-                if re.search(rf"\b(?:a|da|na|pela|à|nossa)\s+{re.escape(name)}\b", text, re.IGNORECASE):
+                if re.search(rf"\b{_FEM_DETERMINERS}\s+{re.escape(name)}\b", text, re.IGNORECASE):
                     reasons.append(f"artigo feminino usado para personagem masculino '{name}'")
 
         if reasons:

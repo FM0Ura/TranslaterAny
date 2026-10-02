@@ -11,7 +11,7 @@ from translaterany.checks import CheckEnv, LineInput
 from translaterany.checks.snapshots import LineSource, build_sources, composite_members, lines_for
 from translaterany.config.model import AppConfig, ChecksConfig
 from translaterany.llm.client import LLMRequest
-from translaterany.memory.matching import load_memory_for_text
+from translaterany.memory.matching import load_all_characters, load_memory_for_text
 from translaterany.memory.models import CharacterEntry
 from translaterany.pipeline.gates import StageGate
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
@@ -202,9 +202,14 @@ class DialogueRefineStage(Stage):
         scene_doc = ctx.inputs.json("scene_analysis", SceneAnalysisDoc) if "scene_analysis" in self.inputs else None
         sources = build_sources(doc, classes, merged)
         ids = [i for i in texts if i in sources]
-        glossary, characters = load_memory_for_text(
-            getattr(ctx, "store", None), ctx.series.key, "\n".join(sources[i].source for i in ids)
+        src_block = "\n".join(sources[i].source for i in ids)
+        pt_block = "\n".join(texts[i] for i in ids if i in texts)
+        combined_text = f"{src_block}\n{pt_block}" if src_block else pt_block
+        glossary, matched_chars = load_memory_for_text(
+            getattr(ctx, "store", None), ctx.series.key, combined_text
         )
+        all_chars = load_all_characters(getattr(ctx, "store", None), ctx.series.key)
+        characters = all_chars or matched_chars
         env = CheckEnv(glossary=glossary, names=[[c.name, *c.aliases] for c in characters], limits=self.limits)
         members = composite_members(merged)
         contexts = scene_doc.lines if scene_doc else {}

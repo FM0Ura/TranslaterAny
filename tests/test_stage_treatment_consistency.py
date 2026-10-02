@@ -84,4 +84,12 @@ def test_scan_identifies_expanded_predicates() -> None:
     assert "u1" in pair.divergent_ids
     assert any("gênero feminino usado por falante masculino" in r for r in pair.divergent_reasons["u1"])
 
-
+def test_scan_identifies_determiners_and_possessives() -> None:
+    lines = [
+        {"id": "u1", "speaker": "Issei", "listener": "Asia", "text": "Levei bronca do presidente.", "confidence": "high"},
+        {"id": "u2", "speaker": "Kiba", "listener": "Issei", "text": "Machucou nosso presidente!", "confidence": "high"},
+        {"id": "u3", "speaker": "Issei", "listener": "Kiba", "text": "Ao contrário do presidente...", "confidence": "high"},
+    ]
+    report = scan_treatment_consistency(lines, character_gender={"Presidente": "female"})
+    all_divergent = {lid for p in report.values() for lid in p.divergent_ids}
+    assert {"u1", "u2", "u3"}.issubset(all_divergent)

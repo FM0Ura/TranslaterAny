@@ -40,3 +40,17 @@ def load_memory_for_text(
 
     mem = MemoryStore(mem_dir)
     return select_for_text(mem.load_glossary().values(), mem.load_characters(), text)
+
+
+def load_all_characters(store: ArtifactStore | None, series_key: str) -> list[CharacterEntry]:
+    """Todos os personagens da série a partir do memory store."""
+    if store is None:
+        return []
+    mem_dir = store.series_dir(series_key) / "memory"
+    if not mem_dir.exists():
+        return []
+    from translaterany.memory.store import MemoryStore  # import tardio: evita ciclo memory <-> pipeline
+
+    mem = MemoryStore(mem_dir)
+    return mem.load_characters()
+
