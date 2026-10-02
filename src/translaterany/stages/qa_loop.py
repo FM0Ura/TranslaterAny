@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Mapping, Sequence
+
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -381,8 +383,14 @@ class QALoopStage(Stage):
                 score_new = severity_score(new_findings)
 
                 exp_markers = marker_ids(source_text)
-                if exp_markers and sorted(marker_ids(wrapped_candidate)) != sorted(exp_markers):
-                    score_new += 100
+                if (
+                    sorted(marker_ids(wrapped_candidate)) != sorted(exp_markers)
+                    or "⟦" in re.sub(r"⟦\d+⟧", "", wrapped_candidate)
+                    or "⟧" in re.sub(r"⟦\d+⟧", "", wrapped_candidate)
+                ):
+                    score_new += 1000
+
+
 
                 if score_new == 0:
                     current_texts[uid] = wrapped_candidate

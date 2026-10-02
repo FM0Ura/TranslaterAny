@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Sequence
 from typing import Any, ClassVar
 
@@ -20,9 +21,11 @@ from translaterany.subtitles.linebreak import wrap_line
 from translaterany.subtitles.merge import MergedUnitsDoc
 from translaterany.subtitles.normalize import NormalizedDoc
 from translaterany.subtitles.redistribute import redistribute_composite_unit
+from translaterany.subtitles.segments import marker_ids
 from translaterany.subtitles.texts import UnitTexts
 
 logger = logging.getLogger(__name__)
+
 
 
 _FIXED = ("normalize", "classify", "translation_memory", "merge_sentences")
@@ -99,16 +102,33 @@ class RedistributeSentencesStage(Stage):
         final_texts: dict[str, str] = {}
 
         # 1. Diálogo (redistribui frases unidas)
+        markers_by_unit = {u.id: u.markers for u in doc.units}
         if merged_doc and merged_doc.units:
             for comp in merged_doc.units:
                 if comp.composite_id in dialogue_texts:
                     translated = dialogue_texts[comp.composite_id]
                     split = redistribute_composite_unit(comp, translated)
+
+                    # Garante que cada unidade desmembrada contenha exatamente os marcadores esperados
+                    for uid in comp.unit_ids:
+                        exp_cnt = markers_by_unit.get(uid, 0)
+                        exp_list = list(range(1, exp_cnt + 1))
+                        u_text = split.get(uid, "")
+                        if exp_cnt == 0:
+                            if "⟦" in u_text or "⟧" in u_text:
+                                split[uid] = re.sub(r"⟦\d+⟧", "", u_text).strip()
+                        else:
+                            curr_markers = marker_ids(u_text)
+                            if sorted(curr_markers) != exp_list:
+                                clean_u = re.sub(r"⟦\d+⟧", "", u_text).strip()
+                                split[uid] = clean_u + "".join(f"⟦{m}⟧" for m in exp_list)
+
                     final_texts.update(split)
                     if len(comp.unit_ids) > 1:
                         count(ctx, "redistributed")
                 elif len(comp.unit_ids) == 1 and comp.composite_id in tm_matched:
                     final_texts[comp.composite_id] = tm_matched[comp.composite_id]
+
 
         for uid, txt in dialogue_texts.items():
             if uid not in final_texts and "+" not in uid:

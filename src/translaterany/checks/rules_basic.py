@@ -14,7 +14,11 @@ from translaterany.subtitles.segments import marker_ids
 @line_check("markers", LINE_TYPES)
 def markers(line: LineInput, env: CheckEnv) -> list[Finding]:
     expected, got = Counter(marker_ids(line.source)), Counter(marker_ids(line.target))
-    if expected == got:
+    has_malformed = (
+        "⟦" in re.sub(r"⟦\d+⟧", "", line.target)
+        or "⟧" in re.sub(r"⟦\d+⟧", "", line.target)
+    )
+    if expected == got and not has_malformed:
         return []
     return [
         Finding(
@@ -24,6 +28,7 @@ def markers(line: LineInput, env: CheckEnv) -> list[Finding]:
             message=f"marcadores divergentes: esperado {sorted(expected.elements())}, obtido {sorted(got.elements())}",
         )
     ]
+
 
 
 @line_check("untranslated", {"dialogue", "sign"})
