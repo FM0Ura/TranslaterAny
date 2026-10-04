@@ -67,3 +67,38 @@ def test_foreign_ptbr_file_skips_unless_forced(data_dir: Path, synthetic_series:
     summary, *_ = run_stages(data_dir, synthetic_series, _stages(translate=True), force=True)
     assert summary.stages["publish"].done == 1
     assert "; TranslaterAny" in foreign.read_text(encoding="utf-8")
+
+
+def test_write_resilient_to_spurious_brackets(data_dir: Path, synthetic_series: Path) -> None:
+    from translaterany.pipeline.registry import register_stage
+    from translaterany.pipeline.stage import StageContext, StageScope
+    from translaterany.subtitles.texts import UnitTexts
+
+    @register_stage
+    class SpuriousTranslateStage(Stage):
+        name = "t_spurious"
+        version = "1"
+        scope = StageScope.EPISODE
+        translates = True
+        produces_texts = True
+
+        def run(self, ctx: StageContext) -> None:
+            texts = {"u1": "Texto com ⟦Spurious⟧ colchetes", "u2": "Texto sem marcadores", "u3": "Placa normal"}
+            ctx.output.json(UnitTexts(texts=texts))
+
+    stages: list[Stage] = [
+        SelectTrackStage(),
+        ExtractStage(),
+        NormalizeStage(),
+        ClassifyStage(),
+        SpuriousTranslateStage(),
+        WriteStage(WriteOptions(text_source="t_spurious")),
+        PublishStage(),
+    ]
+    summary, store, s, eps = run_stages(data_dir, synthetic_series, stages)
+    assert not summary.failed
+    published = synthetic_series / "Season 1" / "S01E01 - A.pt-BR.ass"
+    content = published.read_text(encoding="utf-8")
+    assert "Texto com Spurious colchetes" in content
+    assert "⟦" not in content and "⟧" not in content
+

@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from translaterany.llm.client import LLMClient
 from translaterany.llm.metered import LLMStats, MeteredLLM
@@ -60,6 +60,8 @@ class Runner:
         log: logging.Logger | None = None,
         on_progress: ProgressFn | None = None,
         prices: PriceFn | None = None,
+        source_language: Any = None,
+        target_language: Any = None,
     ) -> None:
         self.stages = list(stages)
         self.store = store
@@ -67,6 +69,11 @@ class Runner:
         self.log = log or logging.getLogger("translaterany.runner")
         self.on_progress = on_progress
         self.prices = prices
+        self.source_language = source_language
+        self.target_language = target_language
+        from translaterany.languages.profile import get_profile
+
+        self.target_profile = get_profile(target_language) if target_language else None
         self._scopes: dict[str, StageScope] = {}
         for stage in self.stages:
             if stage.reads_source and stage.scope is StageScope.SERIES:
@@ -213,6 +220,40 @@ class Runner:
         llm: MeteredLLM,
         metrics: StageMetrics,
     ) -> StageContext:
+        from translaterany.languages.registry import LanguageRegistry
+
+        # Precedência: series.config > runner > default
+        src = getattr(series.config, "source_language", None)
+        if src:
+            src_info = LanguageRegistry.resolve(src)
+        elif self.source_language is not None:
+            src_info = (
+                self.source_language
+                if hasattr(self.source_language, "code")
+                else LanguageRegistry.resolve(str(self.source_language))
+            )
+        else:
+            src_info = LanguageRegistry.resolve("en")
+
+        tgt = getattr(series.config, "target_language", None)
+        if tgt:
+            tgt_info = LanguageRegistry.resolve(tgt)
+        elif self.target_language is not None:
+            tgt_info = (
+                self.target_language
+                if hasattr(self.target_language, "code")
+                else LanguageRegistry.resolve(str(self.target_language))
+            )
+        else:
+            tgt_info = LanguageRegistry.resolve("pt-BR")
+
+        try:
+            from translaterany.languages.profile import get_profile
+
+            tgt_profile = get_profile(tgt_info)
+        except Exception:
+            tgt_profile = None
+
         return StageContext(
             series=series,
             episode=episode,
@@ -233,6 +274,9 @@ class Runner:
             previous_output=previous,
             force=force,
             store=self.store,
+            source_language=src_info,
+            target_language=tgt_info,
+            target_profile=tgt_profile,
         )
 
     def _finish(
@@ -317,13 +361,41 @@ class PipelineRunner:
         config: object = None,
         client: LLMClient | None = None,
         store: ArtifactStore | None = None,
+        source_language: Any = None,
+        target_language: Any = None,
     ) -> None:
         from translaterany.config.loader import ResolvedConfig, _build_stages, default_data_dir, load_config
         from translaterany.config.model import AppConfig, PipelineConfig
+        from translaterany.languages.registry import LanguageRegistry
         from translaterany.llm.fake import FakeLLM
         from translaterany.llm.pricing import price_lookup
         from translaterany.pipeline.registry import REGISTRY
         from translaterany.stages import DEFAULT_PIPELINE
+
+        cfg_source_lang = getattr(config, "source_language", None)
+        cfg_target_lang = getattr(config, "target_language", None)
+
+        if source_language is not None:
+            self.source_language = (
+                source_language if hasattr(source_language, "code") else LanguageRegistry.resolve(str(source_language))
+            )
+        elif cfg_source_lang:
+            self.source_language = LanguageRegistry.resolve(str(cfg_source_lang))
+        else:
+            self.source_language = LanguageRegistry.resolve("en")
+
+        if target_language is not None:
+            self.target_language = (
+                target_language if hasattr(target_language, "code") else LanguageRegistry.resolve(str(target_language))
+            )
+        elif cfg_target_lang:
+            self.target_language = LanguageRegistry.resolve(str(cfg_target_lang))
+        else:
+            self.target_language = LanguageRegistry.resolve("pt-BR")
+
+        from translaterany.languages.profile import get_profile
+
+        self.target_profile = get_profile(self.target_language)
 
         if isinstance(config, ResolvedConfig):
             self.stages = config.stages
@@ -352,5 +424,12 @@ class PipelineRunner:
 
         series, episodes = discover(path)
         store = self._store or ArtifactStore(self.data_dir)
-        runner = Runner(self.stages, store, self.client, prices=self.prices)
+        runner = Runner(
+            self.stages,
+            store,
+            self.client,
+            prices=self.prices,
+            source_language=self.source_language,
+            target_language=self.target_language,
+        )
         return runner.run(series, episodes, force=force)

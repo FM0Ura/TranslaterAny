@@ -5,9 +5,10 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from translaterany.languages.models import LanguageInfo
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import SkipEpisode, Stage, StageContext, StageScope
-from translaterany.stages.select_track import external_ptbr_path
+from translaterany.pipeline.units import Episode
 from translaterany.subtitles.ass import has_marker
 from translaterany.util.fs import file_sha256
 
@@ -17,6 +18,17 @@ class PublishArtifact(BaseModel):
     reason: str
     path: str | None = None
     sha256: str | None = None
+
+
+def get_output_ass_path(video_path: Path, target_lang: LanguageInfo | None = None) -> Path:
+    """Destino da publicação: <vídeo>.<idioma>.ass."""
+    code = target_lang.code if target_lang is not None else "pt-BR"
+    return video_path.with_name(f"{video_path.stem}.{code}.ass")
+
+
+def external_ptbr_path(episode: Episode) -> Path:
+    """Destino da publicação para PT-BR (retrocompatibilidade): <vídeo>.pt-BR.ass."""
+    return get_output_ass_path(episode.source, None)
 
 
 @register_stage
@@ -33,7 +45,7 @@ class PublishStage(Stage):
         if not has_marker(data):
             ctx.output.json(PublishArtifact(published=False, reason="pipeline sem tradução"))
             return
-        dest = external_ptbr_path(ctx.episode)
+        dest = get_output_ass_path(ctx.episode.source, getattr(ctx, "target_language", None))
         if dest.is_file() and not has_marker(dest.read_bytes()) and not ctx.force:
             raise SkipEpisode(f"já existe {dest.name} de outra fonte (use --force para sobrescrever)")
         tmp = dest.with_name(f".{dest.name}.translaterany-tmp")
@@ -51,6 +63,7 @@ class PublishStage(Stage):
             return True
         assert ctx.episode is not None
         dest = Path(art.path)
-        if dest != external_ptbr_path(ctx.episode):  # vídeo renomeado ou movido
+        expected = get_output_ass_path(ctx.episode.source, getattr(ctx, "target_language", None))
+        if dest != expected:  # vídeo renomeado ou movido
             return False
         return dest.is_file() and file_sha256(dest) == art.sha256

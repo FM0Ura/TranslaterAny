@@ -116,7 +116,7 @@ class RedistributeSentencesStage(Stage):
                         u_text = split.get(uid, "")
                         if exp_cnt == 0:
                             if "⟦" in u_text or "⟧" in u_text:
-                                split[uid] = re.sub(r"⟦\d+⟧", "", u_text).strip()
+                                split[uid] = u_text.replace("⟦", "").replace("⟧", "").strip()
                         else:
                             curr_markers = marker_ids(u_text)
                             if sorted(curr_markers) != exp_list:
@@ -132,13 +132,21 @@ class RedistributeSentencesStage(Stage):
 
         for uid, txt in dialogue_texts.items():
             if uid not in final_texts and "+" not in uid:
+                if markers_by_unit.get(uid, 0) == 0 and ("⟦" in txt or "⟧" in txt):
+                    txt = txt.replace("⟦", "").replace("⟧", "").strip()
                 final_texts[uid] = txt
 
         # 2. Placas
-        final_texts.update(signs_texts)
+        for uid, txt in signs_texts.items():
+            if markers_by_unit.get(uid, 0) == 0 and ("⟦" in txt or "⟧" in txt):
+                txt = txt.replace("⟦", "").replace("⟧", "").strip()
+            final_texts[uid] = txt
 
         # 3. Músicas
-        final_texts.update(songs_texts)
+        for uid, txt in songs_texts.items():
+            if markers_by_unit.get(uid, 0) == 0 and ("⟦" in txt or "⟧" in txt):
+                txt = txt.replace("⟦", "").replace("⟧", "").strip()
+            final_texts[uid] = txt
 
         # 4. TM matches remanescentes (músicas só chegam pelo translate_songs, que pode pulá-las)
         for uid, txt in tm_matched.items():

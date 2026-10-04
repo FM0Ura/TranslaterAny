@@ -5,7 +5,7 @@ import tempfile
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 type CheckStatus = Literal["ok", "warn", "fail"]
 
@@ -103,6 +103,7 @@ check_ollama_service = check_ollama_status
 def check_languagetool_service(
     url: str = "http://localhost:8010/v2/check",
     transport: Any = None,
+    target_lang: str | None = None,
 ) -> CheckResult:
     """Verifica se o servidor LanguageTool está acessível via HTTP."""
     import httpx
@@ -112,6 +113,21 @@ def check_languagetool_service(
         with httpx.Client(timeout=3.0, transport=transport) as client:
             resp = client.get(f"{base}/v2/languages")
             if resp.status_code == 200:
+                if target_lang:
+                    try:
+                        langs = resp.json()
+                        target_code = target_lang.lower().split("-")[0]
+                        has_lang = any(
+                            target_code in (item.get("code") or "").lower()
+                            or target_code in (item.get("longCode") or "").lower()
+                            or target_code in (item.get("name") or "").lower()
+                            for item in langs
+                            if isinstance(item, dict)
+                        )
+                        if has_lang:
+                            return CheckResult("ok", f"LanguageTool acessível em {base} (suporta {target_lang})")
+                    except Exception:
+                        pass
                 return CheckResult("ok", f"LanguageTool acessível em {base}")
             return CheckResult("warn", f"LanguageTool em {base} retornou status HTTP {resp.status_code}")
     except Exception as exc:

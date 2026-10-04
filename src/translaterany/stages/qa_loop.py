@@ -12,7 +12,6 @@ import json
 import logging
 import re
 from collections.abc import Mapping, Sequence
-
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -285,21 +284,29 @@ class QALoopStage(Stage):
                 if not prev_text and blamed_stage != "translate_dialogue":
                     prev_text = current_texts.get(uid, "")
 
+                from translaterany.languages.registry import LanguageRegistry
+
+                src_lang = getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en")
+                tgt_lang = getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR")
+                src_code = src_lang.code.upper()
+                tgt_code = tgt_lang.code.upper()
+                tgt_name = "português do Brasil (PT-BR)" if tgt_lang.code == "pt-BR" else tgt_lang.name_pt
+
                 prompt_parts: list[str] = []
                 if source_text:
-                    prompt_parts.append(f"TEXTO ORIGINAL (EN):\n[{uid}] {source_text}")
+                    prompt_parts.append(f"TEXTO ORIGINAL ({src_code}):\n[{uid}] {source_text}")
                 else:
                     prompt_parts.append(f"FALA:\n[{uid}]")
 
                 if prev_text and prev_text != current_texts.get(uid, ""):
-                    prompt_parts.append(f"ÚLTIMA TRADUÇÃO VÁLIDA (PT-BR):\n{prev_text}")
+                    prompt_parts.append(f"ÚLTIMA TRADUÇÃO VÁLIDA ({tgt_code}):\n{prev_text}")
 
                 prompt_parts.append(f"TEXTO ATUAL COM DEFEITO:\n{current_texts.get(uid, '')}")
                 prompt_parts.append(feedback)
 
                 prompt = "\n\n".join(prompt_parts)
                 instructions = (
-                    "Você é um revisor especialista de legendas em português do Brasil (PT-BR). "
+                    f"Você é um revisor especialista de legendas em {tgt_name}. "
                     "Sua tarefa é corrigir a fala indicada eliminando estritamente os erros apontados no feedback. "
                     "Mantenha todos os marcadores especiais como ⟦n⟧ intactos na ordem original. "
                     "Não inclua explicações ou notas adicionais, apenas a tradução corrigida."
@@ -393,8 +400,6 @@ class QALoopStage(Stage):
                     or "⟧" in re.sub(r"⟦\d+⟧", "", wrapped_candidate)
                 ):
                     score_new += 1000
-
-
 
                 if score_new == 0:
                     current_texts[uid] = wrapped_candidate

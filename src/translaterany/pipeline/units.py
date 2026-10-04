@@ -21,6 +21,8 @@ class SeriesConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    source_language: str | None = None
+    target_language: str | None = None
     track: str | None = None  # parte do nome da faixa preferida
     styles: dict[str, str] = Field(default_factory=dict)  # estilo -> tipo de linha
     metadata: SeriesMetadataConfig = Field(default_factory=SeriesMetadataConfig)

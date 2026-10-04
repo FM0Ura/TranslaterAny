@@ -5,8 +5,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from translaterany.languages.models import LanguageInfo
+from translaterany.languages.registry import LanguageRegistry
 from translaterany.media.mkv import MediaError, probe, tool_available
-from translaterany.media.tracks import NoTrack, is_own, is_portuguese, select_track
+from translaterany.media.tracks import NoTrack, is_own, select_track
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import SkipEpisode, Stage, StageContext, StageScope
 from translaterany.pipeline.units import Episode, Series
@@ -56,9 +58,18 @@ def external_ptbr_path(episode: Episode) -> Path:
     return episode.source.with_name(episode.source.stem + ".pt-BR.ass")
 
 
-def foreign_portuguese_files(episode: Episode) -> list[Path]:
-    """Legendas externas em português ao lado do vídeo que não foram feitas pela app."""
+def foreign_subtitle_files(episode: Episode, target_lang: LanguageInfo | None = None) -> list[Path]:
+    """Legendas externas no idioma alvo ao lado do vídeo que não foram feitas pela app."""
     stem = episode.source.stem
+    tags = (
+        PORTUGUESE_TAGS
+        if (target_lang is None or target_lang.code == "pt-BR")
+        else (
+            f".{target_lang.code.lower()}",
+            f".{target_lang.iso639_1.lower()}",
+            f".{target_lang.iso639_2.lower()}",
+        )
+    )
     found = []
     for candidate in episode.source.parent.iterdir():
         name = candidate.name
@@ -68,9 +79,14 @@ def foreign_portuguese_files(episode: Episode) -> list[Path]:
         if not rest.endswith(SUBTITLE_EXTENSIONS):
             continue
         tag = rest[: -len(candidate.suffix)]
-        if tag in PORTUGUESE_TAGS and not has_marker(candidate.read_bytes()):
+        if tag in tags and not has_marker(candidate.read_bytes()):
             found.append(candidate)
     return sorted(found)
+
+
+def foreign_portuguese_files(episode: Episode) -> list[Path]:
+    """Legendas externas em português ao lado do vídeo que não foram feitas pela app."""
+    return foreign_subtitle_files(episode, None)
 
 
 @register_stage
@@ -85,14 +101,24 @@ class SelectTrackStage(Stage):
 
     def run(self, ctx: StageContext) -> None:
         assert ctx.episode is not None
+        source_lang = getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en")
+        target_lang = getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR")
         accepted = ctx.force or _previously_accepted(ctx.previous_output)
-        foreign = foreign_portuguese_files(ctx.episode)
+        foreign = foreign_subtitle_files(ctx.episode, target_lang)
         if foreign and not accepted:
             raise SkipEpisode(f"já existe {foreign[0].name} de outra fonte (use --force para sobrescrever)")
         info = probe(ctx.episode.source)
-        foreign_tracks = any(is_portuguese(t) and not is_own(t) for t in info.subtitles)
+        foreign_tracks = any(
+            LanguageRegistry.matches(t.language, target_lang) and not is_own(t) for t in info.subtitles
+        )
         try:
-            sel = select_track(info, ctx.series.config.track, force=accepted)
+            sel = select_track(
+                info,
+                ctx.series.config.track,
+                force=accepted,
+                source_lang=source_lang,
+                target_lang=target_lang,
+            )
         except NoTrack as exc:
             raise SkipEpisode(exc.reason) from exc
         for warning in sel.warnings:

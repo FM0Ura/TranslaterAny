@@ -22,11 +22,17 @@ def load_series_config(root: Path) -> SeriesConfig:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except (tomllib.TOMLDecodeError, UnicodeDecodeError, OSError) as exc:
         raise SeriesConfigError(f"{path}: arquivo inválido — {exc}") from exc
-    unknown = set(raw) - {"subtitles", "styles", "metadata"}
+    unknown = set(raw) - {"subtitles", "styles", "metadata", "languages", "source_language", "target_language"}
     if unknown:
         raise SeriesConfigError(
-            f"{path}: seção desconhecida {sorted(unknown)} (use [subtitles], [styles] e [metadata])"
+            f"{path}: seção desconhecida {sorted(unknown)} (use [subtitles], [styles], [metadata] e [languages])"
         )
+    languages_raw = raw.get("languages", {})
+    if not isinstance(languages_raw, dict):
+        raise SeriesConfigError(f"{path}: [languages] deve ser uma tabela")
+    src_lang = raw.get("source_language") or languages_raw.get("source") or languages_raw.get("source_language")
+    tgt_lang = raw.get("target_language") or languages_raw.get("target") or languages_raw.get("target_language")
+
     subtitles = raw.get("subtitles", {})
     styles = raw.get("styles", {})
     metadata_raw = raw.get("metadata", {})
@@ -50,6 +56,12 @@ def load_series_config(root: Path) -> SeriesConfig:
             anilist_id = None
         metadata_config = SeriesMetadataConfig(anilist_id=anilist_id)
     try:
-        return SeriesConfig(track=subtitles.get("track"), styles=styles, metadata=metadata_config)
+        return SeriesConfig(
+            source_language=src_lang,
+            target_language=tgt_lang,
+            track=subtitles.get("track"),
+            styles=styles,
+            metadata=metadata_config,
+        )
     except ValidationError as exc:
         raise SeriesConfigError(f"{path}: {exc.errors()[0]['msg']}") from exc

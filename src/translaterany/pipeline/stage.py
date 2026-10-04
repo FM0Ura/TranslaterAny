@@ -50,6 +50,9 @@ class StageContext:
     force: bool = False  # `run --force`: permite sobrescrever PT-BR de terceiros
     store: ArtifactStore | None = None
     metrics: StageMetrics = field(default_factory=StageMetrics)
+    source_language: Any = None  # LanguageInfo
+    target_language: Any = None  # LanguageInfo
+    target_profile: Any = None  # LanguageProfile
 
 
 class Stage(ABC):
