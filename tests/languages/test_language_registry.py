@@ -1,6 +1,3 @@
-# tests/languages/test_registry.py
-import pytest
-from translaterany.languages.models import LanguageInfo
 from translaterany.languages.registry import LanguageRegistry
 
 

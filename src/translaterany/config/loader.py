@@ -30,6 +30,8 @@ class ResolvedConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     translation: TranslationConfig = field(default_factory=TranslationConfig)
     app: AppConfig | None = None
+    source_language: str = "en"
+    target_language: str = "pt-BR"
 
 
 def default_config_path(env: Mapping[str, str] = os.environ) -> Path:
@@ -105,8 +107,13 @@ def load_config(
     unknown = sorted(set(config.checks.disabled) - check_names())
     if unknown:
         raise ConfigError(
-            _format(where, [f"checks.disabled: checagem desconhecida {', '.join(unknown)} "
-                            f"(disponíveis: {', '.join(sorted(check_names()))})"])
+            _format(
+                where,
+                [
+                    f"checks.disabled: checagem desconhecida {', '.join(unknown)} "
+                    f"(disponíveis: {', '.join(sorted(check_names()))})"
+                ],
+            )
         )
 
     stages = _build_stages(config, registry, where)
@@ -120,8 +127,9 @@ def load_config(
         llm=config.llm,
         translation=config.translation,
         app=config,
+        source_language=config.source_language,
+        target_language=config.target_language,
     )
-
 
 
 def _build_stages(config: AppConfig, registry: StageRegistry, where: str) -> list[Stage]:

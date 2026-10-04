@@ -3,15 +3,15 @@
 > Fotografia atual do desenvolvimento. O plano completo está em [`ROADMAP.md`](ROADMAP.md).
 > Atualize este arquivo ao concluir cada etapa de um marco (spec, plano, implementação) e sempre que uma decisão for tomada.
 
-**Última atualização:** 2026-10-02
+**Última atualização:** 2026-10-04
 
 ---
 
 ## Onde estamos
 
-- **Fase:** v1.0.0 lançada e validada em produção (659 testes passando).
-- **Marco atual:** **v1.1 — OCR e Suporte Universal a Idiomas** (em planejamento).
-- **Próxima ação:** elaboração de spec e plano de arquitetura para a v1.1.
+- **Fase:** v1.1 em andamento — **Marco M9 (Suporte Universal a Idiomas) concluído com sucesso** (686 testes passando, zero regressões).
+- **Marco atual:** **M10 — OCR de legendas gráficas (PGS/VobSub)** (próximo marco da v1.1).
+- **Próxima ação:** elaboração de spec e plano de arquitetura para M10 (OCR de legendas em imagem).
 
 ## Progresso dos marcos
 
@@ -28,7 +28,8 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M6 — Refinamento I | ✅ | [spec](docs/superpowers/specs/2026-09-30-m6-refinamento-i-design.md) | [plano](docs/superpowers/plans/2026-09-30-m6-refinamento-i.md) | integrado ao master; aceite real feito — 558 testes |
 | M7 — Refinamento II | ✅ | [spec](docs/superpowers/specs/2026-10-01-m7-refinamento-ii-design.md) | [plano](docs/superpowers/plans/2026-10-01-m7-refinamento-ii.md) | integrado ao master (583 testes); LanguageTool e gênero |
 | M8 — Portões e laço do QA | ✅ | [spec](docs/superpowers/specs/2026-10-01-m8-portoes-qa-design.md) | [plano](docs/superpowers/plans/2026-10-01-m8-portoes-qa.md) | concluído (659 testes); release v1.0.0 |
-| v1.1 — OCR e Suporte Universal a Idiomas | ⬜ | | | extração PGS/VobSub via OCR + source_language e target_language arbitrários |
+| M9 — Suporte Universal a Idiomas (v1.1) | ✅ | [spec](docs/superpowers/specs/2026-10-04-m9-suporte-universal-idiomas-design.md) | [plano](docs/superpowers/plans/2026-10-04-m9-suporte-universal-idiomas.md) | concluído (686 testes); pares arbitrários de idiomas, LanguageRegistry, perfis linguísticos e prompts parametrizados |
+| M10 — OCR de Legendas Gráficas (v1.1) | ⬜ | | | extração PGS/VobSub via OCR leve determinístico para mídias físicas |
 
 ---
 
@@ -86,6 +87,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-10-01 | **M7 — Refinamento II:** 4 etapas sequenciais (`treatment_consistency`, `adapt`, `orthography`, `final_readthrough`) entre `colloquial` e `redistribute_sentences`; cliente LanguageTool HTTP com degradação graciosa e isenções (nomes de personagens e termos do glossário); triagem pronominal/gênero por pares de alta confiança; condensação de CPS > 17 com orçamento de caracteres; leitura corrida final em PT-BR por cena; checagem `doctor` do LanguageTool; revisão final tratou isenções e integridade de marcadores | 583 testes passando |
 | 2026-10-01 | **M8 — Portões e laço do QA (Fim da v1):** StageGate com escada de escalonamento local (feedback + redução unitária) e detecção de oscilação; checagens finais exclusivas (sintaxe ASS, integridade de eventos, timing); algoritmo de blame retroativo no histórico de artefatos; etapa QALoopStage com reprocessamento em cascata pontual e integração determinística com orthography; artefato qa_report.json e aviso de modelo no report; WriteStage respeita text_source explícito; gate.reset() previne vazamento de estado | 650 testes passando; conclusão da v1 |
 | 2026-10-02 | **Lançamento v1.0.0 & Definição da v1.1:** v1.0.0 concluída e validada em produção nos eps 1-4 de High School DxD (659 testes passando); definida a v1.1 com OCR de legendas em imagem (PGS/VobSub) e suporte universal a qualquer idioma de entrada/saída (`source_language` e `target_language`) | expansão para mídias físicas e pares multilíngues arbitrários |
+| 2026-10-04 | **M9 — Suporte Universal a Idiomas (v1.1):** Catálogo universal `LanguageRegistry` com resolução por código canônico ou aliases flexíveis; interface `LanguageProfile` com implementações completas `PortugueseProfile` (100% de paridade), `SpanishProfile`, `EnglishProfile` e fallback resiliente `GenericProfile`; injeção dinâmica de `source_language` e `target_language` em todos os prompts de IA (`translate_dialogue`, `translate_signs`, `translate_songs`, `review_meaning`, `final_readthrough`); triagem gramatical e de tratamento orientadas pelo perfil do idioma alvo; LanguageTool parametrizado por código de idioma; remux e publicação com nomenclatura `.{code}.ass` e flags `0:{code}` e nome legível de faixa | 686 testes passando (+26 novos testes multilíngues); zero regressões |
 
 ---
 

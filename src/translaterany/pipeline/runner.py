@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from translaterany.llm.client import LLMClient
 from translaterany.llm.metered import LLMStats, MeteredLLM
@@ -71,6 +71,9 @@ class Runner:
         self.prices = prices
         self.source_language = source_language
         self.target_language = target_language
+        from translaterany.languages.profile import get_profile
+
+        self.target_profile = get_profile(target_language) if target_language else None
         self._scopes: dict[str, StageScope] = {}
         for stage in self.stages:
             if stage.reads_source and stage.scope is StageScope.SERIES:
@@ -389,6 +392,10 @@ class PipelineRunner:
             self.target_language = LanguageRegistry.resolve(str(cfg_target_lang))
         else:
             self.target_language = LanguageRegistry.resolve("pt-BR")
+
+        from translaterany.languages.profile import get_profile
+
+        self.target_profile = get_profile(self.target_language)
 
         if isinstance(config, ResolvedConfig):
             self.stages = config.stages

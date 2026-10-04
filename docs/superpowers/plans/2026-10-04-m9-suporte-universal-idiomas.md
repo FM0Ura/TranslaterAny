@@ -655,7 +655,7 @@ git commit -m "feat(stages): dynamically inject source and target languages into
 - Consumes: `context.target_language.languagetool_code`, `context.target_language.code`.
 - Produces: `.ass` gravado com `<stem>.{code}.ass`, flags mkvmerge com código e nome do idioma.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/stages/test_publish_remux_multilingual.py
@@ -684,12 +684,12 @@ def test_remux_command_uses_target_language() -> None:
     assert "Espanhol — TranslaterAny" in cmd_str
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/stages/test_publish_remux_multilingual.py -v`
 Expected: FAIL with TypeError or unexpected arguments
 
-- [ ] **Step 3: Update `orthography.py`, `publish.py`, and `remux.py`**
+- [x] **Step 3: Update `orthography.py`, `publish.py`, and `remux.py`**
 
 1. Em `src/translaterany/stages/orthography.py`:
    - Passar `context.target_language.languagetool_code` para o `LanguageToolClient`.
@@ -700,13 +700,13 @@ Expected: FAIL with TypeError or unexpected arguments
 4. Em `src/translaterany/util/doctor.py`:
    - Verificar idiomas no `/v2/languages` do LanguageTool.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/stages/test_publish_remux_multilingual.py -v`
 Run: `uv run pytest tests/test_publish.py tests/test_remux.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/stages/orthography.py src/translaterany/orthography/client.py src/translaterany/util/doctor.py src/translaterany/stages/publish.py src/translaterany/media/remux.py tests/stages/test_publish_remux_multilingual.py
@@ -726,7 +726,7 @@ git commit -m "feat(pipeline): parameterize LanguageTool, publish and remux with
 - Consumes: Pipeline completo com `ja` → `es` e `en` → `pt-BR`.
 - Produces: Execução E2E sintética validada e documentação atualizada.
 
-- [ ] **Step 1: Write E2E integration test**
+- [x] **Step 1: Write E2E integration test**
 
 ```python
 # tests/pipeline/test_multilingual_e2e.py
@@ -754,12 +754,12 @@ def test_multilingual_pipeline_run_ja_to_es(tmp_path: Path) -> None:
     assert runner.target_profile.info.code == "es"
 ```
 
-- [ ] **Step 2: Run test to verify it passes**
+- [x] **Step 2: Run test to verify it passes**
 
 Run: `uv run pytest tests/pipeline/test_multilingual_e2e.py -v`
 Expected: PASS
 
-- [ ] **Step 3: Run full test suite and linters**
+- [x] **Step 3: Run full test suite and linters**
 
 Run: `uv run pytest -q`
 Expected: > 700 testes passando sem falhas (zero regressões).
@@ -767,11 +767,11 @@ Run: `uv run ruff check`
 Run: `uv run ruff format --check`
 Expected: Limpo sem erros.
 
-- [ ] **Step 4: Update `STATE.md` and `ROADMAP.md`**
+- [x] **Step 4: Update `STATE.md` and `ROADMAP.md`**
 
 Registrar no `STATE.md` e `ROADMAP.md` a conclusão do M9 e o avanço da v1.1.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/pipeline/test_multilingual_e2e.py STATE.md ROADMAP.md

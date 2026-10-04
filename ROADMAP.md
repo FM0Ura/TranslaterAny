@@ -246,31 +246,33 @@ extrair → normalizar → classificar → memória de tradução → unir frase
 
 **Escopo:**
 
-1. **Inserção de OCR para Legendas em Imagem (PGS / VobSub)**
+1. **Inserção de OCR para Legendas em Imagem (PGS / VobSub) — Marco M10 (Próximo)**
    - **Extração gráfica:** Suporte à extração de faixas PGS (`.sup`) e VobSub (`.sub`/`.idx`) via `mkvextract`.
    - **Motor de OCR local:** Integração com motor de OCR leve e determinístico (ex.: Tesseract OCR / `pytesseract` ou PaddleOCR) com suporte a múltiplos idiomas e execução local paralela.
    - **Normalização e alinhamento:** Conversão dos bitmaps e timestamps para texto estruturado (`NormalizedDoc`), preservando tempos exatos de início e fim.
    - **Detecção de estilos e posições:** Inferência de diálogos, quebras de linha e formatações básicas (itálico/posição na tela) a partir dos bounding boxes do OCR.
    - **Fluxo transparente:** Uma vez reconhecidas pelo OCR, as legendas entram diretamente nas etapas existentes (`classify`, `scene_analysis`, `translate`, etc.) sem distinção de legendas textuais normais.
 
-2. **Suporte Universal a Idiomas de Entrada e Saída**
+2. **Suporte Universal a Idiomas de Entrada e Saída — Marco M9 (✅ Concluído)**
    - **Configuração dinâmica de pares linguísticos:**
-     - `source_language`: idioma de origem configurável globalmente ou por série (ex.: `ja`, `en`, `es`, `fr`, `de`, `zh`, `ko`, etc. — padrão: `en`).
+     - `source_language`: idioma de origem configurável globalmente, por série ou CLI (ex.: `ja`, `en`, `es`, `fr`, `de`, `zh`, `ko`, etc. — padrão: `en`).
      - `target_language`: idioma de destino configurável (ex.: `pt-BR`, `es`, `en`, `fr`, `de`, `it`, `ja`, etc. — padrão: `pt-BR`).
-   - **Seleção inteligente de faixa:** O seletor de faixas (`select_track`) passa a buscar e priorizar a faixa correspondente ao `source_language` configurado.
+   - **Catálogo e resolução universal (`LanguageRegistry`):**
+     - Resolução resiliente por códigos ISO e aliases flexíveis; checagem unificada de match com faixas de MKV.
+   - **Perfis linguísticos desacoplados (`LanguageProfile`):**
+     - `PortugueseProfile` (100% de paridade com o legado PT-BR), `SpanishProfile`, `EnglishProfile` e `GenericProfile` seguro.
+   - **Seleção inteligente de faixa:** O seletor de faixas (`select_track`) prioriza o `source_language` e detecta colisões com `target_language`.
    - **Prompts multilíngues parametrizados:**
      - Injeção dinâmica de `{source_language}` e `{target_language}` em todos os templates de prompt (`translate_dialogue`, `translate_signs`, `translate_songs`, `review_meaning`, `final_readthrough`).
    - **LanguageTool parametrizado:**
-     - O cliente do LanguageTool passa a enviar o parâmetro `language` correspondente ao `target_language` configurado (ex.: `pt-BR`, `es`, `en-US`, `fr`, `de-DE`, etc.).
-   - **Regras gramaticais e de gênero extensíveis:**
-     - Desacoplamento das regras em `treatment_consistency` e `checks` para comportar perfis linguísticos específicos do idioma alvo.
-   - **Gravação e publicação adaptadas:**
-     - Nomenclatura automática do arquivo de legenda com base no idioma de saída: `.{target_language}.ass` (ex.: `.pt-BR.ass`, `.es.ass`, `.en.ass`).
+     - O cliente do LanguageTool envia o código `languagetool_code` correspondente ao `target_language` configurado.
+   - **Gravação, publicação e remux adaptados:**
+     - Nomenclatura automática do arquivo de legenda com base no idioma de saída: `.{target_language.code}.ass` (ex.: `.pt-BR.ass`, `.es.ass`, `.en.ass`), flags `0:{code}` e nomes legíveis de faixa no remux.
 
 **Pronto quando:**
-1. Um MKV contendo apenas faixa PGS/VobSub é processado pelo OCR e gera legendas traduzidas de qualidade comparável a faixas de texto;
-2. Configurar `source_language = "ja"` ou `target_language = "es"` traduz corretamente os episódios no par linguístico solicitado sem intervenção manual;
-3. Testes sintéticos e de integração cobrem a extração OCR e a tradução com diferentes pares de idiomas.
+1. Configurar `source_language = "ja"` ou `target_language = "es"` traduz corretamente os episódios no par linguístico solicitado sem intervenção manual (✅ Concluído no M9);
+2. Um MKV contendo apenas faixa PGS/VobSub é processado pelo OCR e gera legendas traduzidas de qualidade comparável a faixas de texto (Marco M10);
+3. Testes sintéticos e de integração cobrem a extração OCR e a tradução com diferentes pares de idiomas (M9 coberto com 26 novos testes).
 
 ---
 
