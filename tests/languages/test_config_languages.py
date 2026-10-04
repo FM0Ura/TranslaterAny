@@ -1,10 +1,9 @@
-# tests/languages/test_config_languages.py
 from pathlib import Path
+
 import pytest
+
 from translaterany.config import load_config_from_str
-from translaterany.config.model import AppConfig, ConfigError
 from translaterany.library.series_config import load_series_config
-from translaterany.languages.registry import LanguageRegistry
 from translaterany.pipeline.runner import PipelineRunner
 
 

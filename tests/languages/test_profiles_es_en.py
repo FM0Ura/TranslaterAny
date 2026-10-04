@@ -1,8 +1,7 @@
-# tests/languages/test_profiles_es_en.py
-from translaterany.languages.registry import LanguageRegistry
 from translaterany.languages.profile import get_profile
-from translaterany.languages.profiles.spanish import SpanishProfile
 from translaterany.languages.profiles.english import EnglishProfile
+from translaterany.languages.profiles.spanish import SpanishProfile
+from translaterany.languages.registry import LanguageRegistry
 
 
 def test_spanish_profile_lexicon_and_treatment() -> None:

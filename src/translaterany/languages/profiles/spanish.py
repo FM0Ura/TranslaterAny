@@ -21,9 +21,44 @@ PT_INTRUSION = re.compile(r"\b(?:não|você|obrigado|muito|agora|então|falar|co
 
 ES_FUNCTION_WORDS = frozenset(
     {
-        "el", "la", "de", "que", "y", "a", "en", "un", "ser", "se", "no", "haber", "por", "con", "su", "para",
-        "como", "estar", "tener", "le", "lo", "todo", "pero", "más", "hacer", "o", "poder", "este", "ya",
-        "otro", "ese", "si", "me", "primer", "dar", "muy", "bien", "sin",
+        "el",
+        "la",
+        "de",
+        "que",
+        "y",
+        "a",
+        "en",
+        "un",
+        "ser",
+        "se",
+        "no",
+        "haber",
+        "por",
+        "con",
+        "su",
+        "para",
+        "como",
+        "estar",
+        "tener",
+        "le",
+        "lo",
+        "todo",
+        "pero",
+        "más",
+        "hacer",
+        "o",
+        "poder",
+        "este",
+        "ya",
+        "otro",
+        "ese",
+        "si",
+        "me",
+        "primer",
+        "dar",
+        "muy",
+        "bien",
+        "sin",
     }
 )
 
@@ -64,7 +99,7 @@ class SpanishProfile:
                 pair_key = (spk, lis) if spk < lis else (lis, spk)
                 pairs.setdefault(pair_key, []).append(line)
 
-        for pair_key, group in pairs.items():
+        for _pair_key, group in pairs.items():
             tu_lines = []
             usted_lines = []
             for line in group:

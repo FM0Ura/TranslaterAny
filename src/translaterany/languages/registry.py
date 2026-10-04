@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+
 from translaterany.languages.models import LanguageInfo
 
 _NON_ALPHANUM = re.compile(r"[^a-z0-9]+")

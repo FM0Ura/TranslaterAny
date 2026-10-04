@@ -1,7 +1,6 @@
-# tests/languages/test_profile_portuguese.py
-from translaterany.languages.registry import LanguageRegistry
 from translaterany.languages.profile import get_profile
 from translaterany.languages.profiles.portuguese import PortugueseProfile
+from translaterany.languages.registry import LanguageRegistry
 
 
 def test_get_portuguese_profile() -> None:
