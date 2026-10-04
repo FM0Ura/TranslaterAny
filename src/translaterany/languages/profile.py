@@ -61,4 +61,12 @@ def get_profile(lang: LanguageInfo) -> LanguageProfile:
         from translaterany.languages.profiles.portuguese import PortugueseProfile
 
         return PortugueseProfile(lang)
+    if iso == "es":
+        from translaterany.languages.profiles.spanish import SpanishProfile
+
+        return SpanishProfile(lang)
+    if iso == "en":
+        from translaterany.languages.profiles.english import EnglishProfile
+
+        return EnglishProfile(lang)
     return GenericProfile(lang)
