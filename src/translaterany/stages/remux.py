@@ -56,7 +56,14 @@ class RemuxStage(Stage):
             return
         select = ctx.inputs.json("select_track", SelectTrackArtifact)
         remove = sorted(set(select.own_track_ids) | (set(select.sdh_track_ids) if self.options.remove_sdh else set()))
-        backup = remux(mkv, ass, remove_ids=remove, keep_backup=self.options.keep_backup, log=ctx.log)
+        backup = remux(
+            mkv,
+            ass,
+            remove_ids=remove,
+            keep_backup=self.options.keep_backup,
+            log=ctx.log,
+            target_lang=getattr(ctx, "target_language", None),
+        )
         ctx.output.json(
             RemuxArtifact(
                 status="remuxed",

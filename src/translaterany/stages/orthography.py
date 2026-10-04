@@ -9,12 +9,13 @@ from pydantic import BaseModel
 from translaterany.checks import CheckEnv
 from translaterany.checks.snapshots import LineSource, build_sources
 from translaterany.config.model import AppConfig, ChecksConfig, OrthographyOptions
+from translaterany.languages.registry import LanguageRegistry
 from translaterany.memory.matching import load_memory_for_text
 from translaterany.orthography.client import LanguageToolClient
+from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.stage_metrics import count
 from translaterany.pipeline.units import Episode, Series
-from translaterany.pipeline.registry import register_stage
 from translaterany.refine.edits import LineEdit, apply_edits
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.merge import MergedUnitsDoc
@@ -26,30 +27,31 @@ logger = logging.getLogger(__name__)
 
 _OPTIONAL = ("merge_sentences", "consolidate_memory")
 
-HONORIFICS: frozenset[str] = frozenset({
-    "kun",
-    "chan",
-    "san",
-    "sama",
-    "senpai",
-    "sempai",
-    "sensei",
-    "dono",
-    "kouhai",
-    "shishou",
-    "tan",
-    "hakase",
-    "niisan",
-    "neesan",
-    "onii-san",
-    "onee-san",
-    "onii-chan",
-    "onee-chan",
-})
+HONORIFICS: frozenset[str] = frozenset(
+    {
+        "kun",
+        "chan",
+        "san",
+        "sama",
+        "senpai",
+        "sempai",
+        "sensei",
+        "dono",
+        "kouhai",
+        "shishou",
+        "tan",
+        "hakase",
+        "niisan",
+        "neesan",
+        "onii-san",
+        "onee-san",
+        "onii-chan",
+        "onee-chan",
+    }
+)
 
 
 @register_stage
-
 class OrthographyStage(Stage):
     """Revisão ortográfica determinística com LanguageTool sem IA."""
 
@@ -139,6 +141,8 @@ class OrthographyStage(Stage):
         return result, False, applied
 
     def run(self, ctx: StageContext) -> None:
+        target_lang = getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR")
+        self.client.language = target_lang.languagetool_code
         dialogue = ctx.inputs.json(self.dialogue_input, UnitTexts)
         texts = dict(dialogue.texts)
         if not texts:

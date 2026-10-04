@@ -88,7 +88,7 @@ def doctor(ctx: typer.Context) -> None:
     raw_results = [
         ("config", CheckResult("ok", f"configuração válida ({where})")),
         *run_checks(all_checks(cfg)),
-        ("languagetool", check_languagetool_service()),
+        ("languagetool", check_languagetool_service(target_lang=cfg.target_language)),
         *llm_doctor_checks(cfg),
     ]
     seen_names: set[str] = set()
