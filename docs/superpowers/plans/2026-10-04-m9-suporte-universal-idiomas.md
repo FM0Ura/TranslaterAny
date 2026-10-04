@@ -575,14 +575,14 @@ git commit -m "feat(media): make select_track filter by source_lang and check co
 - Consumes: `context.source_language`, `context.target_language`, `context.target_profile`.
 - Produces: Prompts gerados dinamicamente com os idiomas corretos.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/stages/test_prompts_multilingual.py
+from unittest.mock import MagicMock
 from translaterany.languages.registry import LanguageRegistry
 from translaterany.subtitles.translator import render_system_instructions
 from translaterany.stages.review_meaning import ReviewMeaningStage
-from translaterany.pipeline.stage import StageContext
 
 
 def test_system_instructions_dynamic_languages() -> None:
@@ -597,9 +597,7 @@ def test_review_meaning_prompt_dynamic_languages() -> None:
     ja = LanguageRegistry.resolve("ja")
     es = LanguageRegistry.resolve("es")
     stage = ReviewMeaningStage()
-    ctx = StageContext(
-        stage_names=["review_meaning"],
-        stage_index=0,
+    ctx = MagicMock(
         source_language=ja,
         target_language=es,
     )
@@ -608,12 +606,12 @@ def test_review_meaning_prompt_dynamic_languages() -> None:
     assert "espanhol" in instr.lower()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/stages/test_prompts_multilingual.py -v`
 Expected: FAIL with ImportError or AttributeError
 
-- [ ] **Step 3: Parametrize all AI stage prompt templates**
+- [x] **Step 3: Parametrize all AI stage prompt templates**
 
 1. Em `src/translaterany/subtitles/translator.py`:
    - Criar `render_system_instructions(source: LanguageInfo, target: LanguageInfo) -> str`.
@@ -628,13 +626,13 @@ Expected: FAIL with ImportError or AttributeError
 6. Em `src/translaterany/stages/qa_loop.py`:
    - Usar `context.source_language.code` e `context.target_language.code` nos rótulos de prompt.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/stages/test_prompts_multilingual.py -v`
 Run: `uv run pytest tests/test_translate_dialogue.py tests/test_qa_loop.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/subtitles/translator.py src/translaterany/stages/ tests/stages/test_prompts_multilingual.py
