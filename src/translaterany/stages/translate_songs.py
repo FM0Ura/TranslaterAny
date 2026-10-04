@@ -7,6 +7,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
+from translaterany.languages.registry import LanguageRegistry
 from translaterany.llm.client import LLMClient
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
@@ -14,7 +15,7 @@ from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.classify import Classification
 from translaterany.subtitles.normalize import NormalizedDoc
-from translaterany.subtitles.songs import translate_songs
+from translaterany.subtitles.songs import render_songs_system_instructions, translate_songs
 from translaterany.subtitles.texts import UnitTexts
 
 logger = logging.getLogger(__name__)
@@ -84,5 +85,9 @@ class TranslateSongsStage(Stage):
             max_tokens_per_batch=self.options.max_tokens_per_batch,
             max_lines_per_batch=self.options.max_lines_per_batch,
             metrics=ctx.metrics if isinstance(getattr(ctx, "metrics", None), StageMetrics) else None,
+            system_instructions=render_songs_system_instructions(
+                getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en"),
+                getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR"),
+            ),
         )
         ctx.output.json(result)

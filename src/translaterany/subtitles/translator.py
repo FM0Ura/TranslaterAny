@@ -1,9 +1,11 @@
 import logging
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 from pydantic import BaseModel, Field
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from translaterany.languages.models import LanguageInfo
 from translaterany.llm.client import (
     LLMClient,
     LLMOutputError,
@@ -29,6 +31,24 @@ Mantenha rigorosamente o significado pretendido, pontuação expressiva (... ! ?
 Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as falas
 identificadas por seus IDs.
 NÃO traduza as falas marcadas como contexto."""
+
+
+def render_system_instructions(source: LanguageInfo, target: LanguageInfo) -> str:
+    target_fansub = (
+        "fansubs brasileiros de alta qualidade"
+        if target.code == "pt-BR"
+        else f"fansubs de alta qualidade em {target.name_pt}"
+    )
+    source_title = "Inglês" if source.code == "en" else source.name_pt.title()
+    target_title = "Português do Brasil" if target.code == "pt-BR" else target.name_pt.title()
+    return (
+        f"Você é um tradutor especialista de legendas de animes ({source_title} para {target_title}).\n"
+        f"Sua missão é produzir diálogos naturais, coloquiais e fluidos no estilo de {target_fansub}.\n"
+        "Mantenha rigorosamente o significado pretendido, pontuação expressiva (... ! ?) e estilo de cada personagem.\n"
+        "Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as falas\n"
+        "identificadas por seus IDs.\n"
+        "NÃO traduza as falas marcadas como contexto."
+    )
 
 
 class TranslationItem(BaseModel):
@@ -76,20 +96,22 @@ class DialogueBatchTranslator:
         policy_lines: list[str] = []
         if self.honorifics_policy == "keep":
             policy_lines.append(
-                "- Políticas de honoríficos (honorifics): MANTENHA os sufixos japoneses originais transliterados (-san, -kun, -chan, -senpai, -sama, sensei, etc.). Não remova nem substitua por termos genéricos como senhor/dona."
+                "- Políticas de honoríficos (honorifics): MANTENHA os sufixos japoneses originais transliterados "
+                "(-san, -kun, -chan, -senpai, -sama, sensei, etc.). Não remova nem substitua por termos "
+                "genéricos como senhor/dona."
             )
         elif self.honorifics_policy == "adapt":
             policy_lines.append(
-                "- Políticas de honoríficos (honorifics): adapte os sufixos honoríficos japoneses para tratamento natural em português."
+                "- Políticas de honoríficos (honorifics): adapte os sufixos honoríficos japoneses "
+                "para tratamento natural em português."
             )
         elif self.honorifics_policy == "remove":
-            policy_lines.append(
-                "- Políticas de honoríficos (honorifics): remova os sufixos honoríficos japoneses."
-            )
+            policy_lines.append("- Políticas de honoríficos (honorifics): remova os sufixos honoríficos japoneses.")
 
         if self.profanity_policy == "faithful":
             policy_lines.append(
-                "- Políticas de linguagem forte e palavrões (profanity): traduza com fidelidade mantendo o peso emocional equivalente da fala original em português coloquial, sem censura ou higienização."
+                "- Políticas de linguagem forte e palavrões (profanity): traduza com fidelidade mantendo o "
+                "peso emocional equivalente da fala original em português coloquial, sem censura ou higienização."
             )
         elif self.profanity_policy == "soften":
             policy_lines.append(
@@ -97,13 +119,15 @@ class DialogueBatchTranslator:
             )
         elif self.profanity_policy == "raw":
             policy_lines.append(
-                "- Políticas de linguagem forte e palavrões (profanity): mantenha termos crus e explícitos sem atenuação."
+                "- Políticas de linguagem forte e palavrões (profanity): "
+                "mantenha termos crus e explícitos sem atenuação."
             )
 
         has_low_conf = any(getattr(ctx, "confidence", "") == "low" for ctx in self.line_contexts.values())
         if has_low_conf or self.line_contexts:
             policy_lines.append(
-                "- Gênero e falantes indeterminados: para falas com baixa confiança (low confidence) ou falante desconhecido, adote formulações gramaticalmente neutras (neutral gender phrasing) em português."
+                "- Gênero e falantes indeterminados: para falas com baixa confiança (low confidence) ou falante "
+                "desconhecido, adote formulações gramaticalmente neutras (neutral gender phrasing) em português."
             )
 
         if self.char_budgets:
@@ -113,7 +137,8 @@ class DialogueBatchTranslator:
             )
 
         if policy_lines:
-            base_instructions = f"{base_instructions}\n\n[DIRETRIZES DE ESTILO E POLÍTICAS]:\n" + "\n".join(policy_lines)
+            guidelines = "\n".join(policy_lines)
+            base_instructions = f"{base_instructions}\n\n[DIRETRIZES DE ESTILO E POLÍTICAS]:\n{guidelines}"
 
         self.system_instructions = base_instructions
         self.total_usage = Usage()

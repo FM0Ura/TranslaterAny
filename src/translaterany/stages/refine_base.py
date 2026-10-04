@@ -134,6 +134,8 @@ class RefineData:
     characters: list[CharacterEntry] = field(default_factory=list)
     listener_of: dict[str, str] = field(default_factory=dict)
     confidence_of: dict[str, str] = field(default_factory=dict)
+    ctx: Any = None
+    profile: Any = None
 
 
 class DialogueRefineStage(Stage):
@@ -152,8 +154,14 @@ class DialogueRefineStage(Stage):
         self.inputs = ("normalize", "classify", *_OPTIONAL, *self._extra_inputs(), self.dialogue_input)
 
     # --- a sobrescrever -------------------------------------------------------------------------
-    def instructions(self) -> str:
+    def instructions(self, ctx: StageContext | None = None) -> str:
         raise NotImplementedError
+
+    def get_instructions(self, ctx: StageContext | None = None) -> str:
+        try:
+            return self.instructions(ctx)
+        except TypeError:
+            return self.instructions()
 
     def select_targets(self, ids: Sequence[str], data: RefineData) -> dict[str, list[str]]:
         raise NotImplementedError
@@ -205,9 +213,7 @@ class DialogueRefineStage(Stage):
         src_block = "\n".join(sources[i].source for i in ids)
         pt_block = "\n".join(texts[i] for i in ids if i in texts)
         combined_text = f"{src_block}\n{pt_block}" if src_block else pt_block
-        glossary, matched_chars = load_memory_for_text(
-            getattr(ctx, "store", None), ctx.series.key, combined_text
-        )
+        glossary, matched_chars = load_memory_for_text(getattr(ctx, "store", None), ctx.series.key, combined_text)
         all_chars = load_all_characters(getattr(ctx, "store", None), ctx.series.key)
         characters = all_chars or matched_chars
         env = CheckEnv(glossary=glossary, names=[[c.name, *c.aliases] for c in characters], limits=self.limits)
@@ -217,7 +223,12 @@ class DialogueRefineStage(Stage):
         listener_of = {}
         confidence_of = {}
         for i in ids:
-            ctx_key = i if i in contexts else (members.get(i, [i])[0] if members.get(i) and members[i][0] in contexts else None)
+            if i in contexts:
+                ctx_key = i
+            elif members.get(i) and members[i][0] in contexts:
+                ctx_key = members[i][0]
+            else:
+                ctx_key = None
             if ctx_key and ctx_key in contexts:
                 speaker_of[i] = contexts[ctx_key].speaker
                 listener_of[i] = contexts[ctx_key].listener
@@ -232,6 +243,8 @@ class DialogueRefineStage(Stage):
             characters=characters,
             listener_of=listener_of,
             confidence_of=confidence_of,
+            ctx=ctx,
+            profile=getattr(ctx, "target_profile", None),
         )
         targets = self.select_targets(ids, data)
         if "translation_memory" in self.inputs:  # falas resolvidas pela memória de tradução não são revisadas
@@ -245,29 +258,36 @@ class DialogueRefineStage(Stage):
             ids, set(targets), scene_of, self.options.max_lines_per_block, context_window=CONTEXT_WINDOW
         ):
             count(ctx, "blocks")
-            review = [
-                ReviewLine(
-                    id=i,
-                    source=sources[i].source,
-                    target=texts[i],
-                    speaker=speaker_of.get(i, "Unknown"),
-                    tone=contexts[i].tone if i in contexts else (contexts[members[i][0]].tone if members.get(i) and members[i][0] in contexts else "neutral"),
-                    budget=char_budget(
-                        sources[i].duration_ms,
-                        max_cps=self.max_cps,
-                        max_cpl=self.max_cpl,
-                        events=len(members.get(i, [i])),
-                    ),
-                    signals=targets.get(i, []),
-                    editable=i in targets,
+            review = []
+            for i in block:
+                if i in contexts:
+                    tone = contexts[i].tone
+                elif members.get(i) and members[i][0] in contexts:
+                    tone = contexts[members[i][0]].tone
+                else:
+                    tone = "neutral"
+                review.append(
+                    ReviewLine(
+                        id=i,
+                        source=sources[i].source,
+                        target=texts[i],
+                        speaker=speaker_of.get(i, "Unknown"),
+                        tone=tone,
+                        budget=char_budget(
+                            sources[i].duration_ms,
+                            max_cps=self.max_cps,
+                            max_cpl=self.max_cpl,
+                            events=len(members.get(i, [i])),
+                        ),
+                        signals=targets.get(i, []),
+                        editable=i in targets,
+                    )
                 )
-                for i in block
-            ]
             try:
                 response = ctx.llm.generate(
                     LLMRequest(
                         model=self.options.model,
-                        instructions=self.instructions(),
+                        instructions=self.get_instructions(ctx),
                         prompt=self.render_prompt(review),
                         output_type=EditsResponse,
                         tag=self.name,

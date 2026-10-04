@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 from typing import ClassVar
 
+from translaterany.languages.models import LanguageInfo
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext
 from translaterany.refine.triage import colloquial_signals
@@ -15,6 +16,21 @@ sem acrescentar gírias, ofensas ou palavrões que não existem no original ("en
 "limite_caracteres" quando houver. Mantenha os marcadores ⟦n⟧ exatamente como estão.
 Responda com a lista "edits"; cada item tem "id" (o id da fala), "new"
 (a fala COMPLETA reescrita em português do Brasil, nunca um trecho ou fragmento, mantendo os
+marcadores ⟦n⟧) e "reason" (justificativa curta). "sinais" diz por que a fala foi escolhida: formal_connective,
+enclisis, redundant_subject e archaic_pronoun = texto duro ou literal demais; too_long = encurtar;
+speech_style = ajustar ao jeito de falar do personagem. Falas com
+"editavel": false são só contexto. Responda apenas com as falas que mudar; se nenhuma, lista vazia."""
+
+
+def render_colloquial_instructions(source: LanguageInfo, target: LanguageInfo) -> str:
+    target_display = "português do Brasil" if target.code == "pt-BR" else target.name_pt
+    source_display = "en" if source.code == "en" else source.code
+    return f"""Você é adaptador de legendas de anime para {target_display} falado.
+Deixe cada fala "editavel" mais natural, no tom do personagem ("falante", "tom"), SEM mudar o sentido,
+sem acrescentar gírias, ofensas ou palavrões que não existem no original ("{source_display}"), dentro de
+"limite_caracteres" quando houver. Mantenha os marcadores ⟦n⟧ exatamente como estão.
+Responda com a lista "edits"; cada item tem "id" (o id da fala), "new"
+(a fala COMPLETA reescrita em {target_display}, nunca um trecho ou fragmento, mantendo os
 marcadores ⟦n⟧) e "reason" (justificativa curta). "sinais" diz por que a fala foi escolhida: formal_connective,
 enclisis, redundant_subject e archaic_pronoun = texto duro ou literal demais; too_long = encurtar;
 speech_style = ajustar ao jeito de falar do personagem. Falas com
@@ -45,11 +61,19 @@ class ColloquialStage(DialogueRefineStage):
         dialogue = [s.name for s in before if s.produces_dialogue]
         self.pre_review_input = dialogue[-1] if dialogue else None
 
-    def instructions(self) -> str:
+    def instructions(self, ctx: StageContext | None = None) -> str:
+        if ctx is not None:
+            from translaterany.languages.registry import LanguageRegistry
+
+            source = getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en")
+            target = getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR")
+            return render_colloquial_instructions(source, target)
         return INSTRUCTIONS
 
     def select_targets(self, ids: Sequence[str], data: RefineData) -> dict[str, list[str]]:
         styled = {c.name for c in data.characters if c.speech_style}
+        if data.profile is not None:
+            return data.profile.colloquial_signals(data.lines, data.speaker_of, styled)
         return colloquial_signals(data.lines, data.speaker_of, styled)
 
     def forbidden_texts(self, ctx: StageContext, texts: Mapping[str, str]) -> dict[str, str] | None:

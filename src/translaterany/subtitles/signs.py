@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
+from translaterany.languages.models import LanguageInfo
 from translaterany.llm.client import LLMClient
 from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.subtitles.chunking import DialogueLine
@@ -25,6 +26,23 @@ Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução
 identificados por seus IDs."""
 
 
+def render_signs_system_instructions(source: LanguageInfo, target: LanguageInfo) -> str:
+    target_conv = (
+        "convenções da língua portuguesa" if target.code == "pt-BR" else f"convenções do idioma ({target.name_pt})"
+    )
+    source_title = "Inglês" if source.code == "en" else source.name_pt.title()
+    target_title = "Português do Brasil" if target.code == "pt-BR" else target.name_pt.title()
+    return (
+        f"Você é um tradutor especialista de legendas de animes ({source_title} para {target_title}).\n"
+        "Sua missão é traduzir placas, textos em tela, avisos e títulos de forma concisa, direta e natural.\n"
+        "- Seja extremamente conciso, pois o texto deve caber no elemento visual da tela.\n"
+        "- Preserve exatamente marcadores de tags ou quebras como ⟦n⟧ sem alterá-los ou removê-los.\n"
+        f"- Mantenha termos canônicos e {target_conv} (ex: Conselho Estudantil, Sala dos Professores, etc.).\n"
+        "Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as placas/textos\n"
+        "identificados por seus IDs."
+    )
+
+
 def translate_signs(
     doc: NormalizedDoc,
     classes: dict[str, UnitClass] | Classification,
@@ -35,16 +53,13 @@ def translate_signs(
     max_tokens_per_batch: int = 800,
     max_lines_per_batch: int | None = 1,
     metrics: StageMetrics | None = None,
+    system_instructions: str | None = None,
 ) -> UnitTexts:
     """Traduz placas e elementos gráficos visuais, respeitando concisão e marcadores."""
     class_map = classes.units if isinstance(classes, Classification) else classes
     tm_map = tm_resolved or {}
 
-    sign_units = [
-        u
-        for u in doc.units
-        if u.id in class_map and class_map[u.id].type in ("sign", "title")
-    ]
+    sign_units = [u for u in doc.units if u.id in class_map and class_map[u.id].type in ("sign", "title")]
 
     texts: dict[str, str] = {}
     pending_units: list[DialogueLine] = []
@@ -69,7 +84,7 @@ def translate_signs(
         max_lines_per_batch=max_lines_per_batch,
         max_context_lines=0,
         metrics=metrics,
-        system_instructions=SIGNS_SYSTEM_INSTRUCTIONS,
+        system_instructions=system_instructions or SIGNS_SYSTEM_INSTRUCTIONS,
     )
     raw_translations = translator.translate_lines(pending_units)
 

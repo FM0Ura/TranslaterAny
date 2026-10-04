@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
+from translaterany.languages.models import LanguageInfo
 from translaterany.llm.client import LLMClient
 from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.subtitles.chunking import DialogueLine
@@ -16,7 +17,8 @@ from translaterany.subtitles.translator import DialogueBatchTranslator
 
 logger = logging.getLogger(__name__)
 
-SONGS_SYSTEM_INSTRUCTIONS = """Você é um tradutor e letrista especialista de músicas de animes (Inglês para Português do Brasil).
+SONGS_SYSTEM_INSTRUCTIONS = """Você é um tradutor e letrista especialista de músicas de animes
+(Inglês para Português do Brasil).
 Sua missão é traduzir letras de aberturas, encerramentos e canções de forma poética, lírica e expressiva.
 - Produza versos que soem naturais, emotivos e rítmicos em português brasileiro.
 - NUNCA traduza tags de karaokê (ex: \\k, \\kf, \\K) nem palavras em romaji ou japonês transliterado.
@@ -24,6 +26,22 @@ Sua missão é traduzir letras de aberturas, encerramentos e canções de forma 
 - Preserve exatamente quaisquer marcadores numéricos como ⟦n⟧ se presentes.
 Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as linhas de música
 identificadas por seus IDs."""
+
+
+def render_songs_system_instructions(source: LanguageInfo, target: LanguageInfo) -> str:
+    target_desc = "português brasileiro" if target.code == "pt-BR" else target.name_pt
+    source_title = "Inglês" if source.code == "en" else source.name_pt.title()
+    target_title = "Português do Brasil" if target.code == "pt-BR" else target.name_pt.title()
+    return (
+        f"Você é um tradutor e letrista especialista de músicas de animes ({source_title} para {target_title}).\n"
+        "Sua missão é traduzir letras de aberturas, encerramentos e canções de forma poética, lírica e expressiva.\n"
+        f"- Produza versos que soem naturais, emotivos e rítmicos em {target_desc}.\n"
+        "- NUNCA traduza tags de karaokê (ex: \\k, \\kf, \\K) nem palavras em romaji ou japonês transliterado.\n"
+        "- Preserve o sentido lírico e poético da canção original.\n"
+        "- Preserve exatamente quaisquer marcadores numéricos como ⟦n⟧ se presentes.\n"
+        "Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as linhas de música\n"
+        "identificadas por seus IDs."
+    )
 
 
 def translate_songs(
@@ -36,6 +54,7 @@ def translate_songs(
     max_tokens_per_batch: int = 800,
     max_lines_per_batch: int | None = 1,
     metrics: StageMetrics | None = None,
+    system_instructions: str | None = None,
 ) -> UnitTexts:
     """Traduz canções e letras musicais, preservando lírica e ignorando karaokê/romaji."""
     class_map = classes.units if isinstance(classes, Classification) else classes
@@ -73,7 +92,7 @@ def translate_songs(
         max_lines_per_batch=max_lines_per_batch,
         max_context_lines=2,
         metrics=metrics,
-        system_instructions=SONGS_SYSTEM_INSTRUCTIONS,
+        system_instructions=system_instructions or SONGS_SYSTEM_INSTRUCTIONS,
     )
     raw_translations = translator.translate_lines(pending_units)
 

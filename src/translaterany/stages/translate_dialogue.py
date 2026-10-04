@@ -26,7 +26,12 @@ from translaterany.subtitles.normalize import NormalizedDoc
 from translaterany.subtitles.scene_analysis import SceneAnalysisDoc
 from translaterany.subtitles.segments import marker_ids
 from translaterany.subtitles.texts import UnitTexts
-from translaterany.subtitles.translator import DialogueBatchTranslator, TranslationBatch, _normalize_id
+from translaterany.subtitles.translator import (
+    DialogueBatchTranslator,
+    TranslationBatch,
+    _normalize_id,
+    render_system_instructions,
+)
 from translaterany.util.doctor import Check, ollama_check, ollama_models_check
 
 if TYPE_CHECKING:
@@ -249,6 +254,11 @@ class StageTranslateDialogue(Stage):
                     )
                 )
             }
+            from translaterany.languages.registry import LanguageRegistry
+
+            src_lang = getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en")
+            tgt_lang = getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR")
+            sys_instructions = render_system_instructions(src_lang, tgt_lang)
             translator = DialogueBatchTranslator(
                 client=client,
                 model_name=self.options.model,
@@ -259,6 +269,7 @@ class StageTranslateDialogue(Stage):
                 max_context_lines=self.options.max_context_lines,
                 glossary=matched_glossary,
                 characters=matched_characters,
+                system_instructions=sys_instructions,
                 honorifics_policy=honorifics,
                 profanity_policy=profanity,
                 line_contexts=line_contexts,
@@ -390,7 +401,6 @@ class StageTranslateDialogue(Stage):
                         count(ctx, "markers_lost")
 
                 final_texts[line_id] = tr
-
 
         ctx.output.json(UnitTexts(texts=final_texts, used_terms=used_terms_dict))
 

@@ -101,21 +101,23 @@ class SelectTrackStage(Stage):
 
     def run(self, ctx: StageContext) -> None:
         assert ctx.episode is not None
+        source_lang = getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en")
+        target_lang = getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR")
         accepted = ctx.force or _previously_accepted(ctx.previous_output)
-        foreign = foreign_subtitle_files(ctx.episode, ctx.target_language)
+        foreign = foreign_subtitle_files(ctx.episode, target_lang)
         if foreign and not accepted:
             raise SkipEpisode(f"já existe {foreign[0].name} de outra fonte (use --force para sobrescrever)")
         info = probe(ctx.episode.source)
         foreign_tracks = any(
-            LanguageRegistry.matches(t.language, ctx.target_language) and not is_own(t) for t in info.subtitles
+            LanguageRegistry.matches(t.language, target_lang) and not is_own(t) for t in info.subtitles
         )
         try:
             sel = select_track(
                 info,
                 ctx.series.config.track,
                 force=accepted,
-                source_lang=ctx.source_language,
-                target_lang=ctx.target_language,
+                source_lang=source_lang,
+                target_lang=target_lang,
             )
         except NoTrack as exc:
             raise SkipEpisode(exc.reason) from exc
