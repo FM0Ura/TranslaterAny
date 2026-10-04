@@ -6,6 +6,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class ConfigError(ValueError):
+    """Configuração inválida. A mensagem já vem pronta para o usuário (PT-BR)."""
+
+
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -180,6 +184,8 @@ class StagesDict(dict[str, StageConfig]):
 
 
 class AppConfig(_Strict):
+    source_language: str = "en"
+    target_language: str = "pt-BR"
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     library: LibraryConfig = Field(default_factory=LibraryConfig)
@@ -189,6 +195,16 @@ class AppConfig(_Strict):
     gates: GatesConfig = Field(default_factory=GatesConfig)
     pipeline: PipelineConfig | None = None
     stages: dict[str, StageConfig] = Field(default_factory=StagesDict)
+
+    @model_validator(mode="after")
+    def _validate_languages(self) -> AppConfig:
+        from translaterany.languages.registry import LanguageRegistry
+
+        src = LanguageRegistry.resolve(self.source_language)
+        tgt = LanguageRegistry.resolve(self.target_language)
+        if src.code == tgt.code:
+            raise ValueError("idioma de origem e destino não podem ser iguais")
+        return self
 
     @model_validator(mode="after")
     def _wrap_stages(self) -> AppConfig:

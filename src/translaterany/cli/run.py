@@ -37,10 +37,16 @@ def run(
     ctx: typer.Context,
     path: Annotated[Path, typer.Argument(help="Pasta da série ou da biblioteca.")],
     force: Annotated[bool, typer.Option("--force", help="Reabre pulados e sobrescreve PT-BR de terceiros.")] = False,
+    source: Annotated[str | None, typer.Option("--source", "-s", help="Idioma de origem (ex: en, ja).")] = None,
+    target: Annotated[str | None, typer.Option("--target", "-t", help="Idioma de destino (ex: pt-BR, es).")] = None,
 ) -> None:
     """Executa o pipeline numa série ou em todas as séries de uma biblioteca."""
+    from translaterany.languages.registry import LanguageRegistry
+
     state: AppState = ctx.obj
     cfg = load_or_exit(state)
+    source_lang = LanguageRegistry.resolve(source) if source else LanguageRegistry.resolve(cfg.source_language)
+    target_lang = LanguageRegistry.resolve(target) if target else LanguageRegistry.resolve(cfg.target_language)
     results = run_checks(all_checks(cfg))
     if has_failure(results):
         console.print("[red]Verificação de ambiente falhou:[/red]")
@@ -59,11 +65,17 @@ def run(
 
     failed = False
     for scan in scans:
-        failed |= not _run_series(scan, cfg, force)
+        failed |= not _run_series(scan, cfg, force, source_lang, target_lang)
     raise typer.Exit(EXIT_FAILURE if failed else EXIT_OK)
 
 
-def _run_series(scan: SeriesScan, cfg: ResolvedConfig, force: bool) -> bool:
+def _run_series(
+    scan: SeriesScan,
+    cfg: ResolvedConfig,
+    force: bool,
+    source_lang: Any = None,
+    target_lang: Any = None,
+) -> bool:
     """Processa uma série; devolve False se algo falhou."""
     series = scan.series
     console.print(f"Série: [bold]{series.name}[/bold] — {len(scan.episodes)} episódio(s)")
@@ -85,9 +97,15 @@ def _run_series(scan: SeriesScan, cfg: ResolvedConfig, force: bool) -> bool:
             progress.update(tasks[stage], completed=done)
 
         runner = Runner(
-            cfg.stages, ArtifactStore(cfg.data_dir), PydanticAIClient(cfg.llm), log, on_progress,
+            cfg.stages,
+            ArtifactStore(cfg.data_dir),
+            PydanticAIClient(cfg.llm),
+            log,
+            on_progress,
             prices=price_lookup(cfg.llm),
-        )  # fmt: skip
+            source_language=source_lang,
+            target_language=target_lang,
+        )
         try:
             summary = runner.run(series, scan.episodes, force=force)
         except SeriesLocked:
