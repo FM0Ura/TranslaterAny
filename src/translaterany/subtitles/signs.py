@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from translaterany.llm.client import LLMClient
 from translaterany.pipeline.stage_metrics import StageMetrics
@@ -76,18 +77,20 @@ def translate_signs(
     for line in pending_units:
         u = sign_units_by_id[line.id]
         tr = raw_translations.get(line.id, u.text)
-        if u.markers > 0:
-            expected = list(range(1, u.markers + 1))
-            if sorted(marker_ids(tr)) != expected:
-                logger.warning(
-                    "Placa %s: tradução perdeu marcadores %s (obtido %s). Mantendo texto original.",
-                    u.id,
-                    expected,
-                    marker_ids(tr),
-                )
-                tr = u.text
-                if metrics:
-                    metrics.count("markers_lost")
+        expected = list(range(1, u.markers + 1))
+        if not expected and ("⟦" in tr or "⟧" in tr):
+            tr = tr.replace("⟦", "").replace("⟧", "")
+        has_malformed = "⟦" in re.sub(r"⟦\d+⟧", "", tr) or "⟧" in re.sub(r"⟦\d+⟧", "", tr)
+        if sorted(marker_ids(tr)) != expected or has_malformed:
+            logger.warning(
+                "Placa %s: tradução perdeu ou corrompeu marcadores %s (obtido %s). Mantendo texto original.",
+                u.id,
+                expected,
+                marker_ids(tr),
+            )
+            tr = u.text
+            if metrics:
+                metrics.count("markers_lost")
         texts[u.id] = tr
 
     return UnitTexts(texts=texts)

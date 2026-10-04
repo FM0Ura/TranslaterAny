@@ -1,8 +1,8 @@
 """Etapa write: remonta o .ass com os textos da etapa indicada em text_source."""
 
+import logging
 import re
 from collections.abc import Sequence
-
 
 from pydantic import BaseModel, ConfigDict
 
@@ -13,6 +13,8 @@ from translaterany.subtitles.ass import parse_ass, render_ass
 from translaterany.subtitles.normalize import NormalizedDoc
 from translaterany.subtitles.segments import fill, marker_ids
 from translaterany.subtitles.texts import UnitTexts
+
+logger = logging.getLogger(__name__)
 
 ORIGINAL = "normalize"
 DEFAULT_SOURCE = "redistribute_sentences"
@@ -59,9 +61,19 @@ class WriteStage(Stage):
                 continue
             text = texts[ev.unit]
             expected = list(range(1, markers_by_unit[ev.unit] + 1))
-            if sorted(marker_ids(text)) != expected or "⟦" in re.sub(r"⟦\d+⟧", "", text) or "⟧" in re.sub(r"⟦\d+⟧", "", text):
-                raise TextError(f"unidade {ev.unit}: o texto precisa conter exatamente os marcadores {expected}")
+            if not expected and ("⟦" in text or "⟧" in text):
+                text = text.replace("⟦", "").replace("⟧", "")
+            has_malformed = "⟦" in re.sub(r"⟦\d+⟧", "", text) or "⟧" in re.sub(r"⟦\d+⟧", "", text)
+            if sorted(marker_ids(text)) != expected or has_malformed:
+                logger.warning(
+                    "unidade %s: marcadores divergentes (esperado %s, obtido %s); revertendo para original",
+                    ev.unit,
+                    expected,
+                    marker_ids(text),
+                )
+                text = ev.text
             new_texts[ev.index] = ev.prefix + fill(text, ev.markers) + ev.suffix
         translates = source in REGISTRY and REGISTRY.get(source).translates
         changed = any(doc.events[i].text != text for i, text in new_texts.items())
         ctx.output.file(".ass", render_ass(doc, new_texts, marker=translates and changed))
+
