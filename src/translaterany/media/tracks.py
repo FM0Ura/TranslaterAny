@@ -3,6 +3,8 @@
 import re
 from dataclasses import dataclass, field
 
+from translaterany.languages.models import LanguageInfo
+from translaterany.languages.registry import LanguageRegistry
 from translaterany.media.mkv import IMAGE_CODECS, TEXT_CODECS, MkvInfo, Track
 
 OWN_TRACK_NAME = "Português (Brasil) — TranslaterAny"
@@ -57,33 +59,56 @@ def is_english_or_und(track: Track) -> bool:
     return lang.startswith("en") or lang in {"eng", "und"}
 
 
-def select_track(info: MkvInfo, preferred: str | None = None, *, force: bool = False) -> Selection:
+def is_source_or_und(track: Track, source_lang: LanguageInfo) -> bool:
+    lang = track.language.lower()
+    return lang in {"und", ""} or LanguageRegistry.matches(track.language, source_lang)
+
+
+def select_track(
+    info: MkvInfo,
+    preferred: str | None = None,
+    *,
+    force: bool = False,
+    source_lang: LanguageInfo | None = None,
+    target_lang: LanguageInfo | None = None,
+) -> Selection:
+    if source_lang is None:
+        source_lang = LanguageRegistry.resolve("en")
+    if target_lang is None:
+        target_lang = LanguageRegistry.resolve("pt-BR")
+
     subs = info.subtitles
     own = [t for t in subs if is_own(t)]
-    if not force and any(is_portuguese(t) and not is_own(t) for t in subs):
-        raise NoTrack("já existe legenda PT-BR de outra fonte (use --force para sobrescrever)")
+    target_display = "PT-BR" if target_lang.code == "pt-BR" else target_lang.name_pt
+    if not force and any(LanguageRegistry.matches(t.language, target_lang) and not is_own(t) for t in subs):
+        raise NoTrack(f"já existe legenda {target_display} de outra fonte (use --force para sobrescrever)")
     sdh = [t for t in subs if not is_own(t) and is_sdh(t)]
     infos: list[CandidateInfo] = []
     candidates: list[Track] = []
+    source_display = "inglês" if source_lang.code == "en" else source_lang.name_pt
     for track in subs:
         if is_own(track):
             infos.append(CandidateInfo(track.id, track.name, "own", "faixa da própria app"))
         elif track.codec_id in IMAGE_CODECS:
             infos.append(CandidateInfo(track.id, track.name, "image", "legenda em imagem"))
-        elif track.codec_id not in TEXT_CODECS or not is_english_or_und(track):
-            infos.append(CandidateInfo(track.id, track.name, "other_language", "não é legenda de texto em inglês"))
+        elif track.codec_id not in TEXT_CODECS or not is_source_or_und(track, source_lang):
+            infos.append(
+                CandidateInfo(track.id, track.name, "other_language", f"não é legenda de texto em {source_display}")
+            )
         elif is_sdh(track):
             infos.append(CandidateInfo(track.id, track.name, "sdh", "SDH/CC nunca é usada como base"))
         else:
             candidates.append(track)
 
     if not candidates:
-        english_text = [t for t in subs if t.codec_id in TEXT_CODECS and is_english_or_und(t) and not is_own(t)]
-        if english_text and all(is_sdh(t) for t in english_text):
-            raise NoTrack("só há legenda SDH em inglês")
+        source_text = [
+            t for t in subs if t.codec_id in TEXT_CODECS and is_source_or_und(t, source_lang) and not is_own(t)
+        ]
+        if source_text and all(is_sdh(t) for t in source_text):
+            raise NoTrack(f"só há legenda SDH em {source_display}")
         if any(t.codec_id in IMAGE_CODECS for t in subs):
             raise NoTrack("legenda em imagem (OCR fora da v1)")
-        raise NoTrack("sem legenda em inglês")
+        raise NoTrack(f"sem legenda em {source_display}")
 
     warnings: list[str] = []
     chosen: Track | None = None
