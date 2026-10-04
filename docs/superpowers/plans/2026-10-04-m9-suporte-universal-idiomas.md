@@ -478,7 +478,7 @@ git commit -m "feat(languages): implement SpanishProfile and EnglishProfile"
 - Consumes: `LanguageRegistry.matches()`, `context.source_language`, `context.target_language`.
 - Produces: `select_track(info, source_lang=..., target_lang=..., preferred=..., force=...)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/media/test_tracks_multilingual.py
@@ -493,7 +493,7 @@ def test_select_track_by_source_language() -> None:
         Track(id=0, type="subtitles", codec_id="S_TEXT/ASS", name="Dialog", language="jpn", default=True, forced=False, hearing_impaired=False),
         Track(id=1, type="subtitles", codec_id="S_TEXT/ASS", name="English", language="eng", default=False, forced=False, hearing_impaired=False),
     ]
-    info = MkvInfo(video_track_id=0, audio_track_ids=[], subtitles=tracks, attachments=[])
+    info = MkvInfo(tracks=tuple(tracks), attachments=(), duration_ns=None)
     
     # Buscando Japonês como origem
     ja = LanguageRegistry.resolve("ja")
@@ -512,7 +512,7 @@ def test_collision_check_with_target_language() -> None:
         Track(id=0, type="subtitles", codec_id="S_TEXT/ASS", name="English", language="eng", default=True, forced=False, hearing_impaired=False),
         Track(id=1, type="subtitles", codec_id="S_TEXT/ASS", name="Español Latino", language="spa", default=False, forced=False, hearing_impaired=False),
     ]
-    info = MkvInfo(video_track_id=0, audio_track_ids=[], subtitles=tracks, attachments=[])
+    info = MkvInfo(tracks=tuple(tracks), attachments=(), duration_ns=None)
     en = LanguageRegistry.resolve("en")
     es = LanguageRegistry.resolve("es")
 
@@ -525,12 +525,12 @@ def test_collision_check_with_target_language() -> None:
     assert sel.chosen.id == 0
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest tests/media/test_tracks_multilingual.py -v`
 Expected: FAIL with TypeError or unexpected arguments in select_track
 
-- [ ] **Step 3: Update `tracks.py`, `select_track.py`, and `extract.py`**
+- [x] **Step 3: Update `tracks.py`, `select_track.py`, and `extract.py`**
 
 1. Em `src/translaterany/media/tracks.py`:
    - Atualizar `select_track` para receber `source_lang: LanguageInfo | None = None` e `target_lang: LanguageInfo | None = None`.
@@ -542,13 +542,13 @@ Expected: FAIL with TypeError or unexpected arguments in select_track
 3. Em `src/translaterany/stages/extract.py`:
    - Só acionar heurística `looks_english` se `context.source_language.iso639_1 == "en"`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/media/test_tracks_multilingual.py -v`
 Run: `uv run pytest tests/test_select_track.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/translaterany/media/tracks.py src/translaterany/stages/select_track.py src/translaterany/stages/extract.py tests/media/test_tracks_multilingual.py
