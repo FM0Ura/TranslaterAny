@@ -57,4 +57,8 @@ def get_profile(lang: LanguageInfo) -> LanguageProfile:
     if iso in _PROFILE_REGISTRY:
         factory = _PROFILE_REGISTRY[iso]
         return factory(lang)
+    if iso == "pt":
+        from translaterany.languages.profiles.portuguese import PortugueseProfile
+
+        return PortugueseProfile(lang)
     return GenericProfile(lang)
