@@ -236,20 +236,9 @@ def check_tesseract_installed(source_lang: str | None = None) -> CheckResult:
         return CheckResult("fail", f"erro ao executar tesseract: {exc}")
 
     if source_lang:
-        lang_code = source_lang.lower().split("-")[0]
-        lang_3_map = {
-            "en": "eng",
-            "ja": "jpn",
-            "pt": "por",
-            "es": "spa",
-            "fr": "fra",
-            "de": "deu",
-            "it": "ita",
-            "zh": "chi_sim",
-            "ko": "kor",
-            "ru": "rus",
-        }
-        tess_lang = lang_3_map.get(lang_code, lang_code)
+        from translaterany.media.ocr.engine import get_tesseract_lang
+
+        tess_lang = get_tesseract_lang(source_lang)
         try:
             proc_langs = subprocess.run([binary, "--list-langs"], capture_output=True, text=True, timeout=5.0)
             available = [

@@ -25,7 +25,10 @@ def test_pipeline_runs_pgs_end_to_end(tmp_path: Path) -> None:
     fake_llm = FakeLLM(responses={"Hello world": "Olá mundo"})
     store = ArtifactStore(tmp_path / "data")
 
-    with patch("translaterany.media.ocr.engine._call_tesseract_hocr", return_value="<span>Hello world</span>"):
+    with (
+        patch("translaterany.media.ocr.engine._call_tesseract_hocr", return_value="<span>Hello world</span>"),
+        patch("shutil.which", return_value="/usr/bin/tesseract"),
+    ):
         runner = PipelineRunner(config=cfg, client=fake_llm, store=store)
         res = runner.run_series(tmp_path)
         assert res.status == "success"
@@ -67,9 +70,12 @@ Dialogue: 0,0:00:01.00,0:00:03.00,Sign,,0,0,0,,Signs only
     fake_llm = FakeLLM(responses={"Full dialogue line": "Linha completa de diálogo"})
     store = ArtifactStore(tmp_path / "data")
 
-    with patch(
-        "translaterany.media.ocr.engine._call_tesseract_hocr",
-        return_value="<span>Full dialogue line</span>",
+    with (
+        patch(
+            "translaterany.media.ocr.engine._call_tesseract_hocr",
+            return_value="<span>Full dialogue line</span>",
+        ),
+        patch("shutil.which", return_value="/usr/bin/tesseract"),
     ):
         runner = PipelineRunner(config=cfg, client=fake_llm, store=store)
         res = runner.run_series(tmp_path)

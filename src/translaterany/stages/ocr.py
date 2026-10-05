@@ -57,12 +57,21 @@ class OCRStage(Stage):
             ctx.output.json(art)
             return
 
+        import shutil
+
+        if shutil.which("tesseract") is None:
+            raise RuntimeError(
+                "tesseract não encontrado no PATH: necessário para OCR de legendas gráficas. "
+                "Instale via 'brew install tesseract tesseract-lang' ou pelo gerenciador de pacotes do sistema."
+            )
+
         from translaterany.languages.registry import LanguageRegistry
+        from translaterany.media.ocr.engine import get_tesseract_lang
         from translaterany.media.ocr.pgs import parse_pgs
         from translaterany.media.ocr.vobsub import parse_vobsub
 
         source_lang_info = getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en")
-        tess_lang = getattr(source_lang_info, "iso639_2", "eng") or "eng"
+        tess_lang = get_tesseract_lang(source_lang_info)
 
         if ext == ".sup":
             displays = parse_pgs(extract_path)

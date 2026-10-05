@@ -14,6 +14,46 @@ from PIL import Image, ImageOps
 
 from translaterany.media.ocr.models import SubtitleDisplaySet
 
+TESSERACT_LANG_MAP: dict[str, str] = {
+    "en": "eng",
+    "eng": "eng",
+    "ja": "jpn",
+    "jpn": "jpn",
+    "pt": "por",
+    "por": "por",
+    "es": "spa",
+    "spa": "spa",
+    "fr": "fra",
+    "fra": "fra",
+    "de": "deu",
+    "deu": "deu",
+    "it": "ita",
+    "ita": "ita",
+    "zh": "chi_sim",
+    "chi": "chi_sim",
+    "zho": "chi_sim",
+    "ko": "kor",
+    "kor": "kor",
+    "ru": "rus",
+    "rus": "rus",
+}
+
+
+def get_tesseract_lang(lang: object) -> str:
+    """Mapeia um código ou objeto de idioma para o código esperado pelo Tesseract."""
+    if hasattr(lang, "iso639_2") and lang.iso639_2:
+        code = str(lang.iso639_2).lower()
+        if code in TESSERACT_LANG_MAP:
+            return TESSERACT_LANG_MAP[code]
+    if hasattr(lang, "code") and lang.code:
+        code = str(lang.code).lower().split("-")[0]
+        if code in TESSERACT_LANG_MAP:
+            return TESSERACT_LANG_MAP[code]
+    if isinstance(lang, str):
+        code = lang.lower().split("-")[0]
+        return TESSERACT_LANG_MAP.get(code, code)
+    return "eng"
+
 
 @dataclass(frozen=True)
 class OCRResultLine:
@@ -102,6 +142,11 @@ def _call_tesseract_hocr(image: Image.Image, lang: str) -> str:
         cmd = ["tesseract", tmp_name, "stdout", "--psm", "6", "--oem", "1", "-l", lang, "hocr"]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15.0)
         return proc.stdout
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "tesseract não encontrado no PATH: instale via 'brew install tesseract tesseract-lang' "
+            "ou pelo gerenciador de pacotes do sistema."
+        ) from exc
     except Exception:
         return ""
     finally:

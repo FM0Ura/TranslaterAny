@@ -56,3 +56,38 @@ def test_ocr_stage_infers_position_styles(tmp_path: Path) -> None:
     )
     ev_bottom = _build_ass_event(bottom_line)
     assert ev_bottom.style == "Default"
+
+
+def test_ocr_stage_raises_clear_error_when_tesseract_missing(tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    import pytest
+
+    sup_file = tmp_path / "track.sup"
+    sup_file.write_bytes(b"dummy sup")
+
+    stage = OCRStage()
+    mock_inputs = SimpleNamespace(path=lambda name: sup_file)
+    mock_output = MagicMock()
+    mock_output._directory = tmp_path
+    ctx = SimpleNamespace(
+        inputs=mock_inputs,
+        output=mock_output,
+        episode=SimpleNamespace(source=Path("video.mkv")),
+        log=MagicMock(),
+    )
+
+    with patch("shutil.which", return_value=None):
+        with pytest.raises(RuntimeError, match="tesseract não encontrado"):
+            stage.run(ctx)
+
+
+def test_tesseract_lang_mapping() -> None:
+    from translaterany.languages.registry import LanguageRegistry
+    from translaterany.media.ocr.engine import get_tesseract_lang
+
+    assert get_tesseract_lang("zh") == "chi_sim"
+    assert get_tesseract_lang("ja") == "jpn"
+    assert get_tesseract_lang("en") == "eng"
+    assert get_tesseract_lang("pt-BR") == "por"
+    assert get_tesseract_lang(LanguageRegistry.resolve("zh")) == "chi_sim"
