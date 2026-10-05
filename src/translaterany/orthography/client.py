@@ -76,6 +76,16 @@ class LanguageToolClient:
             ):
                 continue
 
+            # Salvaguarda: Não substituir palavras capitalizadas (nomes próprios) por sugestões de TYPOS
+            # quando não estão no início de uma frase/fala.
+            is_title = bool(original and original[0].isupper())
+            is_sentence_start = offset == 0 or (
+                offset > 0
+                and text[:offset].rstrip().endswith((".", "!", "?", "…", "—", '"', "“", "”", "¿", "¡", "-", ":"))
+            )
+            if cat == "TYPOS" and is_title and not is_sentence_start:
+                continue
+
             replacements = match.get("replacements", [])
             if not replacements:
                 continue

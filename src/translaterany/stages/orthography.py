@@ -165,7 +165,19 @@ class OrthographyStage(Stage):
             search_block,
         )
         exemptions: set[str] = set(HONORIFICS)
-        for term in glossary:
+        store = getattr(ctx, "store", None)
+        if store:
+            from translaterany.memory.matching import load_all_characters
+            from translaterany.memory.store import MemoryStore
+
+            mem_dir = store.series_dir(ctx.series.key) / "memory"
+            all_chars = load_all_characters(store, ctx.series.key)
+            all_terms = list(MemoryStore(mem_dir).load_glossary().values()) if mem_dir.exists() else []
+        else:
+            all_chars = characters
+            all_terms = glossary
+
+        for term in (*glossary, *all_terms):
             for val in (term.term, term.translation, *term.aliases):
                 if val:
                     exemptions.add(val)
@@ -173,7 +185,7 @@ class OrthographyStage(Stage):
                         cleaned = word.strip("-,.?!:; ")
                         if cleaned:
                             exemptions.add(cleaned)
-        for char in characters:
+        for char in (*characters, *all_chars):
             for val in (char.name, *char.aliases):
                 if val:
                     exemptions.add(val)

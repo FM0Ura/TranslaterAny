@@ -331,3 +331,33 @@ def test_pydantic_ai_client_cloud_provider_missing_api_key_raises_config_error(m
 
     with pytest.raises(LLMConfigError, match="Chave de API não configurada para o provedor 'openai'"):
         client._resolve_model("gpt-4o")
+
+
+def test_pydantic_ai_client_disables_thinking_for_cloud_models_when_think_false(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    config = LLMConfig()
+    config.models["gemini-3.5-flash"] = ModelConfig(
+        provider="gemini",
+        model="gemini-3.5-flash",
+        num_ctx=16384,
+        think=False,
+    )
+    client = PydanticAIClient(config)
+    model_name, base_url, api_key, extra_args = client._resolve_model("gemini-3.5-flash")
+    assert extra_args.get("extra_body", {}).get("reasoning_effort") == "none"
+    assert "num_ctx" not in extra_args.get("extra_body", {})
+
+
+def test_pydantic_ai_client_keeps_thinking_when_think_true(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    config = LLMConfig()
+    config.models["gemini-3.5-flash"] = ModelConfig(
+        provider="gemini",
+        model="gemini-3.5-flash",
+        num_ctx=16384,
+        think=True,
+    )
+    client = PydanticAIClient(config)
+    model_name, base_url, api_key, extra_args = client._resolve_model("gemini-3.5-flash")
+    assert "reasoning_effort" not in extra_args.get("extra_body", {})
+

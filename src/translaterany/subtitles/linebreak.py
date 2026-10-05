@@ -32,6 +32,8 @@ def wrap_line(text: str, max_cpl: int) -> str:
         score = abs(top - bottom) + (0 if top <= bottom else 3) + (100 if max(top, bottom) > max_cpl else 0)
         if flat[:i].rstrip().endswith(_PUNCT_END):
             score -= 4
+        if flat[:i].count("(") > flat[:i].count(")"):
+            score += 20
         if best is None or score < best[0]:
             best = (score, i)
     if best is None:

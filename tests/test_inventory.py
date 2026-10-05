@@ -37,6 +37,7 @@ def test_builtin_stages_registered_and_default_pipeline() -> None:
         "metadata",
         "select_track",
         "extract",
+        "ocr",
         "normalize",
         "classify",
         "extract_terms",

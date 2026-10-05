@@ -20,10 +20,12 @@ logger = logging.getLogger(__name__)
 SIGNS_SYSTEM_INSTRUCTIONS = """Você é um tradutor especialista de legendas de animes (Inglês para Português do Brasil).
 Sua missão é traduzir placas, textos em tela, avisos e títulos de forma concisa, direta e natural.
 - Seja extremamente conciso, pois o texto deve caber no elemento visual da tela.
+- Atenção a placas ou letreiros divididos em múltiplos fragmentos/palavras contínuas (ex.: 'The' / 'World\\'s in Dang' / 'er!!'). Quando uma linha for apenas parte de uma frase ou título composto, traduza APENAS a parte correspondente de forma concisa e proporcional, sem traduzir a frase inteira em uma só linha ou sobrepor partes vizinhas.
 - Preserve exatamente marcadores de tags ou quebras como ⟦n⟧ sem alterá-los ou removê-los.
 - Mantenha termos canônicos e convenções da língua portuguesa (ex: Conselho Estudantil, Sala dos Professores, etc.).
 Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as placas/textos
-identificados por seus IDs."""
+identificados por seus IDs.
+NÃO traduza as falas marcadas como contexto."""
 
 
 def render_signs_system_instructions(source: LanguageInfo, target: LanguageInfo) -> str:
@@ -36,10 +38,13 @@ def render_signs_system_instructions(source: LanguageInfo, target: LanguageInfo)
         f"Você é um tradutor especialista de legendas de animes ({source_title} para {target_title}).\n"
         "Sua missão é traduzir placas, textos em tela, avisos e títulos de forma concisa, direta e natural.\n"
         "- Seja extremamente conciso, pois o texto deve caber no elemento visual da tela.\n"
+        "- Atenção a placas ou letreiros divididos em múltiplos fragmentos/palavras contínuas (ex.: 'The' / 'World\\'s in Dang' / 'er!!'). "
+        "Quando uma linha for apenas parte de uma frase ou título composto, traduza APENAS a parte correspondente de forma concisa e proporcional, sem traduzir a frase inteira em uma só linha ou sobrepor partes vizinhas.\n"
         "- Preserve exatamente marcadores de tags ou quebras como ⟦n⟧ sem alterá-los ou removê-los.\n"
         f"- Mantenha termos canônicos e {target_conv} (ex: Conselho Estudantil, Sala dos Professores, etc.).\n"
         "Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as placas/textos\n"
-        "identificados por seus IDs."
+        "identificados por seus IDs.\n"
+        "NÃO traduza as falas marcadas como contexto."
     )
 
 
@@ -82,7 +87,7 @@ def translate_signs(
         fallback_model=fallback_model,
         max_tokens_per_batch=max_tokens_per_batch,
         max_lines_per_batch=max_lines_per_batch,
-        max_context_lines=0,
+        max_context_lines=2,
         metrics=metrics,
         system_instructions=system_instructions or SIGNS_SYSTEM_INSTRUCTIONS,
     )

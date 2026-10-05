@@ -87,8 +87,9 @@ def test_only_sdh() -> None:
 
 
 def test_only_image_subtitles() -> None:
-    with pytest.raises(NoTrack, match="imagem"):
-        _select(_track(2, "English", codec="S_HDMV/PGS"))
+    sel = _select(_track(2, "English", codec="S_HDMV/PGS"))
+    assert sel.chosen.id == 2
+    assert sel.chosen.codec_id == "S_HDMV/PGS"
 
 
 def test_no_english() -> None:

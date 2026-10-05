@@ -13,6 +13,7 @@ from translaterany.util.doctor import (
     check_nvidia_gpu,
     check_ollama_models,
     check_ollama_status,
+    check_tesseract_installed,
     has_failure,
     run_checks,
 )
@@ -89,6 +90,7 @@ def doctor(ctx: typer.Context) -> None:
         ("config", CheckResult("ok", f"configuração válida ({where})")),
         *run_checks(all_checks(cfg)),
         ("languagetool", check_languagetool_service(target_lang=cfg.target_language)),
+        ("tesseract", check_tesseract_installed(source_lang=cfg.source_language)),
         *llm_doctor_checks(cfg),
     ]
     seen_names: set[str] = set()

@@ -47,6 +47,8 @@ def _find_split_points(text: str, durations: list[int]) -> list[int]:
                     penalty = 1.0
                 else:
                     penalty = 2.5
+                if prefix.count("(") > prefix.count(")"):
+                    penalty *= 5.0
                 return dist * penalty
 
             best_s = min(valid_spaces, key=score)

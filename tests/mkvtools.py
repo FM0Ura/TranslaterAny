@@ -40,7 +40,7 @@ SRT = "1\n00:00:01,000 --> 00:00:02,000\nHello there, how are you?\n\n2\n00:00:0
 
 @dataclass
 class Sub:
-    content: str
+    content: str | bytes
     name: str
     lang: str = "en"
     ext: str = ".ass"
@@ -56,7 +56,10 @@ def make_mkv(path: Path, subs: list[Sub], fonts: int = 1, age: float = 3600) -> 
     cmd = ["mkvmerge", "-q", "-o", str(path)]
     for i, sub in enumerate(subs):
         file = work / f"{i}{sub.ext}"
-        file.write_text(sub.content, encoding="utf-8")
+        if isinstance(sub.content, bytes):
+            file.write_bytes(sub.content)
+        else:
+            file.write_text(sub.content, encoding="utf-8")
         cmd += [
             "--language", f"0:{sub.lang}",
             "--track-name", f"0:{sub.name}",

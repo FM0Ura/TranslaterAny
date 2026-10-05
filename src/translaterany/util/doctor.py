@@ -214,3 +214,46 @@ def nvidia_gpu_check() -> Check:
         return CheckResult("ok" if ok else "warn", msg)
 
     return FunctionCheck("gpu", run)
+
+
+def check_tesseract_installed(source_lang: str | None = None) -> CheckResult:
+    """Verifica se o binário tesseract está instalado e se possui o pacote de idioma necessário."""
+    import shutil
+    import subprocess
+
+    binary = shutil.which("tesseract")
+    if not binary:
+        return CheckResult(
+            "warn",
+            "tesseract não encontrado no PATH (necessário para legendas PGS/VobSub; "
+            "instale via 'brew install tesseract' ou gerenciador do sistema)",
+        )
+
+    try:
+        proc_ver = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=5.0)
+        ver_line = proc_ver.stdout.splitlines()[0] if proc_ver.stdout else "tesseract"
+    except Exception as exc:
+        return CheckResult("fail", f"erro ao executar tesseract: {exc}")
+
+    if source_lang:
+        from translaterany.media.ocr.engine import get_tesseract_lang
+
+        tess_lang = get_tesseract_lang(source_lang)
+        try:
+            proc_langs = subprocess.run([binary, "--list-langs"], capture_output=True, text=True, timeout=5.0)
+            available = [
+                line.strip().lower()
+                for line in proc_langs.stdout.splitlines()
+                if line.strip() and not line.startswith("List of")
+            ]
+            if tess_lang not in available:
+                return CheckResult(
+                    "warn",
+                    f"{ver_line} instalado, mas o pacote de idioma '{tess_lang}' "
+                    "não foi encontrado em 'tesseract --list-langs' "
+                    "(instale 'tesseract-lang' ou o pacote correspondente)",
+                )
+        except Exception:
+            pass
+
+    return CheckResult("ok", f"{ver_line} instalado")
