@@ -124,11 +124,12 @@ def render_ass(doc: AssDocument, new_texts: Mapping[int, str], *, marker: bool =
     lines = list(doc.lines)
     for index, new_text in new_texts.items():
         event = doc.events[index]
-        if new_text == event.text:
+        clean_text = new_text.replace("\r\n", r"\N").replace("\n", r"\N").replace("\r", r"\N")
+        if clean_text == event.text:
             continue
         original = lines[event.line_no]
         terminator = original[len(original.rstrip("\r\n")) :]
-        lines[event.line_no] = original[: event.text_offset] + new_text + terminator
+        lines[event.line_no] = original[: event.text_offset] + clean_text + terminator
     if marker and not any(line.strip() == MARKER for line in lines):
         at = next((i + 1 for i, line in enumerate(lines) if line.strip().lower() == "[script info]"), 0)
         lines.insert(at, MARKER + doc.newline)

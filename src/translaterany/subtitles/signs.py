@@ -111,6 +111,6 @@ def translate_signs(
             tr = u.text
             if metrics:
                 metrics.count("markers_lost")
-        texts[u.id] = tr
+        texts[u.id] = tr.replace("\r\n", r"\N").replace("\n", r"\N").replace("\r", r"\N")
 
     return UnitTexts(texts=texts)

@@ -81,8 +81,9 @@ class WriteStage(Stage):
                 continue
             text = texts[ev.unit]
             expected = list(range(1, markers_by_unit[ev.unit] + 1))
+            text = re.sub(r"⟦\s*[nN]\s*⟧", "", text)
             if not expected and ("⟦" in text or "⟧" in text):
-                text = text.replace("⟦", "").replace("⟧", "")
+                text = text.replace("⟦", "").replace("⟧", "").strip()
             has_malformed = "⟦" in re.sub(r"⟦\d+⟧", "", text) or "⟧" in re.sub(r"⟦\d+⟧", "", text)
             if sorted(marker_ids(text)) != expected or has_malformed:
                 logger.warning(
@@ -92,6 +93,7 @@ class WriteStage(Stage):
                     marker_ids(text),
                 )
                 text = ev.text
+            text = text.replace("\r\n", r"\N").replace("\n", r"\N").replace("\r", r"\N")
             new_texts[ev.index] = ev.prefix + fill(text, ev.markers) + ev.suffix
         translates = source in REGISTRY and REGISTRY.get(source).translates
         changed = any(doc.events[i].text != text for i, text in new_texts.items())

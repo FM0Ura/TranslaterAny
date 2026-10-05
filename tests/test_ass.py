@@ -93,3 +93,10 @@ def test_legacy_ssa_format_with_marked() -> None:
     doc = parse_ass(data)
     assert doc.events[0].text == "Old, style" and doc.events[0].start_ms == 1000
     assert render_ass(doc, {}) == data
+
+
+def test_render_converts_literal_newlines_to_backslash_n() -> None:
+    doc = parse_ass(SAMPLE)
+    out = render_ass(doc, {1: "Linha 1\nLinha 2\r\nLinha 3"}).decode()
+    assert "Dialogue: 0,0:00:01.50,0:00:03.00,Default,Ana,0,0,0,,Linha 1\\NLinha 2\\NLinha 3\n" in out
+

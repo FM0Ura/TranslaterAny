@@ -102,3 +102,39 @@ def test_write_resilient_to_spurious_brackets(data_dir: Path, synthetic_series: 
     assert "Texto com Spurious colchetes" in content
     assert "⟦" not in content and "⟧" not in content
 
+
+def test_write_resilient_to_placeholder_n_marker(data_dir: Path, synthetic_series: Path) -> None:
+    from translaterany.pipeline.registry import register_stage
+    from translaterany.pipeline.stage import StageContext, StageScope
+    from translaterany.subtitles.texts import UnitTexts
+
+    @register_stage
+    class PlaceholderTranslateStage(Stage):
+        name = "t_placeholder"
+        version = "1"
+        scope = StageScope.EPISODE
+        translates = True
+        produces_texts = True
+
+        def run(self, ctx: StageContext) -> None:
+            texts = {"u1": "Texto normal... ⟦n⟧", "u2": "Outro texto ⟦N⟧ aqui", "u3": "Placa normal"}
+            ctx.output.json(UnitTexts(texts=texts))
+
+    stages: list[Stage] = [
+        SelectTrackStage(),
+        ExtractStage(),
+        NormalizeStage(),
+        ClassifyStage(),
+        PlaceholderTranslateStage(),
+        WriteStage(WriteOptions(text_source="t_placeholder")),
+        PublishStage(),
+    ]
+    summary, store, s, eps = run_stages(data_dir, synthetic_series, stages)
+    assert not summary.failed
+    published = synthetic_series / "Season 1" / "S01E01 - A.pt-BR.ass"
+    content = published.read_text(encoding="utf-8")
+    assert "Texto normal..." in content
+    assert "Outro texto  aqui" in content or "Outro texto aqui" in content
+    assert "⟦n⟧" not in content and "⟦N⟧" not in content
+
+

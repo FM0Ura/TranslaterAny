@@ -114,9 +114,12 @@ class RedistributeSentencesStage(Stage):
                         exp_cnt = markers_by_unit.get(uid, 0)
                         exp_list = list(range(1, exp_cnt + 1))
                         u_text = split.get(uid, "")
+                        u_text = re.sub(r"⟦\s*[nN]\s*⟧", "", u_text)
                         if exp_cnt == 0:
                             if "⟦" in u_text or "⟧" in u_text:
                                 split[uid] = u_text.replace("⟦", "").replace("⟧", "").strip()
+                            else:
+                                split[uid] = u_text.strip()
                         else:
                             curr_markers = marker_ids(u_text)
                             if sorted(curr_markers) != exp_list:
@@ -132,18 +135,21 @@ class RedistributeSentencesStage(Stage):
 
         for uid, txt in dialogue_texts.items():
             if uid not in final_texts and "+" not in uid:
+                txt = re.sub(r"⟦\s*[nN]\s*⟧", "", txt)
                 if markers_by_unit.get(uid, 0) == 0 and ("⟦" in txt or "⟧" in txt):
                     txt = txt.replace("⟦", "").replace("⟧", "").strip()
                 final_texts[uid] = txt
 
         # 2. Placas
         for uid, txt in signs_texts.items():
+            txt = re.sub(r"⟦\s*[nN]\s*⟧", "", txt)
             if markers_by_unit.get(uid, 0) == 0 and ("⟦" in txt or "⟧" in txt):
                 txt = txt.replace("⟦", "").replace("⟧", "").strip()
             final_texts[uid] = txt
 
         # 3. Músicas
         for uid, txt in songs_texts.items():
+            txt = re.sub(r"⟦\s*[nN]\s*⟧", "", txt)
             if markers_by_unit.get(uid, 0) == 0 and ("⟦" in txt or "⟧" in txt):
                 txt = txt.replace("⟦", "").replace("⟧", "").strip()
             final_texts[uid] = txt
