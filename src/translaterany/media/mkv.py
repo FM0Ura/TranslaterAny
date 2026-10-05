@@ -84,11 +84,17 @@ def probe(path: Path) -> MkvInfo:
     return parse_identify(data)
 
 
-def extract_track(path: Path, track_id: int, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    result = _run(["mkvextract", str(path), "tracks", f"{track_id}:{dest}"], check=False)
-    if result.returncode > 1 or not dest.exists():
-        raise MediaError(f"falha ao extrair a faixa {track_id} de {path.name}: {_first_line(result)}")
+def extract_track(
+    path: Path,
+    track_id: int,
+    dest: Path | None = None,
+    *,
+    codec_id: str | None = None,
+    out_dir: Path | None = None,
+) -> Path:
+    from translaterany.media.extract import extract_track as _ext
+
+    return _ext(path, track_id, dest, codec_id=codec_id, out_dir=out_dir)
 
 
 _FONT_MIMES = frozenset(
