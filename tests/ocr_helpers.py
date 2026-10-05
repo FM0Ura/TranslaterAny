@@ -79,3 +79,100 @@ def make_synthetic_sup(
 
     dest.write_bytes(b"".join(chunks))
     return dest
+
+
+def make_synthetic_vobsub(
+    sub_path: Path,
+    idx_path: Path,
+    start_ms: int = 1000,
+    end_ms: int = 3000,
+    width: int = 100,
+    height: int = 30,
+    video_w: int = 720,
+    video_h: int = 480,
+    x: int = 50,
+    y: int = 400,
+) -> None:
+    """Gera arquivos .idx e .sub sintéticos válidos contendo uma legenda DVD."""
+    sub_path.parent.mkdir(parents=True, exist_ok=True)
+    idx_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Gerar .idx
+    start_s = start_ms // 1000
+    start_rem = start_ms % 1000
+    h_val = start_s // 3600
+    m_val = (start_s % 3600) // 60
+    s_val = start_s % 60
+    ts_str = f"{h_val:02d}:{m_val:02d}:{s_val:02d}:{start_rem:03d}"
+
+    idx_content = (
+        f"# VobSub index file\n"
+        f"size: {video_w}x{video_h}\n"
+        f"palette: 000000, 111111, 222222, ffffff, 000000, 000000, 000000, 000000, "
+        f"000000, 000000, 000000, 000000, 000000, 000000, 000000, 000000\n"
+        f"timestamp: {ts_str}, filepos: 000000000\n"
+    )
+    idx_path.write_text(idx_content, encoding="utf-8")
+
+    # 2. Gerar .sub com SPU
+    # Coordinates: x1 = x, x2 = x + width - 1, y1 = y, y2 = y + height - 1
+    x1, x2 = x, x + width - 1
+    y1, y2 = y, y + height - 1
+
+    # RLE dummy: para cada linha, 2 bytes 0x0000 (end of line code)
+    # Total de linhas no top field = (height + 1) // 2, bottom field = height // 2
+    top_lines = (height + 1) // 2
+    bot_lines = height // 2
+    top_rle = b"\x00\x00" * top_lines
+    bot_rle = b"\x00\x00" * bot_lines
+    pixel_data = top_rle + bot_rle
+
+    top_offset = 4
+    bot_offset = 4 + len(top_rle)
+    dcsq_offset = 4 + len(pixel_data)
+
+    # DCSQ 1: Start display at t=0
+    delay_units = max(1, end_ms - start_ms)
+
+    # DCSQ 1 commands
+    # 0x01 (start)
+    # 0x03 (colors: 0x3210 -> c3=3, c2=2, c1=1, c0=0)
+    # 0x04 (contrast: 0xFFF0 -> a3=15, a2=15, a1=15, a0=0)
+    # 0x05 (coords: 6 bytes)
+    # 0x06 (top/bot offsets: 4 bytes)
+    # 0xFF
+    coord_bytes = bytes(
+        [
+            (x1 >> 4) & 0xFF,
+            ((x1 & 0x0F) << 4) | ((x2 >> 8) & 0x0F),
+            x2 & 0xFF,
+            (y1 >> 4) & 0xFF,
+            ((y1 & 0x0F) << 4) | ((y2 >> 8) & 0x0F),
+            y2 & 0xFF,
+        ]
+    )
+
+    dcsq1_cmds = (
+        b"\x01"
+        + b"\x03\x32\x10"
+        + b"\x04\xff\xf0"
+        + b"\x05"
+        + coord_bytes
+        + struct.pack(">BHH", 0x06, top_offset, bot_offset)
+        + b"\xff"
+    )
+
+    # Next seq offset:
+    dcsq2_offset = dcsq_offset + 4 + len(dcsq1_cmds)
+    dcsq1_header = struct.pack(">HH", 0, dcsq2_offset)
+    dcsq1 = dcsq1_header + dcsq1_cmds
+
+    # DCSQ 2: Stop display at delay_units
+    dcsq2_cmds = b"\x02\xff"
+    dcsq2_header = struct.pack(">HH", delay_units, dcsq2_offset)  # points to self
+    dcsq2 = dcsq2_header + dcsq2_cmds
+
+    spu_payload = pixel_data + dcsq1 + dcsq2
+    spu_size = 4 + len(spu_payload)
+    spu_header = struct.pack(">HH", spu_size, dcsq_offset)
+    sub_path.write_bytes(spu_header + spu_payload)
