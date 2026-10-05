@@ -31,6 +31,84 @@ class SceneAnalysisDoc(BaseModel):
     lines: dict[str, LineContext] = Field(default_factory=dict)
 
 
+_ROLE_PRIORITY: dict[str, int] = {
+    "main": 3,
+    "supporting": 2,
+    "guest": 1,
+    "unknown": 0,
+}
+
+_VOCATIVE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^(?:(?:Hey|Listen|Look|Wait|Oh),?\s+)?([A-Za-z]+)[,!]\s+", re.IGNORECASE),
+    re.compile(r"[,\-—]\s*([A-Za-z]+)[\.!?]+$", re.IGNORECASE),
+    re.compile(r"^([A-Za-z]+)[!?]+$", re.IGNORECASE),
+)
+
+
+def _build_known_names(characters: list[CharacterEntry]) -> dict[str, str]:
+    """Mapeia tokens de nomes e apelidos (minúsculos) para o nome canônico do personagem.
+    Personagens principais (MAIN) têm precedência sobre coadjuvantes na resolução de nomes compartilhados.
+    """
+    sorted_chars = sorted(
+        characters,
+        key=lambda c: _ROLE_PRIORITY.get(str(c.role).lower(), 0),
+        reverse=True,
+    )
+    known: dict[str, str] = {}
+    for c in sorted_chars:
+        candidates = [c.name] + c.name.split() + list(c.aliases)
+        for a in c.aliases:
+            candidates.extend(a.split())
+        for token in candidates:
+            cleaned = token.lower().strip()
+            if len(cleaned) >= 3 and cleaned not in known:
+                known[cleaned] = c.name
+    return known
+
+
+def _extract_vocative(text: str, known_names: dict[str, str]) -> str | None:
+    """Detecta se uma frase interpela diretamente um personagem conhecido pelo nome/vocativo."""
+    if not known_names or not text:
+        return None
+    cleaned = text.strip()
+    for pattern in _VOCATIVE_PATTERNS:
+        match = pattern.search(cleaned)
+        if match:
+            token = match.group(1).lower()
+            if token in known_names:
+                return known_names[token]
+    return None
+
+
+def _apply_vocative_safeguard(
+    parsed: SceneAnalysisDoc,
+    group: list[CompositeUnit],
+    known_names: dict[str, str],
+) -> None:
+    """Garante que falas contendo vocativos não atribuam o personagem chamado como orador (speaker),
+    corrigindo inversões comuns entre orador e ouvinte.
+    """
+    if not known_names:
+        return
+
+    for unit in group:
+        ctx = parsed.lines.get(unit.composite_id)
+        if not ctx:
+            continue
+        addressed = _extract_vocative(unit.clean_text, known_names)
+        if not addressed:
+            continue
+
+        if ctx.speaker == addressed:
+            if ctx.listener != "Unknown" and ctx.listener != addressed:
+                ctx.speaker, ctx.listener = ctx.listener, ctx.speaker
+            else:
+                ctx.speaker = "Unknown"
+                ctx.listener = addressed
+        elif ctx.listener == "Unknown":
+            ctx.listener = addressed
+
+
 def analyze_scenes(
     merged_doc: MergedUnitsDoc,
     scenes: list[Scene],
@@ -63,9 +141,11 @@ def analyze_scenes(
             "gender": str(c.gender),
             "role": str(c.role),
             "speech_style": c.speech_style,
+            "aliases": c.aliases,
         }
         for c in characters
     ]
+    known_names = _build_known_names(characters)
     final_lines = dict(fallback_lines)
     by_id = {u.composite_id: u for u in merged_doc.units}
     members = {u.composite_id: list(u.unit_ids) for u in merged_doc.units}
@@ -73,7 +153,7 @@ def analyze_scenes(
     scene_of = scene_index_of(ids, members, unit_events or {}, scenes)
     for id_group in group_by_scene(ids, scene_of, max_lines_per_call):
         group = [by_id[i] for i in id_group]
-        parsed = _analyze_group(group, char_list, synopsis, client, model)
+        parsed = _analyze_group(group, char_list, synopsis, client, model, known_names)
         for k, v in parsed.lines.items():
             if k in final_lines and k in id_group:
                 final_lines[k] = v
@@ -81,14 +161,27 @@ def analyze_scenes(
 
 
 def _analyze_group(
-    group: list[CompositeUnit], char_list: list[dict[str, Any]], synopsis: str, client: Any, model: str
+    group: list[CompositeUnit],
+    char_list: list[dict[str, Any]],
+    synopsis: str,
+    client: Any,
+    model: str,
+    known_names: dict[str, str] | None = None,
 ) -> SceneAnalysisDoc:
-    lines_payload = [{"id": u.composite_id, "speaker": u.speaker, "text": u.clean_text} for u in group]
+    lines_payload = [
+        {
+            "id": u.composite_id,
+            "speaker": u.speaker,
+            "text": u.clean_text.replace(r"\N", " ").replace("\n", " ").strip(),
+        }
+        for u in group
+    ]
 
     prompt = (
         f"Synopsis: {synopsis}\n"
-        f"Known characters:\n{json.dumps(char_list, ensure_ascii=False)}\n\n"
-        "Analyze the following dialogue lines of one scene. For each line, determine:\n"
+        f"Known characters with genders and aliases:\n{json.dumps(char_list, ensure_ascii=False)}\n\n"
+        "Analyze the dialogue lines below. Maintain consistent speaker attribution across multi-line statements.\n"
+        "For each line, determine:\n"
         "- speaker: character name\n"
         "- listener: intended listener/interlocutor\n"
         "- confidence: 'high' (known main/supporting character), 'medium', or 'low' (unknown/crowd)\n"
@@ -99,10 +192,23 @@ def _analyze_group(
     )
 
     instructions = (
-        "You are an expert anime director and subtitle translator. "
-        "Analyze dialogue scenes and output valid JSON matching the requested schema."
+        "You are an expert anime director and subtitle dialogue analyst. "
+        "Analyze dialogue scenes and output valid JSON matching the requested schema.\n\n"
+        "CRITICAL GUIDELINES FOR DIALOGUE FLOW AND TURN-TAKING:\n"
+        "1. NO AUTOMATIC ALTERNATION: Subtitle events often split a single character's speech across multiple consecutive lines. "
+        "Do NOT assume speakers alternate every line (A -> B -> A -> B). A single character frequently speaks 2, 3, or more consecutive lines "
+        "(monologues, explanations, rants, multi-sentence thoughts).\n"
+        "2. SEMANTIC CONTINUITY: If line N+1 elaborates, explains, justifies, or continues the emotional thought of line N without an explicit response "
+        "from another character, it is spoken by the SAME character.\n"
+        "3. VOCATIVE RESOLUTION: When a character addresses someone by name or nickname (e.g. 'Takagi, why do you...', 'You wouldn't understand, Takashi', 'Relax, Taka'):\n"
+        "   - The named character is the LISTENER of that line, NEVER the speaker.\n"
+        "   - In a two-person conversation, the speaker is the other interlocutor.\n"
+        "   - The next line is often the response spoken by the named character.\n"
+        "4. MULTI-LINE MONOLOGUES: When a character is teasing, insulting, lecturing, or scolding another (e.g. developing a point across several sentences), "
+        "keep the speaker consistent across all those sentences until the interlocutor actually replies or interrupts."
     )
 
+    result = SceneAnalysisDoc()
     try:
         if hasattr(client, "generate"):
             from translaterany.llm.client import LLMRequest
@@ -114,15 +220,15 @@ def _analyze_group(
                 output_type=SceneAnalysisDoc,
                 tag="scene_analysis",
             )
-            return client.generate(req).output
-        if hasattr(client, "complete"):
+            result = client.generate(req).output
+        elif hasattr(client, "complete"):
             raw = client.complete(prompt)
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
+            result = SceneAnalysisDoc.model_validate(json.loads(m.group(0))) if m else SceneAnalysisDoc()
         elif callable(client):
             raw = client(prompt)
-        else:
-            return SceneAnalysisDoc()
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        return SceneAnalysisDoc.model_validate(json.loads(m.group(0))) if m else SceneAnalysisDoc()
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
+            result = SceneAnalysisDoc.model_validate(json.loads(m.group(0))) if m else SceneAnalysisDoc()
     except Exception as exc:
         first = group[0].composite_id if group else "?"
         logger.warning(
@@ -130,4 +236,9 @@ def _analyze_group(
             first,
             exc,
         )
-        return SceneAnalysisDoc()
+        result = SceneAnalysisDoc()
+
+    if known_names:
+        _apply_vocative_safeguard(result, group, known_names)
+
+    return result
