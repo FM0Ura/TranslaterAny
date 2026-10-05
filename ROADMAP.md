@@ -246,7 +246,7 @@ extrair → normalizar → classificar → memória de tradução → unir frase
 
 **Escopo:**
 
-1. **Inserção de OCR para Legendas em Imagem (PGS / VobSub) — Marco M10 (Próximo)**
+1. **Inserção de OCR para Legendas em Imagem (PGS / VobSub) — Marco M10 (✅ Concluído)**
    - **Extração gráfica:** Suporte à extração de faixas PGS (`.sup`) e VobSub (`.sub`/`.idx`) via `mkvextract`.
    - **Motor de OCR local:** Integração com motor de OCR leve e determinístico (ex.: Tesseract OCR / `pytesseract` ou PaddleOCR) com suporte a múltiplos idiomas e execução local paralela.
    - **Normalização e alinhamento:** Conversão dos bitmaps e timestamps para texto estruturado (`NormalizedDoc`), preservando tempos exatos de início e fim.
@@ -271,8 +271,8 @@ extrair → normalizar → classificar → memória de tradução → unir frase
 
 **Pronto quando:**
 1. Configurar `source_language = "ja"` ou `target_language = "es"` traduz corretamente os episódios no par linguístico solicitado sem intervenção manual (✅ Concluído no M9);
-2. Um MKV contendo apenas faixa PGS/VobSub é processado pelo OCR e gera legendas traduzidas de qualidade comparável a faixas de texto (Marco M10);
-3. Testes sintéticos e de integração cobrem a extração OCR e a tradução com diferentes pares de idiomas (M9 coberto com 26 novos testes).
+2. Um MKV contendo apenas faixa PGS/VobSub é processado pelo OCR e gera legendas traduzidas de qualidade comparável a faixas de texto (✅ Concluído no M10);
+3. Testes sintéticos e de integração cobrem a extração OCR e a tradução com diferentes pares de idiomas (✅ M9 e M10 concluídos — 713 testes no total).
 
 ---
 

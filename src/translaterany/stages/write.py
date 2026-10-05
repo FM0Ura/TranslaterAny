@@ -3,6 +3,7 @@
 import logging
 import re
 from collections.abc import Sequence
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
@@ -36,22 +37,41 @@ class WriteStage(Stage):
     scope = StageScope.EPISODE
     Options = WriteOptions
 
+    source_stage: str = "extract"
+
     def __init__(self, options: BaseModel | None = None) -> None:
         super().__init__(options)
+        self.source_stage = "extract"
+        self._update_inputs()
+
+    def _update_inputs(self) -> None:
         source = self.options.text_source
-        self.inputs = ("extract", ORIGINAL) if source == ORIGINAL else ("extract", ORIGINAL, source)
+        base = self.source_stage
+        self.inputs = (base, ORIGINAL) if source == ORIGINAL else (base, ORIGINAL, source)
 
     def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
+        stages_by_name = {s.name: s for s in previous}
+        if "ocr" in stages_by_name:
+            self.source_stage = "ocr"
+        else:
+            self.source_stage = "extract"
+
         if "text_source" not in self.options.model_fields_set:
             texts = [s.name for s in previous if s.produces_texts]
             if texts:
                 self.options.text_source = texts[-1]
-                source = self.options.text_source
-                self.inputs = ("extract", ORIGINAL) if source == ORIGINAL else ("extract", ORIGINAL, source)
+
+        self._update_inputs()
 
     def run(self, ctx: StageContext) -> None:
         source = self.options.text_source
-        doc = parse_ass(ctx.inputs.path("extract").read_bytes())
+        if self.source_stage == "ocr":
+            from translaterany.stages.ocr import OCRArtifact
+
+            art = ctx.inputs.json("ocr", OCRArtifact)
+            doc = parse_ass(Path(art.path).read_bytes())
+        else:
+            doc = parse_ass(ctx.inputs.path("extract").read_bytes())
         normalized = ctx.inputs.json(ORIGINAL, NormalizedDoc)
         texts = {} if source == ORIGINAL else ctx.inputs.json(source, UnitTexts).texts
         markers_by_unit = {u.id: u.markers for u in normalized.units}
@@ -76,4 +96,3 @@ class WriteStage(Stage):
         translates = source in REGISTRY and REGISTRY.get(source).translates
         changed = any(doc.events[i].text != text for i, text in new_texts.items())
         ctx.output.file(".ass", render_ass(doc, new_texts, marker=translates and changed))
-
