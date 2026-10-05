@@ -89,41 +89,43 @@ def select_track(
     for track in subs:
         if is_own(track):
             infos.append(CandidateInfo(track.id, track.name, "own", "faixa da própria app"))
-        elif track.codec_id in IMAGE_CODECS:
-            infos.append(CandidateInfo(track.id, track.name, "image", "legenda em imagem"))
-        elif track.codec_id not in TEXT_CODECS or not is_source_or_und(track, source_lang):
-            infos.append(
-                CandidateInfo(track.id, track.name, "other_language", f"não é legenda de texto em {source_display}")
-            )
+        elif track.codec_id not in (TEXT_CODECS | IMAGE_CODECS):
+            infos.append(CandidateInfo(track.id, track.name, "other_language", f"codec {track.codec_id} não suportado"))
+        elif not is_source_or_und(track, source_lang):
+            infos.append(CandidateInfo(track.id, track.name, "other_language", f"não é legenda em {source_display}"))
         elif is_sdh(track):
             infos.append(CandidateInfo(track.id, track.name, "sdh", "SDH/CC nunca é usada como base"))
         else:
             candidates.append(track)
 
     if not candidates:
-        source_text = [
-            t for t in subs if t.codec_id in TEXT_CODECS and is_source_or_und(t, source_lang) and not is_own(t)
+        source_subs = [
+            t
+            for t in subs
+            if t.codec_id in (TEXT_CODECS | IMAGE_CODECS) and is_source_or_und(t, source_lang) and not is_own(t)
         ]
-        if source_text and all(is_sdh(t) for t in source_text):
+        if source_subs and all(is_sdh(t) for t in source_subs):
             raise NoTrack(f"só há legenda SDH em {source_display}")
-        if any(t.codec_id in IMAGE_CODECS for t in subs):
-            raise NoTrack("legenda em imagem (OCR fora da v1)")
         raise NoTrack(f"sem legenda em {source_display}")
 
     warnings: list[str] = []
     chosen: Track | None = None
     reason = ""
+
+    def sort_key(t: Track) -> tuple[bool, bool, bool, int]:
+        return (is_signs(t), t.codec_id in IMAGE_CODECS, not t.default, t.id)
+
     if preferred:
         matches = sorted(
             (t for t in candidates if preferred.lower() in t.name.lower()),
-            key=lambda t: (is_signs(t), not t.default, t.id),
+            key=sort_key,
         )
         if matches:
             chosen, reason = matches[0], f"escolha manual (series.toml: '{preferred}')"
         else:
             warnings.append(f"series.toml pede faixa com '{preferred}', mas nenhuma candidata corresponde")
     if chosen is None:
-        ordered = sorted(candidates, key=lambda t: (is_signs(t), not t.default, t.id))
+        ordered = sorted(candidates, key=sort_key)
         chosen = ordered[0]
         full = [t for t in candidates if not is_signs(t)]
         if is_signs(chosen):
@@ -134,9 +136,18 @@ def select_track(
             reason = "faixa completa (não é de placas/músicas)"
     for track in candidates:
         if track is not chosen:
-            why = "preterida: placas/músicas" if is_signs(track) else "preterida no desempate"
-            infos.append(CandidateInfo(track.id, track.name, "signs_songs" if is_signs(track) else "full", why))
-    infos.append(CandidateInfo(chosen.id, chosen.name, "signs_songs" if is_signs(chosen) else "full", None))
+            if is_signs(track):
+                why = "preterida: placas/músicas"
+                kind = "signs_songs"
+            elif track.codec_id in IMAGE_CODECS and chosen.codec_id in TEXT_CODECS:
+                why = "preterida: preferência por legenda de texto sobre imagem"
+                kind = "image"
+            else:
+                why = "preterida no desempate"
+                kind = "image" if track.codec_id in IMAGE_CODECS else "full"
+            infos.append(CandidateInfo(track.id, track.name, kind, why))
+    chosen_kind = "signs_songs" if is_signs(chosen) else ("image" if chosen.codec_id in IMAGE_CODECS else "full")
+    infos.append(CandidateInfo(chosen.id, chosen.name, chosen_kind, None))
     infos.sort(key=lambda c: c.id)
     return Selection(
         chosen=chosen,

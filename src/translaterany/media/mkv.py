@@ -20,13 +20,13 @@ class MediaError(Exception):
 @dataclass(frozen=True)
 class Track:
     id: int
-    type: str  # video | audio | subtitles
     codec_id: str
     language: str  # IETF quando disponível (ex.: "en", "pt-BR"), senão ISO 639-2
-    name: str
-    default: bool
-    forced: bool
-    hearing_impaired: bool
+    type: str = "subtitles"  # video | audio | subtitles
+    name: str = ""
+    default: bool = False
+    forced: bool = False
+    hearing_impaired: bool = False
 
 
 @dataclass(frozen=True)
@@ -38,9 +38,9 @@ class Attachment:
 
 @dataclass(frozen=True)
 class MkvInfo:
-    tracks: tuple[Track, ...]
-    attachments: tuple[Attachment, ...]
-    duration_ns: int | None
+    tracks: Sequence[Track]
+    attachments: Sequence[Attachment] = ()
+    duration_ns: int | None = None
 
     @property
     def subtitles(self) -> list[Track]:
