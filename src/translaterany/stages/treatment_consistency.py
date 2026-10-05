@@ -1,7 +1,7 @@
 """Etapa treatment_consistency: unificação de pronomes (você/tu/senhor) e gênero entre personagens (M7)."""
 
 from collections.abc import Sequence
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from translaterany.config.model import TreatmentConsistencyOptions
 from translaterany.languages.models import LanguageInfo
@@ -25,14 +25,21 @@ e "reason" (justificativa curta).
 Se nenhuma fala precisar de alteração, retorne a lista "edits" vazia."""
 
 
-def render_treatment_instructions(source: LanguageInfo, target: LanguageInfo) -> str:
+def render_treatment_instructions(
+    source: LanguageInfo, target: LanguageInfo, characters: Sequence[Any] | None = None
+) -> str:
     target_display = "português do Brasil" if target.code == "pt-BR" else target.name_pt
-    return f"""Você é revisor de legendas de anime ({source.name_pt} -> {target_display})
+    base = f"""Você é revisor de legendas de anime ({source.name_pt} -> {target_display})
 focado em COERÊNCIA DE TRATAMENTO e GÊNERO.
-Revise as falas "editavel" que divergiram do padrão de tratamento do par de personagens ou com flexão de gênero/artigos
-incorreta, conforme indicado em "sinais".
+Revise as falas "editavel" para garantir a consistência do tratamento (você/tu) e a flexão correta de gênero,
+adjetivos, substantivos e artigos entre os personagens interagindo (falante e ouvinte).
 Ajuste os pronomes (ex.: unifique para "você" ou "tu" conforme a maioria indicada) e as flexões verbais/adjetivais
 correspondentes.
+Garanta a concordância de gênero entre falante e ouvinte:
+- Quando o falante se referir a si mesmo, flexione adjetivos e particípios no gênero do falante
+  (ex.: feminino: "cansada", "mordida", "pronta").
+- Quando o falante se dirigir ao ouvinte, flexione no gênero do ouvinte
+  (ex.: se o ouvinte for mulher: "aluna exemplar", "burra", "amiga"; se for homem: "aluno exemplar", "burro", "amigo").
 Corrija também artigos definidos/indefinidos e possessivos quando associados a personagens ou títulos
 femininos/masculinos indicados em sinais (ex.: substitua "o presidente"/"do presidente"/"nosso presidente"
 por "a presidente"/"da presidente"/"nossa presidente" quando se referir a uma mulher).
@@ -40,6 +47,18 @@ NÃO altere o sentido original nem reescreva falas desnecessariamente. Mantenha 
 Responda com a lista "edits"; cada item tem "id", "new" (a fala COMPLETA corrigida em {target_display})
 e "reason" (justificativa curta).
 Se nenhuma fala precisar de alteração, retorne a lista "edits" vazia."""
+
+    if characters:
+        known = []
+        for c in characters:
+            if not getattr(c, "gender", None) or str(c.gender).lower() in ("unknown", "gender.unknown"):
+                continue
+            g = "masculino" if str(c.gender).lower() in ("male", "gender.male", "m") else "feminino"
+            known.append(f"- {c.name}: {g}")
+        if known:
+            base += "\n\nPersonagens conhecidos e seus gêneros:\n" + "\n".join(known)
+
+    return base
 
 
 @register_stage
@@ -52,10 +71,12 @@ class TreatmentConsistencyStage(DialogueRefineStage):
     def instructions(self, ctx: StageContext | None = None) -> str:
         if ctx is not None:
             from translaterany.languages.registry import LanguageRegistry
+            from translaterany.memory.matching import load_all_characters
 
             source = getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en")
             target = getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR")
-            return render_treatment_instructions(source, target)
+            chars = load_all_characters(getattr(ctx, "store", None), getattr(getattr(ctx, "series", None), "key", ""))
+            return render_treatment_instructions(source, target, characters=chars)
         return INSTRUCTIONS
 
     def select_targets(self, ids: Sequence[str], data: RefineData) -> dict[str, list[str]]:
@@ -82,17 +103,15 @@ class TreatmentConsistencyStage(DialogueRefineStage):
                 if alias and alias not in char_gender:
                     char_gender[alias] = g_val
 
+        signals: dict[str, list[str]] = {}
         if data.profile is not None:
             rep = data.profile.scan_treatment(lines_info, character_gender=char_gender)
-            targets: dict[str, list[str]] = {}
             for lid, reasons in rep.divergent_reasons.items():
-                targets[lid] = reasons if isinstance(reasons, list) else [str(reasons)]
-            return targets
+                signals[lid] = reasons if isinstance(reasons, list) else [str(reasons)]
+        else:
+            report = scan_treatment_consistency(lines_info, character_gender=char_gender)
+            for pair_report in report.values():
+                for lid, reasons in pair_report.divergent_reasons.items():
+                    signals[lid] = reasons
 
-        report = scan_treatment_consistency(lines_info, character_gender=char_gender)
-
-        targets = {}
-        for pair_report in report.values():
-            for lid, reasons in pair_report.divergent_reasons.items():
-                targets[lid] = reasons
-        return targets
+        return {i: signals.get(i, []) for i in ids}

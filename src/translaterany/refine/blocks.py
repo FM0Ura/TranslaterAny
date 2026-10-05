@@ -18,6 +18,7 @@ class ReviewLine:
     budget: int | None
     signals: list[str]
     editable: bool
+    listener: str | None = None
 
 
 def _windowed(scene: Sequence[str], group: Sequence[str], targets: set[str], window: int) -> list[str]:
@@ -67,17 +68,23 @@ def build_blocks(
 
 
 def render_block_prompt(lines: Sequence[ReviewLine]) -> str:
-    payload = [
-        {
+    payload = []
+    for ln in lines:
+        item = {
             "id": ln.id,
             "en": flatten_breaks(ln.source),
             "pt": flatten_breaks(ln.target),
             "falante": ln.speaker,
-            "tom": ln.tone,
-            "limite_caracteres": ln.budget,
-            "sinais": ln.signals,
-            "editavel": ln.editable,
         }
-        for ln in lines
-    ]
+        if ln.listener and ln.listener != "Unknown":
+            item["ouvinte"] = ln.listener
+        item.update(
+            {
+                "tom": ln.tone,
+                "limite_caracteres": ln.budget,
+                "sinais": ln.signals,
+                "editavel": ln.editable,
+            }
+        )
+        payload.append(item)
     return json.dumps(payload, ensure_ascii=False)

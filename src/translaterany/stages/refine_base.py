@@ -281,6 +281,7 @@ class DialogueRefineStage(Stage):
                         ),
                         signals=targets.get(i, []),
                         editable=i in targets,
+                        listener=listener_of.get(i, "Unknown"),
                     )
                 )
             try:
