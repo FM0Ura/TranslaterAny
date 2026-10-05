@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, TaskID, TextColumn
@@ -39,9 +39,11 @@ def run(
     force: Annotated[bool, typer.Option("--force", help="Reabre pulados e sobrescreve PT-BR de terceiros.")] = False,
     source: Annotated[str | None, typer.Option("--source", "-s", help="Idioma de origem (ex: en, ja).")] = None,
     target: Annotated[str | None, typer.Option("--target", "-t", help="Idioma de destino (ex: pt-BR, es).")] = None,
+    episode: Annotated[str | None, typer.Option("--episode", "-e", help="Só um episódio (ex.: S01E01).")] = None,
 ) -> None:
     """Executa o pipeline numa série ou em todas as séries de uma biblioteca."""
     from translaterany.languages.registry import LanguageRegistry
+    from translaterany.library.episodes import parse_episode
 
     state: AppState = ctx.obj
     cfg = load_or_exit(state)
@@ -65,6 +67,13 @@ def run(
 
     failed = False
     for scan in scans:
+        if episode:
+            parsed = parse_episode(episode)
+            target_key = parsed.key.upper() if parsed else episode.upper()
+            scan.episodes = [ep for ep in scan.episodes if ep.key.upper() == target_key]
+            if not scan.episodes:
+                console.print(f"[yellow]Episódio '{episode}' não encontrado na série {scan.series.name}.[/yellow]")
+                continue
         failed |= not _run_series(scan, cfg, force, source_lang, target_lang)
     raise typer.Exit(EXIT_FAILURE if failed else EXIT_OK)
 

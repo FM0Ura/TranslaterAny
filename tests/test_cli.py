@@ -216,3 +216,9 @@ def test_run_lists_ignored_files(tmp_path: Path, data_dir: Path, series_dir: Pat
     assert result.exit_code == 0, result.output
     assert "ignorado nesta execução" in result.output and "duplicado" in result.output
     assert "2 episódio(s)" in result.output
+
+
+def test_run_filters_by_episode(tmp_path: Path, data_dir: Path, series_dir: Path) -> None:
+    result = _invoke("--config", str(_config(tmp_path, data_dir)), "run", str(series_dir), "--episode", "S01E01")
+    assert result.exit_code == 0, result.output
+    assert "1 episódio(s)" in result.output
