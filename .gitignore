@@ -15,3 +15,7 @@ temporada-teste/
 # Ferramentas e workspaces temporários
 .superpowers/
 graphify-out/
+
+# Segredos e ambiente
+.env
+

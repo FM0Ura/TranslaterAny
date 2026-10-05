@@ -39,6 +39,10 @@ query ($search: String) {
           name {
             full
             native
+            alternative
+            alternativeSpoiler
+            first
+            last
           }
           gender
         }
@@ -71,6 +75,10 @@ query ($search: String, $year: Int) {
           name {
             full
             native
+            alternative
+            alternativeSpoiler
+            first
+            last
           }
           gender
         }
@@ -103,6 +111,10 @@ query ($id: Int) {
           name {
             full
             native
+            alternative
+            alternativeSpoiler
+            first
+            last
           }
           gender
         }
@@ -167,10 +179,28 @@ def _parse_media_to_match(media: dict, fallback_title: str) -> AniListMatch:
         else:
             gender = Gender.UNKNOWN
 
+        alternatives = name_dict.get("alternative") or []
+        alternative_spoilers = name_dict.get("alternativeSpoiler") or []
+        first_name = name_dict.get("first") or ""
+        last_name = name_dict.get("last") or ""
+
+        aliases: list[str] = []
+        for alt in [*alternatives, *alternative_spoilers]:
+            if alt and isinstance(alt, str):
+                cleaned = alt.strip()
+                if cleaned and cleaned not in aliases and cleaned != full_name:
+                    aliases.append(cleaned)
+
+        if first_name and last_name:
+            jp_order = f"{last_name} {first_name}".strip()
+            if jp_order not in aliases and jp_order != full_name:
+                aliases.append(jp_order)
+
         characters.append(
             CharacterEntry(
                 name=full_name,
                 native_name=native_name,
+                aliases=aliases,
                 role=role,
                 gender=gender,
                 source=EntrySource.METADATA,

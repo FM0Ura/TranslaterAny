@@ -23,7 +23,15 @@ def select_for_text(
 ) -> tuple[list[GlossaryEntry], list[CharacterEntry]]:
     """Entradas do glossário e personagens mencionados no texto (filtro por episódio)."""
     terms = [e for e in glossary if any(matches_term(t, text) for t in (e.term, *e.aliases))]
-    chars = [c for c in characters if any(matches_term(n, text) for n in (c.name, *c.aliases))]
+    chars = []
+    for c in characters:
+        forms = [c.name, *c.aliases]
+        for part in c.name.split():
+            cleaned = part.strip()
+            if len(cleaned) >= 3 and cleaned not in forms:
+                forms.append(cleaned)
+        if any(matches_term(n, text) for n in forms):
+            chars.append(c)
     return terms, chars
 
 

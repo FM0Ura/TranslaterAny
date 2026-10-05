@@ -81,6 +81,10 @@ def load_config(
     default_pipeline: Sequence[str] | None = None,
     env: Mapping[str, str] = os.environ,
 ) -> ResolvedConfig:
+    from translaterany.config.dotenv import load_dotenv
+
+    load_dotenv()
+
     if default_pipeline is None:
         from translaterany.stages import DEFAULT_PIPELINE  # registra as etapas embutidas
 
@@ -92,6 +96,90 @@ def load_config(
             raw = tomllib.loads(path.read_text(encoding="utf-8"))
         except tomllib.TOMLDecodeError as exc:
             raise ConfigError(f"Erro no config ({path}): TOML inválido — {exc}") from exc
+
+    profile_override = env.get("TRANSLATERANY_LLM_PROFILE") or env.get("LLM_PROFILE")
+    if profile_override and profile_override in ("local", "hibrido", "nuvem"):
+        raw.setdefault("llm", {})["profile"] = profile_override
+
+    cloud_model = env.get("TRANSLATERANY_CLOUD_MODEL") or env.get("CLOUD_MODEL")
+    model_tr = env.get("TRANSLATERANY_MODEL_TRANSLATE") or env.get("MODEL_TRANSLATE") or cloud_model
+    model_rev = env.get("TRANSLATERANY_MODEL_REVIEW") or env.get("MODEL_REVIEW") or cloud_model
+
+    think_env = env.get("TRANSLATERANY_LLM_THINK") or env.get("TRANSLATERANY_THINK") or env.get("LLM_THINK")
+    think_override = think_env.strip().lower() in ("true", "1", "yes", "sim", "on") if think_env is not None else None
+
+    if (
+        model_tr
+        or model_rev
+        or think_override is not None
+        or any(k.startswith("TRANSLATERANY_STAGE_") and k.endswith("_MODEL") for k in env)
+    ):
+        llm_raw = raw.setdefault("llm", {})
+        models_raw = llm_raw.setdefault("models", {})
+        profiles_raw = llm_raw.setdefault("profiles", {})
+
+        if think_override is not None:
+            for m_cfg in models_raw.values():
+                if isinstance(m_cfg, dict):
+                    m_cfg["think"] = think_override
+
+        def _infer_provider(name: str) -> str:
+            name_lower = name.lower()
+            if "translategemma" in name_lower or "gemma" in name_lower or "qwen" in name_lower or "llama" in name_lower:
+                return "ollama"
+            if "gemini" in name_lower:
+                return "gemini"
+            if "gpt" in name_lower or "o1" in name_lower or "o3" in name_lower or "chatgpt" in name_lower:
+                return "openai"
+            if env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY"):
+                return "gemini"
+            if env.get("OPENAI_API_KEY"):
+                return "openai"
+            return "ollama"
+
+        active_prof = llm_raw.get("profile", "nuvem")
+        prof_cfg = profiles_raw.setdefault(active_prof, {})
+
+        default_think = think_override if think_override is not None else False
+
+        if model_tr:
+            prov = _infer_provider(model_tr)
+            models_raw[model_tr] = {
+                "provider": prov,
+                "model": model_tr,
+                "num_ctx": 16384,
+                "temperature": 0.3,
+                "think": default_think,
+            }
+            prof_cfg["translate"] = model_tr
+
+        if model_rev:
+            prov = _infer_provider(model_rev)
+            models_raw[model_rev] = {
+                "provider": prov,
+                "model": model_rev,
+                "num_ctx": 16384,
+                "temperature": 0.3,
+                "think": default_think,
+            }
+            prof_cfg["review"] = model_rev
+
+        # Sobrescrita específica de modelo por etapa (ex: TRANSLATERANY_STAGE_FINAL_READTHROUGH_MODEL=gpt-4o)
+        for env_k, env_v in env.items():
+            if env_k.startswith("TRANSLATERANY_STAGE_") and env_k.endswith("_MODEL") and env_v.strip():
+                stage_part = env_k[len("TRANSLATERANY_STAGE_") : -len("_MODEL")].lower()
+                st_model = env_v.strip()
+                prov = _infer_provider(st_model)
+                models_raw[st_model] = {
+                    "provider": prov,
+                    "model": st_model,
+                    "num_ctx": 16384,
+                    "temperature": 0.3,
+                    "think": default_think,
+                }
+                raw.setdefault("stages", {}).setdefault(stage_part, {}).setdefault("options", {})["model"] = st_model
+
+
     where = str(path) if path else "config padrão"
 
     try:

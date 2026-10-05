@@ -84,6 +84,8 @@ class PydanticAIClient(LLMClient):
             base_url = provider_cfg.base_url
         elif model_cfg.provider == "ollama":
             base_url = "http://localhost:11434/v1"
+        elif model_cfg.provider == "gemini":
+            base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
         else:
             base_url = None
 
@@ -104,8 +106,14 @@ class PydanticAIClient(LLMClient):
             )
 
         extra_args: dict[str, Any] = {"temperature": model_cfg.temperature}
-        if model_cfg.num_ctx:
-            extra_args["extra_body"] = {"num_ctx": model_cfg.num_ctx}
+        if model_cfg.provider == "ollama":
+            if model_cfg.num_ctx:
+                extra_args["extra_body"] = {"num_ctx": model_cfg.num_ctx}
+        else:
+            # Para provedores em nuvem (Gemini, OpenAI):
+            # Não enviar num_ctx (parâmetro restrito ao Ollama) e desabilitar thinking se think=False
+            if not model_cfg.think:
+                extra_args.setdefault("extra_body", {})["reasoning_effort"] = "none"
 
         return model_cfg.model, base_url, api_key, extra_args
 
@@ -164,14 +172,18 @@ class PydanticAIClient(LLMClient):
                 raise LLMOutputError(f"Falha de validação da saída estruturada: {exc}") from exc
             raise
 
-        raw_usage = result.usage() if callable(getattr(result, "usage", None)) else getattr(result, "usage", None)
+        output_data = getattr(result, "output", None)
+        if output_data is None:
+            output_data = getattr(result, "data", None)
+
+        raw_usage = result.usage if hasattr(result, "usage") and not callable(result.usage) else (result.usage() if callable(getattr(result, "usage", None)) else None)
         usage = Usage(
-            input_tokens=getattr(raw_usage, "request_tokens", 0) or getattr(raw_usage, "input_tokens", 0) or 0,
-            output_tokens=getattr(raw_usage, "response_tokens", 0) or getattr(raw_usage, "output_tokens", 0) or 0,
+            input_tokens=getattr(raw_usage, "input_tokens", 0) or getattr(raw_usage, "request_tokens", 0) or 0,
+            output_tokens=getattr(raw_usage, "output_tokens", 0) or getattr(raw_usage, "response_tokens", 0) or 0,
         )
 
         return LLMResponse(
-            output=result.data,
+            output=output_data,
             model_id=model_name,
             usage=usage,
         )

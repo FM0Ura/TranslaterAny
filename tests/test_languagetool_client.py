@@ -120,3 +120,31 @@ def test_languagetool_ignores_honorifics_and_token_exemptions() -> None:
     assert corrected == "Concordo com o Hyoudou Issei-kun!"
     assert applied == 0
 
+
+def test_languagetool_ignores_capitalized_proper_nouns_mid_sentence() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "matches": [
+                    {
+                        "message": "Palavra desconhecida",
+                        "offset": 12,
+                        "length": 6,
+                        "rule": {"category": {"id": "TYPOS"}},
+                        "replacements": [{"value": "Karin"}],
+                    },
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = LanguageToolClient(url="http://localhost:8010/v2/check", timeout_s=5.0, transport=transport)
+
+    text = "Falando com Okarin sobre isso."
+    # Mesmo sem 'okarin' explicitamente em exemptions, não deve substituir palavra com maiúscula no meio da frase
+    corrected, applied = client.correct_text(text, exemptions=set())
+    assert corrected == "Falando com Okarin sobre isso."
+    assert applied == 0
+
+
