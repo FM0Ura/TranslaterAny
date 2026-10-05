@@ -164,7 +164,7 @@ def parse_pgs(sup_path: Path) -> list[SubtitleDisplaySet]:
                 entries_data = payload[2:]
                 for e_idx in range(0, len(entries_data) - 4, 5):
                     eid, y, cr, cb, alpha = struct.unpack_from(">BBBBB", entries_data, e_idx)
-                    pal[eid] = alpha
+                    pal[eid] = (y, alpha)
 
         elif seg_type == 0x15:  # ODS (Object Definition Segment)
             if len(payload) >= 4:
@@ -195,13 +195,18 @@ def parse_pgs(sup_path: Path) -> list[SubtitleDisplaySet]:
                     elif len(raw_pixels) > expected_len:
                         raw_pixels = raw_pixels[:expected_len]
 
+                    has_bright_text = any(isinstance(v, tuple) and v[1] > 64 and v[0] >= 80 for v in pal.values())
+
                     bin_bytes = bytearray(expected_len)
                     for idx, c in enumerate(raw_pixels):
-                        if c == 0:
+                        val = pal.get(c, (0, 0))
+                        y_val, alpha = val if isinstance(val, tuple) else (0, val)
+                        if alpha <= 64:
                             bin_bytes[idx] = 255
+                        elif has_bright_text:
+                            bin_bytes[idx] = 0 if y_val >= 80 else 255
                         else:
-                            alpha = pal.get(c, 255)
-                            bin_bytes[idx] = 0 if alpha > 64 else 255
+                            bin_bytes[idx] = 0
 
                     img = Image.frombytes("L", (ods_obj.width, ods_obj.height), bytes(bin_bytes))
 
