@@ -32,3 +32,14 @@ def test_ocr_engine_deduplicates_identical_consecutive_frames() -> None:
         assert results[0].start_ms == 1000
         assert results[0].end_ms == 3000
         assert mock_tess.call_count == 1  # Evitou segunda chamada por hash idêntico
+
+
+def test_ocr_engine_cleans_italic_ocr_confusion() -> None:
+    from translaterany.media.ocr.engine import _parse_hocr
+
+    hocr = "<span>/ stayed up /ate.</span>"
+    assert _parse_hocr(hocr) == "I stayed up late."
+
+    hocr2 = "<span>Because | don't like stupid people.</span>"
+    assert _parse_hocr(hocr2) == "Because I don't like stupid people."
+

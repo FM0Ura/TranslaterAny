@@ -146,3 +146,27 @@ def test_translator_max_context_lines_zero():
     assert len(recorded_prompts) == 2
     for p in recorded_prompts:
         assert "[CONTEXTO RECENTE" not in p
+
+
+def test_translator_cleans_alternative_slashes_from_output():
+    def behavior(call_count, req):
+        return LLMResponse(
+            output=TranslationBatch(
+                items=[
+                    TranslationItem(id="1", text="Que foi? / O que foi?"),
+                    TranslationItem(id="2", text="Serviço 24/7"),
+                ]
+            ),
+            model_id="test",
+        )
+
+    client = MockLLM(behavior)
+    translator = DialogueBatchTranslator(client=client, model_name="translategemma")
+    lines = [
+        DialogueLine(id="1", text="What's the deal?"),
+        DialogueLine(id="2", text="24/7 service"),
+    ]
+    res = translator.translate_lines(lines)
+    assert res["1"] == "Que foi?"
+    assert res["2"] == "Serviço 24/7"
+

@@ -30,7 +30,8 @@ Sua missão é produzir diálogos naturais, coloquiais e fluidos no estilo de fa
 Mantenha rigorosamente o significado pretendido, pontuação expressiva (... ! ?) e estilo de cada personagem.
 Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as falas
 identificadas por seus IDs.
-NÃO traduza as falas marcadas como contexto."""
+NÃO traduza as falas marcadas como contexto.
+NUNCA forneça opções alternativas separadas por barra (ex.: 'Opção 1 / Opção 2'); escolha sempre uma única melhor tradução para cada fala."""
 
 
 def render_system_instructions(source: LanguageInfo, target: LanguageInfo) -> str:
@@ -47,8 +48,17 @@ def render_system_instructions(source: LanguageInfo, target: LanguageInfo) -> st
         "Mantenha rigorosamente o significado pretendido, pontuação expressiva (... ! ?) e estilo de cada personagem.\n"
         "Você DEVE devolver exclusivamente a estrutura solicitada, contendo a tradução de todas as falas\n"
         "identificadas por seus IDs.\n"
-        "NÃO traduza as falas marcadas como contexto."
+        "NÃO traduza as falas marcadas como contexto.\n"
+        "NUNCA forneça opções alternativas separadas por barra (ex.: 'Opção 1 / Opção 2'); escolha sempre uma única melhor tradução para cada fala."
     )
+
+
+def _clean_alternative_slash(text: str, source_text: str = "") -> str:
+    """Se a IA devolveu opções alternativas separadas por barra (ex.: 'Que foi? / O que foi?'),
+    seleciona a primeira opção, exceto se a barra já existia no texto original."""
+    if " / " in text and "/" not in source_text:
+        return text.split(" / ")[0].strip()
+    return text
 
 
 class TranslationItem(BaseModel):
@@ -207,13 +217,15 @@ class DialogueBatchTranslator:
         )
 
         translations: dict[str, str] = {}
+        by_id = {line.id: line for line in lines}
         if output:
             for item in output.items:
                 item_id = _normalize_id(item.id)
                 if item_id in expected_ids:
-                    translations[item_id] = item.text
+                    src_text = by_id[item_id].text if item_id in by_id else ""
+                    translations[item_id] = _clean_alternative_slash(item.text, src_text)
             if not translations and len(lines) == 1 and len(output.items) == 1:
-                translations[lines[0].id] = output.items[0].text  # chamada de uma fala: o ID não importa
+                translations[lines[0].id] = _clean_alternative_slash(output.items[0].text, lines[0].text)  # chamada de uma fala: o ID não importa
 
         # Nível 2: Reconciliação de IDs ausentes
         missing_ids = expected_ids - set(translations.keys())

@@ -113,6 +113,14 @@ class _HOCRParser(HTMLParser):
             self.pieces.append(" ")
 
 
+def _clean_common_ocr_errors(text: str) -> str:
+    # 1. Standalone | or / followed by space and lowercase, or apostrophe (e.g. '| don\'t', '/ stayed', '|\'m')
+    text = re.sub(r"(^|[\s\(\[\{])[/|](?=\s+[a-z]|[\'’][a-z]|[\s.,!?]|$)", r"\g<1>I", text)
+    # 2. Leading / or | attached to lowercase word (e.g. '/ate' -> 'late', '|ike' -> 'like')
+    text = re.sub(r"(^|[\s\(\[\{])[/|](?=[a-z]{2,})", r"\g<1>l", text)
+    return text
+
+
 def _parse_hocr(hocr: str) -> str:
     parser = _HOCRParser()
     parser.feed(hocr)
@@ -122,7 +130,7 @@ def _parse_hocr(hocr: str) -> str:
     raw_text = raw_text.replace("{\\i0}{\\i1}", "").replace("{\\i1}{\\i0}", "")
     raw_text = re.sub(r" +", " ", raw_text)
     raw_text = re.sub(r"\s*\\N\s*", lambda m: r"\N", raw_text)
-    return raw_text
+    return _clean_common_ocr_errors(raw_text)
 
 
 def _call_tesseract_hocr(image: Image.Image, lang: str) -> str:
