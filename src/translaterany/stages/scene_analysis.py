@@ -33,8 +33,6 @@ class SceneAnalysisStage(Stage):
         "classify",
         "consolidate_memory",
         "merge_sentences",
-        "extract_voice",
-        "consolidate_voice_bank",
     )
     enabled_by_default: ClassVar[bool] = True
     Options: ClassVar[type[BaseModel]] = SceneAnalysisOptions
@@ -42,6 +40,15 @@ class SceneAnalysisStage(Stage):
     def __init__(self, options: BaseModel | None = None, client: Any = None) -> None:
         super().__init__(options)
         self.client = client
+
+    def bind_pipeline(self, previous: Sequence[Stage], app: Any = None) -> None:
+        prev_names = {s.name for s in previous}
+        extra = []
+        if "extract_voice" in prev_names:
+            extra.append("extract_voice")
+        if "consolidate_voice_bank" in prev_names:
+            extra.append("consolidate_voice_bank")
+        self.inputs = (*self.inputs, *extra)
 
     def run(self, ctx: StageContext) -> None:
         merged_doc = ctx.inputs.json("merge_sentences", MergedUnitsDoc)
