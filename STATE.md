@@ -31,6 +31,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M9 — Suporte Universal a Idiomas (v1.1) | ✅ | [spec](docs/superpowers/specs/2026-10-04-m9-suporte-universal-idiomas-design.md) | [plano](docs/superpowers/plans/2026-10-04-m9-suporte-universal-idiomas.md) | concluído (686 testes); pares arbitrários de idiomas, LanguageRegistry, perfis linguísticos e prompts parametrizados |
 | M10 — OCR de Legendas Gráficas (v1.1) | ✅ | [spec](docs/superpowers/specs/2026-10-05-m10-ocr-legendas-graficas-design.md) | [plano](docs/superpowers/plans/2026-10-05-m10-ocr-legendas-graficas.md) | concluído (715 testes); suporte nativo a PGS/VobSub via Tesseract OCR em paralelo, hOCR com itálico, deduplicação SHA-256 e estilos de posição |
 | M11 — Diarização de Áudio e Multimodalidade (v1.2) | ✅ | [spec](docs/superpowers/specs/2026-10-06-m11-diarizacao-audio-design.md) | [plano](docs/superpowers/plans/2026-10-06-m11-diarizacao-audio.md) | concluído (746 testes); extração de áudio, Map-Reduce de perfis de voz por série, fusão multimodal no scene_analysis, precedência de gênero do AniList e salvaguarda de vocativo |
+| M12 — UI Web e API RESTful (v1.3) | 📝 | [spec](docs/superpowers/specs/2026-10-06-m12-ui-web-design.md) | ⬜ | spec criada; servidor FastAPI com API RESTful desacoplada, fila com suporte a pausa, grafo de pipeline e editor de memórias |
 
 ---
 
