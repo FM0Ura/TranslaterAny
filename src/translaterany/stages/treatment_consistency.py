@@ -54,7 +54,9 @@ Se nenhuma fala precisar de alteração, retorne a lista "edits" vazia."""
             if not getattr(c, "gender", None) or str(c.gender).lower() in ("unknown", "gender.unknown"):
                 continue
             g = "masculino" if str(c.gender).lower() in ("male", "gender.male", "m") else "feminino"
-            known.append(f"- {c.name}: {g}")
+            aliases = [a for a in getattr(c, "aliases", []) or [] if a and a != c.name]
+            aliases_str = f" (apelidos: {', '.join(aliases)})" if aliases else ""
+            known.append(f"- {c.name}{aliases_str}: {g}")
         if known:
             base += "\n\nPersonagens conhecidos e seus gêneros:\n" + "\n".join(known)
 
