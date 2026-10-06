@@ -28,13 +28,27 @@ class SceneAnalysisStage(Stage):
     name: ClassVar[str] = "scene_analysis"
     version: ClassVar[str] = "2"  # 2: uma chamada por cena
     scope: ClassVar[StageScope] = StageScope.EPISODE
-    inputs: ClassVar[tuple[str, ...]] = ("normalize", "classify", "consolidate_memory", "merge_sentences")
+    inputs: ClassVar[tuple[str, ...]] = (
+        "normalize",
+        "classify",
+        "consolidate_memory",
+        "merge_sentences",
+    )
     enabled_by_default: ClassVar[bool] = True
     Options: ClassVar[type[BaseModel]] = SceneAnalysisOptions
 
     def __init__(self, options: BaseModel | None = None, client: Any = None) -> None:
         super().__init__(options)
         self.client = client
+
+    def bind_pipeline(self, previous: Sequence[Stage], app: Any = None) -> None:
+        prev_names = {s.name for s in previous}
+        extra = []
+        if "extract_voice" in prev_names:
+            extra.append("extract_voice")
+        if "consolidate_voice_bank" in prev_names:
+            extra.append("consolidate_voice_bank")
+        self.inputs = (*self.inputs, *extra)
 
     def run(self, ctx: StageContext) -> None:
         merged_doc = ctx.inputs.json("merge_sentences", MergedUnitsDoc)
@@ -58,15 +72,48 @@ class SceneAnalysisStage(Stage):
                 story = mem_store.load_story()
                 synopsis = story.synopsis or ""
 
+        voice_bank = None
+        episode_segments = {}
+        try:
+            from translaterany.media.audio.voice_bank import VoiceBankDoc
+
+            voice_bank = ctx.inputs.json("consolidate_voice_bank", VoiceBankDoc)
+        except Exception:
+            pass
+
+        try:
+            from translaterany.media.audio.artifacts import VoiceEmbeddingsArtifact
+
+            voice_art = ctx.inputs.json("extract_voice", VoiceEmbeddingsArtifact)
+            episode_segments = {s.unit_id: s for s in voice_art.segments}
+        except Exception:
+            pass
+
         client = self.client or getattr(ctx, "llm", None)
-        doc = analyze_scenes(
-            merged_doc=merged_doc,
-            scenes=classification.scenes,
-            characters=characters,
-            synopsis=synopsis,
-            client=client,
-            model=self.options.model,
-            unit_events={u.id: u.events for u in normalized.units},
-            max_lines_per_call=self.options.max_lines_per_call,
-        )
+        if voice_bank and episode_segments:
+            from translaterany.subtitles.scene_analysis import analyze_scenes_multimodal
+
+            doc = analyze_scenes_multimodal(
+                merged_doc=merged_doc,
+                scenes=classification.scenes,
+                characters=characters,
+                voice_bank=voice_bank,
+                episode_segments=episode_segments,
+                synopsis=synopsis,
+                client=client,
+                model=self.options.model,
+                unit_events={u.id: u.events for u in normalized.units},
+                max_lines_per_call=self.options.max_lines_per_call,
+            )
+        else:
+            doc = analyze_scenes(
+                merged_doc=merged_doc,
+                scenes=classification.scenes,
+                characters=characters,
+                synopsis=synopsis,
+                client=client,
+                model=self.options.model,
+                unit_events={u.id: u.events for u in normalized.units},
+                max_lines_per_call=self.options.max_lines_per_call,
+            )
         ctx.output.json(doc)

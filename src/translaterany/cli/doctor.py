@@ -9,6 +9,8 @@ from translaterany.config import ConfigError, ResolvedConfig, load_config
 from translaterany.config.model import ProviderConfig
 from translaterany.util.doctor import (
     CheckResult,
+    check_audio_runtimes,
+    check_ffmpeg_audio_codecs,
     check_languagetool_service,
     check_nvidia_gpu,
     check_ollama_models,
@@ -91,6 +93,8 @@ def doctor(ctx: typer.Context) -> None:
         *run_checks(all_checks(cfg)),
         ("languagetool", check_languagetool_service(target_lang=cfg.target_language)),
         ("tesseract", check_tesseract_installed(source_lang=cfg.source_language)),
+        ("audio_codecs", check_ffmpeg_audio_codecs()),
+        ("audio_runtimes", check_audio_runtimes()),
         *llm_doctor_checks(cfg),
     ]
     seen_names: set[str] = set()

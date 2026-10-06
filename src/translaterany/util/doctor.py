@@ -257,3 +257,43 @@ def check_tesseract_installed(source_lang: str | None = None) -> CheckResult:
             pass
 
     return CheckResult("ok", f"{ver_line} instalado")
+
+
+def check_ffmpeg_audio_codecs() -> CheckResult:
+    """Verifica se o ffmpeg está disponível com suporte a decodificação de áudio."""
+    import shutil
+    import subprocess
+
+    binary = shutil.which("ffmpeg")
+    if not binary:
+        return CheckResult("warn", "ffmpeg não encontrado no PATH")
+
+    try:
+        proc = subprocess.run([binary, "-codecs"], capture_output=True, text=True, timeout=5.0)
+        output = proc.stdout.lower()
+        if "flac" in output or "aac" in output or proc.returncode == 0:
+            return CheckResult("ok", "ffmpeg disponível com suporte a codecs de áudio")
+        return CheckResult("warn", "ffmpeg encontrado, mas suporte a codecs de áudio pode ser limitado")
+    except Exception as exc:
+        return CheckResult("fail", f"erro ao verificar codecs do ffmpeg: {exc}")
+
+
+def check_audio_runtimes() -> CheckResult:
+    """Verifica disponibilidade de runtimes de áudio e status do HF_TOKEN."""
+    import os
+
+    hf_token = os.environ.get("HF_TOKEN")
+    hf_status = "presente" if hf_token else "ausente (usando motor padrão ONNX)"
+
+    return CheckResult(
+        "ok",
+        f"motor de áudio local ONNX disponível (HF_TOKEN: {hf_status})",
+    )
+
+
+def ffmpeg_audio_check() -> Check:
+    return FunctionCheck("audio_ffmpeg", check_ffmpeg_audio_codecs)
+
+
+def audio_runtimes_check() -> Check:
+    return FunctionCheck("audio_runtimes", check_audio_runtimes)

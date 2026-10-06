@@ -13,6 +13,7 @@ O progresso corrente, decisões e pendências ficam em [`STATE.md`](STATE.md).
 - Um marco só começa quando o anterior está pronto. Descobertas durante um marco que afetem os seguintes são registradas em `STATE.md` e refletidas aqui.
 - A **v1** está completa ao fim do M8 (versão estável lançada: `v1.0.0`).
 - A **v1.1** introduz OCR de legendas em imagem (PGS/VobSub) e suporte universal a qualquer idioma de entrada e saída.
+- A **v1.2** introduz Diarização de Áudio e Multimodalidade (Marco M11): extração acústica de vozes, Map-Reduce de perfis de voz por série e fusão multimodal para identificação precisa de falantes e gênero.
 
 ---
 
@@ -272,18 +273,51 @@ extrair → normalizar → classificar → memória de tradução → unir frase
 **Pronto quando:**
 1. Configurar `source_language = "ja"` ou `target_language = "es"` traduz corretamente os episódios no par linguístico solicitado sem intervenção manual (✅ Concluído no M9);
 2. Um MKV contendo apenas faixa PGS/VobSub é processado pelo OCR e gera legendas traduzidas de qualidade comparável a faixas de texto (✅ Concluído no M10);
-3. Testes sintéticos e de integração cobrem a extração OCR e a tradução com diferentes pares de idiomas (✅ M9 e M10 concluídos — 713 testes no total).
+3. Testes sintéticos e de integração cobrem a extração OCR e a tradução com diferentes pares de idiomas (✅ M9 e M10 concluídos — 715 testes no total).
 
 ---
 
-## Depois da v1.1 (backlog)
+### v1.2 — Diarização de Áudio e Multimodalidade (Marco M11 — ✅ Concluído)
+
+**Objetivo:** Elevar a precisão e confiança da atribuição de falantes (`scene_analysis`) através de análise multimodal de áudio, desambiguando personagens, definindo gênero gramatical canônico/acústico e prevenindo alucinações de gênero e falante.
+
+**Escopo:**
+
+1. **Extração e Embeddings Acústicos (`ExtractVoiceStage` - Map por Episódio):**
+   - Extração leve de áudio por fala (`AudioExtractor`) com corte de timestamps exatos via `ffmpeg` (mono, 16kHz, PCM).
+   - Motores plugáveis via `DiarizationEngine`:
+     - `OnnxAudioDiarizer`: motor local padrão, pesos abertos sem autenticação nem HF token.
+     - `PyAnnoteAudioDiarizer`: motor avançado opcional com suporte a `HF_TOKEN` e degradação graciosa se ausente.
+   - Diagnósticos no `doctor` para codecs de áudio (`ffmpeg`/`ffprobe`) e runtimes onnx/pyannote.
+   - Artefato por episódio: `VoiceEmbeddingsArtifact` (`voice_embeddings.json`).
+
+2. **Consolidação do Banco de Vozes da Série (`ConsolidateVoiceBankStage` - Reduce de Série):**
+   - Agrupamento acústico de centróides através de todos os episódios (`VoiceBankDoc` / `voice_bank.json`).
+   - Mapeamento determinístico de vozes para o catálogo canônico de personagens (`characters.yaml`).
+   - Precedência estrita de gênero: gênero do AniList/metadados sempre tem prioridade sobre o pitch acústico (resolvendo meninos dublados por mulheres).
+
+3. **Fusão Multimodal no Pipeline (`analyze_scenes_multimodal` no `SceneAnalysisStage`):**
+   - Associação por similaridade cosseno entre os segmentos de áudio e os perfis do `voice_bank.json`.
+   - Confiança elevada para `high` quando o match de voz confirma a hipótese do personagem.
+   - Salvaguarda estrita de vocativo: quando um nome de personagem é falado em vocativo na fala, a voz é associada ao interlocutor (*listener*), nunca atribuindo a fala ao personagem chamado.
+   - Falantes desconhecidos (`Unknown`): preservam o gênero acústico detectado (`female`/`male`) para manter concordância verbal/nominal correta no PT-BR sem poluir o banco de vozes canônico.
+   - Binding dinâmico de pipeline: ativação transparente e condicional das entradas de áudio sem quebrar pipelines parciais ou customizados.
+
+**Pronto quando:**
+1. Áudio de cada fala é extraído e embeddado em `voice_embeddings.json` por episódio (✅);
+2. `voice_bank.json` agrupa centróides da temporada com perfis de voz consolidados (✅);
+3. `scene_analysis` funde áudio + texto elevando confiança para `high` e respeitando salvaguarda de vocativo e precedência de gênero (✅);
+4. Suíte completa com 746 testes passando com 100% de sucesso e zero regressões (✅ M11 concluído — 746 testes no total).
+
+---
+
+## Depois da v1.2 (backlog)
 
 - `eval` com conjunto de ouro + **métricas camada 3** (COMETKiwi, IA como juiz).
 - **Guia de estilo por série** (`style.yaml`) — adiado ("por enquanto não").
 - Política configurável para notas de tradução (T/N) do fansub.
 - Troca automática para fonte de fallback quando a fonte do fansub não tiver acentos.
 - Portões de etapa anterior (retraduzir o episódio quando a taxa de edição da revisão for alta).
-- Diarização de áudio para elevar a confiança da atribuição de falantes.
 - UI web e/ou serviço automático (observar pasta, webhook Sonarr/Jellyfin).
 
 ## Descartado
