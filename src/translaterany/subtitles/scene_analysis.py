@@ -195,17 +195,20 @@ def _analyze_group(
         "You are an expert anime director and subtitle dialogue analyst. "
         "Analyze dialogue scenes and output valid JSON matching the requested schema.\n\n"
         "CRITICAL GUIDELINES FOR DIALOGUE FLOW AND TURN-TAKING:\n"
-        "1. NO AUTOMATIC ALTERNATION: Subtitle events often split a single character's speech across multiple consecutive lines. "
-        "Do NOT assume speakers alternate every line (A -> B -> A -> B). A single character frequently speaks 2, 3, or more consecutive lines "
+        "1. NO AUTOMATIC ALTERNATION: Subtitle events often split a single character's speech "
+        "across multiple consecutive lines. Do NOT assume speakers alternate every line (A -> B -> A -> B). "
+        "A single character frequently speaks 2, 3, or more consecutive lines "
         "(monologues, explanations, rants, multi-sentence thoughts).\n"
-        "2. SEMANTIC CONTINUITY: If line N+1 elaborates, explains, justifies, or continues the emotional thought of line N without an explicit response "
-        "from another character, it is spoken by the SAME character.\n"
-        "3. VOCATIVE RESOLUTION: When a character addresses someone by name or nickname (e.g. 'Takagi, why do you...', 'You wouldn't understand, Takashi', 'Relax, Taka'):\n"
+        "2. SEMANTIC CONTINUITY: If line N+1 elaborates, explains, justifies, or continues the emotional "
+        "thought of line N without an explicit response from another character, it is spoken by the SAME character.\n"
+        "3. VOCATIVE RESOLUTION: When a character addresses someone by name or nickname "
+        "(e.g. 'Takagi, why do you...', 'You wouldn't understand, Takashi', 'Relax, Taka'):\n"
         "   - The named character is the LISTENER of that line, NEVER the speaker.\n"
         "   - In a two-person conversation, the speaker is the other interlocutor.\n"
         "   - The next line is often the response spoken by the named character.\n"
-        "4. MULTI-LINE MONOLOGUES: When a character is teasing, insulting, lecturing, or scolding another (e.g. developing a point across several sentences), "
-        "keep the speaker consistent across all those sentences until the interlocutor actually replies or interrupts."
+        "4. MULTI-LINE MONOLOGUES: When a character is teasing, insulting, lecturing, or scolding another "
+        "(e.g. developing a point across several sentences), keep the speaker consistent across all those "
+        "sentences until the interlocutor actually replies or interrupts."
     )
 
     result = SceneAnalysisDoc()
@@ -242,3 +245,85 @@ def _analyze_group(
         _apply_vocative_safeguard(result, group, known_names)
 
     return result
+
+
+def analyze_scenes_multimodal(
+    merged_doc: MergedUnitsDoc,
+    scenes: list[Scene],
+    characters: list[CharacterEntry],
+    voice_bank: Any | None = None,
+    episode_segments: Mapping[str, Any] | None = None,
+    synopsis: str = "",
+    client: Any | None = None,
+    model: str = "review",
+    unit_events: Mapping[str, list[int]] | None = None,
+    max_lines_per_call: int = 40,
+) -> SceneAnalysisDoc:
+    """Executa a análise de cena textual e enriquece com a correspondência acústica de centróides de voz."""
+    from translaterany.media.audio.clustering import cosine_distance
+
+    base_doc = analyze_scenes(
+        merged_doc=merged_doc,
+        scenes=scenes,
+        characters=characters,
+        synopsis=synopsis,
+        client=client,
+        model=model,
+        unit_events=unit_events,
+        max_lines_per_call=max_lines_per_call,
+    )
+
+    if not voice_bank or not getattr(voice_bank, "profiles", None) or not episode_segments:
+        return base_doc
+
+    known_names = _build_known_names(characters)
+    updated_lines = dict(base_doc.lines)
+
+    for unit in merged_doc.units:
+        ctx = updated_lines.get(unit.composite_id)
+        if not ctx:
+            continue
+
+        seg = episode_segments.get(unit.composite_id)
+        if not seg:
+            for uid in unit.unit_ids:
+                if uid in episode_segments:
+                    seg = episode_segments[uid]
+                    break
+
+        if not seg or not getattr(seg, "embedding", None) or not any(x != 0 for x in seg.embedding):
+            continue
+
+        best_profile = None
+        best_sim = -1.0
+        for prof in voice_bank.profiles:
+            if not prof.centroid:
+                continue
+            dist = cosine_distance(seg.embedding, prof.centroid)
+            sim = 1.0 - dist
+            if sim > best_sim:
+                best_sim = sim
+                best_profile = prof
+
+        addressed = _extract_vocative(unit.clean_text, known_names) if known_names else None
+
+        if best_profile and best_sim >= 0.80:
+            speaker_candidate = best_profile.character_name
+            if addressed and speaker_candidate == addressed:
+                ctx.speaker = "Unknown"
+                ctx.listener = addressed
+                ctx.confidence = "medium"
+            else:
+                ctx.speaker = speaker_candidate
+                ctx.confidence = "high"
+                if addressed and ctx.listener == "Unknown":
+                    ctx.listener = addressed
+        elif getattr(seg, "acoustic_gender", None) in ("male", "female"):
+            ctx.confidence = "medium"
+            if addressed and ctx.listener == "Unknown":
+                ctx.listener = addressed
+
+        updated_lines[unit.composite_id] = ctx
+
+    return SceneAnalysisDoc(lines=updated_lines)
+
