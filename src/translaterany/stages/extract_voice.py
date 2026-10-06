@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from typing import ClassVar
 
+from pydantic import BaseModel, ConfigDict
 from translaterany.media.audio.artifacts import VoiceEmbeddingsArtifact
 from translaterany.media.audio.engine import create_diarization_engine
 from translaterany.media.audio.extractor import AudioExtractor
@@ -18,6 +19,12 @@ from translaterany.subtitles.normalize import NormalizedDoc
 logger = logging.getLogger(__name__)
 
 
+class ExtractVoiceOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    engine: str = "onnx"
+    hf_token: str | None = None
+
+
 @register_stage
 class ExtractVoiceStage(Stage):
     """Etapa por episódio que extrai o áudio correspondente do MKV e produz voice_embeddings.json."""
@@ -28,15 +35,20 @@ class ExtractVoiceStage(Stage):
     inputs: ClassVar[tuple[str, ...]] = ("normalize",)
     translates: ClassVar[bool] = False
     enabled_by_default: ClassVar[bool] = True
+    Options: ClassVar[type[BaseModel]] = ExtractVoiceOptions
 
     def _find_audio_track_index(self, mkv_path: Path) -> int | None:
-        """Encontra o índice relativo da primeira faixa de áudio vocal no MKV."""
+        """Encontra o índice relativo da primeira faixa de áudio vocal no MKV (prioriza japonês)."""
         try:
             info = probe(mkv_path)
             audio_tracks = [t for t in info.tracks if t.type == "audio"]
             if not audio_tracks:
                 return None
-            # Retorna o índice ordinal de áudio (para uso no -map 0:a:<idx>)
+            for idx, track in enumerate(audio_tracks):
+                lang = (track.language or "").lower()
+                if lang in ("ja", "jpn", "japanese"):
+                    return idx
+            # Retorna o primeiro áudio ordinal se não houver faixa japonesa explícita
             return 0
         except (MediaError, Exception) as exc:
             logger.debug("Não foi possível identificar faixas de áudio em %s: %s", mkv_path, exc)
@@ -76,13 +88,8 @@ class ExtractVoiceStage(Stage):
             if ev.unit and ev.end_ms > ev.start_ms:
                 timings.append(UnitTiming(unit_id=ev.unit, start_ms=ev.start_ms, end_ms=ev.end_ms))
 
-        engine_name = "onnx"
-        hf_token = None
-        if ctx.config:
-            # Obtém opções configuradas se houver
-            opts = getattr(ctx.config, "stages_options", {}).get("extract_voice", {})
-            engine_name = opts.get("engine", "onnx")
-            hf_token = opts.get("hf_token")
+        engine_name = getattr(self.options, "engine", "onnx")
+        hf_token = getattr(self.options, "hf_token", None)
 
         engine = create_diarization_engine(engine_name=engine_name, hf_token=hf_token)
         extractor = AudioExtractor()
