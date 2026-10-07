@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Grafo do Pipeline Plugável - TranslaterAny{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-800 pb-6">
+        <div>
+            {% if series_key %}
+            <div class="flex items-center space-x-2 text-sm text-gray-400 mb-1">
+                <a href="/series/{{ series_key }}" class="hover:text-white">&larr; Voltar para a série</a>
+            </div>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight">Pipeline da Série: <span class="text-indigo-400 font-mono">{{ series_key }}</span></h1>
+            <p class="text-sm text-gray-400 mt-1">Configuração personalizada gravada no <code class="text-xs bg-gray-900 px-1.5 py-0.5 rounded text-indigo-300">series.toml</code>.</p>
+            {% else %}
+            <h1 class="text-3xl font-extrabold text-white tracking-tight">Grafo do Pipeline Plugável</h1>
+            <p class="text-sm text-gray-400 mt-1">Habilite ou desabilite etapas globalmente. Etapas desligadas entram em modo <b>Bypass</b>.</p>
+            {% endif %}
+        </div>
+
+        <!-- Estatísticas Rápidas -->
+        <div class="flex items-center space-x-4 bg-gray-900 px-4 py-2 rounded-xl border border-gray-800 text-xs">
+            <div>
+                <span class="text-gray-400">Total:</span>
+                <span class="font-bold text-white ml-1">{{ graph.stages|length }}</span>
+            </div>
+            <div class="border-l border-gray-800 pl-4">
+                <span class="text-emerald-400">Ativas:</span>
+                <span class="font-bold text-emerald-400 ml-1" id="count-active">{{ graph.stages|selectattr('enabled')|list|length }}</span>
+            </div>
+            <div class="border-l border-gray-800 pl-4">
+                <span class="text-amber-400">Bypass:</span>
+                <span class="font-bold text-amber-400 ml-1" id="count-bypass">{{ graph.stages|rejectattr('enabled')|list|length }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista Sequencial de Nós do Pipeline (DAG Linear) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="pipeline-nodes-container">
+        {% for stage in graph.stages %}
+            {% include "components/pipeline_node.html" %}
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+    async function toggleStage(stageName, enabled, seriesKey) {
+        const url = seriesKey 
+            ? `/api/v1/series/${seriesKey}/pipeline/toggle` 
+            : '/api/v1/pipeline/toggle';
+
+        try {
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({stage_name: stageName, enabled: enabled})
+            });
+
+            if (res.ok) {
+                // Recarrega a página para refletir estados visuais e contadores
+                window.location.reload();
+            } else {
+                alert('Erro ao alterar status da etapa');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Falha na comunicação com o servidor');
+        }
+    }
+</script>
+{% endblock %}

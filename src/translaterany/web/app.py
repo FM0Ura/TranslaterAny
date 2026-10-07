@@ -17,6 +17,7 @@ from translaterany.web.api.pipeline import router as pipeline_router
 from translaterany.web.api.series import router as series_router
 from translaterany.web.jobs import JobManager
 from translaterany.web.pages.dashboard import router as dashboard_router
+from translaterany.web.pages.pipeline import router as pipeline_page_router
 from translaterany.web.pages.series import router as series_page_router
 from translaterany.web.pages.settings import router as settings_page_router
 from translaterany.web.services.config_service import ConfigService
@@ -74,6 +75,7 @@ def create_app(
 
     # Rotas de páginas HTML
     app.include_router(dashboard_router)
+    app.include_router(pipeline_page_router)
     app.include_router(series_page_router)
     app.include_router(settings_page_router)
 
