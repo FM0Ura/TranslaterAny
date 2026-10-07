@@ -26,7 +26,7 @@ class SceneAnalysisOptions(BaseModel):
 @register_stage
 class SceneAnalysisStage(Stage):
     name: ClassVar[str] = "scene_analysis"
-    version: ClassVar[str] = "2"  # 2: uma chamada por cena
+    version: ClassVar[str] = "3"  # 2: uma chamada por cena; 3: falantes determinísticos + sinal de gênero
     scope: ClassVar[StageScope] = StageScope.EPISODE
     inputs: ClassVar[tuple[str, ...]] = (
         "normalize",
@@ -89,6 +89,14 @@ class SceneAnalysisStage(Stage):
         except Exception:
             pass
 
+        unit_events = {u.id: u.events for u in normalized.units}
+        event_span = {ev.index: (ev.start_ms, ev.end_ms) for ev in normalized.events}
+        unit_times: dict[str, tuple[int, int]] = {}
+        for u in normalized.units:
+            spans = [event_span[i] for i in u.events if i in event_span]
+            if spans:
+                unit_times[u.id] = (min(s[0] for s in spans), max(s[1] for s in spans))
+
         client = self.client or getattr(ctx, "llm", None)
         if voice_bank and episode_segments:
             from translaterany.subtitles.scene_analysis import analyze_scenes_multimodal
@@ -102,8 +110,9 @@ class SceneAnalysisStage(Stage):
                 synopsis=synopsis,
                 client=client,
                 model=self.options.model,
-                unit_events={u.id: u.events for u in normalized.units},
+                unit_events=unit_events,
                 max_lines_per_call=self.options.max_lines_per_call,
+                unit_times=unit_times,
             )
         else:
             doc = analyze_scenes(
@@ -113,7 +122,8 @@ class SceneAnalysisStage(Stage):
                 synopsis=synopsis,
                 client=client,
                 model=self.options.model,
-                unit_events={u.id: u.events for u in normalized.units},
+                unit_events=unit_events,
                 max_lines_per_call=self.options.max_lines_per_call,
+                unit_times=unit_times,
             )
         ctx.output.json(doc)

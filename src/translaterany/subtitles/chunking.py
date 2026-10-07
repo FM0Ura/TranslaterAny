@@ -65,6 +65,21 @@ def create_dialogue_batches(
     return batches
 
 
+_GENDER_PT = {"male": "masculino", "female": "feminino"}
+
+
+def _speaker_gender(lctx: Any, characters: Sequence[CharacterEntry]) -> str:
+    """Gênero do falante: campo da análise de cena; artefatos antigos (sem o campo) usam a lista de personagens."""
+    gender = getattr(lctx, "speaker_gender", "unknown")
+    if gender in _GENDER_PT:
+        return gender
+    for c in characters:
+        if c.name == getattr(lctx, "speaker", None):
+            value = c.gender.value if hasattr(c.gender, "value") else str(c.gender)
+            return value if value in _GENDER_PT else "unknown"
+    return "unknown"
+
+
 def format_batch_prompt(
     lines: list[DialogueLine],
     context: list[ContextLine],
@@ -105,8 +120,11 @@ def format_batch_prompt(
                 if lctx:
                     notes = []
                     speaker = getattr(lctx, "speaker", None)
-                    if speaker and speaker != "Unknown":
-                        notes.append(f"falante: {speaker}")
+                    known_speaker = bool(speaker) and speaker != "Unknown"
+                    gender = _speaker_gender(lctx, characters) if known_speaker else "unknown"
+                    if known_speaker:
+                        label = _GENDER_PT.get(gender)
+                        notes.append(f"falante: {speaker} ({label})" if label else f"falante: {speaker}")
                     listener = getattr(lctx, "listener", None)
                     if listener and listener != "Unknown":
                         notes.append(f"ouvinte: {listener}")
@@ -116,8 +134,12 @@ def format_batch_prompt(
                     conf = getattr(lctx, "confidence", None)
                     if conf:
                         notes.append(f"confiança: {conf}")
-                    if conf == "low":
-                        notes.append("adote formulação neutra / neutral gender")
+                    if conf == "low" or gender == "unknown":
+                        # falante desconhecido (qualquer confiança) ou de gênero ignorado: não presumir masculino
+                        notes.append(
+                            "gênero do falante indeterminado: adote formulação neutra / neutral gender "
+                            "(evite adjetivos e particípios de gênero na 1ª pessoa)"
+                        )
                     if notes:
                         sections.append(f"- [{line.id}] {', '.join(notes)}")
             sections.append("")
