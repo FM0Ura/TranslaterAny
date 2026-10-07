@@ -148,3 +148,69 @@ def test_languagetool_ignores_capitalized_proper_nouns_mid_sentence() -> None:
     assert applied == 0
 
 
+
+def _client_with_match(text: str, target: str, category: str, replacement: str) -> LanguageToolClient:
+    offset = text.index(target)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "matches": [
+                    {
+                        "message": "x",
+                        "offset": offset,
+                        "length": len(target),
+                        "rule": {"category": {"id": category}},
+                        "replacements": [{"value": replacement}],
+                    }
+                ]
+            },
+        )
+
+    return LanguageToolClient(url="http://localhost:8010/v2/check", transport=httpx.MockTransport(handler))
+
+
+def test_languagetool_rejects_word_swaps_on_loanwords_and_onomatopoeia() -> None:
+    """Regressão: 'tsundere'->'sugere', 'nyan'->'miam', 'Putz'->'Pubs' corrompiam falas."""
+    cases = [
+        ("Eu não sou tsundere nem yandere!", "tsundere", "sugere"),
+        ("Desculpa a demora, Kyouma! Nyan~!", "Nyan", "Nyhan"),
+        ("Putz, o quê?", "Putz", "Pubs"),
+        ("Fica ótimo com essa roupa de miko...", "miko", "mico"),
+        ("Mayushii! Tissuinha! Rápido!", "Tissuinha", "Diclinia"),
+    ]
+    for text, target, replacement in cases:
+        client = _client_with_match(text, target, "TYPOS", replacement)
+        corrected, applied = client.correct_text(text, exemptions=set())
+        assert corrected == text, (text, corrected)
+        assert applied == 0
+
+
+def test_languagetool_rejects_grammar_and_casing_rewrites() -> None:
+    """Regressão: 'uma gênio'->'um gênio', 'e-mails'->'e-Mails', 'você'->'Você' em fragmentos."""
+    cases = [
+        ("Aposto que você é uma gênio doida, né?", "uma", "GRAMMAR", "um"),
+        ("Mandei os e-mails ontem.", "mails", "CASING", "Mails"),
+        ("você não vai falhar...", "você", "CASING", "Você"),
+    ]
+    for text, target, category, replacement in cases:
+        client = _client_with_match(text, target, category, replacement)
+        corrected, applied = client.correct_text(text, exemptions=set())
+        assert corrected == text, (text, corrected)
+        assert applied == 0
+
+
+def test_languagetool_still_applies_accent_only_fixes() -> None:
+    text = "Incrívelmente bom."
+    client = _client_with_match(text, "Incrívelmente", "TYPOS", "Incrivelmente")
+    corrected, applied = client.correct_text(text, exemptions=set())
+    assert corrected == "Incrivelmente bom."
+    assert applied == 1
+
+    text = "Voce sabe."
+    client = _client_with_match(text, "Voce", "TYPOS", "Você")
+    corrected, applied = client.correct_text(text, exemptions=set())
+    assert corrected == "Você sabe."
+    assert applied == 1
+

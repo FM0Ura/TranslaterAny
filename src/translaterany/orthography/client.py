@@ -1,6 +1,7 @@
 """Cliente HTTP para o serviço local do LanguageTool com filtros de regras e isenções (M7)."""
 
 import logging
+import unicodedata
 from collections.abc import Set
 from typing import Any
 
@@ -10,6 +11,12 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_CATEGORIES = {"TYPOS", "CASING", "GRAMMAR"}
 BLOCKED_CATEGORIES = {"STYLE", "COLLOQUIALISMS"}
+
+
+def _strip_accents(word: str) -> str:
+    """Remove diacríticos (preservando a caixa), para detectar correções que só mudam acentuação."""
+    decomposed = unicodedata.normalize("NFD", word)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
 class LanguageToolClient:
@@ -92,6 +99,12 @@ class LanguageToolClient:
 
             sub = replacements[0].get("value")
             if not sub or sub == original:
+                continue
+
+            # Salvaguarda: só aceita correções de acentuação. A primeira sugestão do LanguageTool para
+            # estrangeirismos, onomatopeias e coloquialismos (tsundere->sugere, nyan->miam, Putz->Pubs) ou
+            # reescritas de gênero/caixa em fragmentos de fala corrompem a legenda.
+            if _strip_accents(sub) != _strip_accents(original):
                 continue
 
             result = result[:offset] + sub + result[offset + length :]
