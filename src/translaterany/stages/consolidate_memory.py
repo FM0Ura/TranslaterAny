@@ -8,45 +8,12 @@ from translaterany.memory.artifacts import ConsolidatedMemoryArtifact, ExtractTe
 from translaterany.memory.models import CharacterEntry, EntrySource, StoryMemory
 from translaterany.memory.sanitize import sanitize_glossary
 from translaterany.memory.store import MemoryStore
+from translaterany.memory.styles import apply_character_styles, character_tokens, is_valid_character_token
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 
 logger = logging.getLogger(__name__)
-
-
-_COMMON_HONORIFICS: frozenset[str] = frozenset(
-    {
-        "san",
-        "kun",
-        "chan",
-        "sama",
-        "sensei",
-        "senpai",
-        "dono",
-        "shi",
-        "tan",
-        "mr",
-        "mrs",
-        "ms",
-        "miss",
-        "dr",
-        "lord",
-        "lady",
-    }
-)
-
-
-def _is_valid_character_token(token: str) -> bool:
-    """Verifica se um token é válido para correspondência heurística (ignora <= 2 chars e honoríficos)."""
-    clean = token.strip(".,!?:;\"'").lower()
-    return len(clean) > 2 and clean not in _COMMON_HONORIFICS
-
-
-def _character_tokens(name: str) -> list[str]:
-    """Extrai tokens válidos de um nome de personagem para correspondência heurística."""
-    tokens = [t.strip(".,!?:;\"'").lower() for t in name.split()]
-    return [t for t in tokens if len(t) > 2 and t not in _COMMON_HONORIFICS]
 
 
 @register_stage
@@ -108,13 +75,13 @@ class ConsolidateMemoryStage(Stage):
 
             matched = False
             m_norm = m_clean.strip(".,!?:;\"'").lower()
-            is_valid_mention_token = _is_valid_character_token(m_clean)
+            is_valid_mention_token = is_valid_character_token(m_clean)
 
             # Verifica nos personagens de metadados recebidos
             for c in incoming_chars:
                 aliases_lower = [a.lower() for a in c.aliases]
                 is_exact_match = m_clean.lower() == c.name.lower() or m_clean.lower() in aliases_lower
-                valid_tokens = _character_tokens(c.name)
+                valid_tokens = character_tokens(c.name)
                 is_token_match = is_valid_mention_token and m_norm in valid_tokens
 
                 if is_exact_match or is_token_match:
@@ -128,7 +95,7 @@ class ConsolidateMemoryStage(Stage):
                 for ec in existing_chars:
                     aliases_lower = [a.lower() for a in ec.aliases]
                     is_exact_match = m_clean.lower() == ec.name.lower() or m_clean.lower() in aliases_lower
-                    valid_tokens = _character_tokens(ec.name)
+                    valid_tokens = character_tokens(ec.name)
                     is_token_match = is_valid_mention_token and m_norm in valid_tokens
 
                     if is_exact_match or is_token_match:
@@ -143,6 +110,12 @@ class ConsolidateMemoryStage(Stage):
                 incoming_chars.append(CharacterEntry(name=m_clean, source=EntrySource.EXTRACTED))
 
         merged_chars = mem_store.merge_characters(incoming_chars)
+
+        # Estilo de fala observado nos episódios (artefatos antigos não têm o campo)
+        observed_styles = [s for ep_art in episodes_extracts.values() if ep_art for s in ep_art.character_styles]
+        if observed_styles:
+            merged_chars = apply_character_styles(merged_chars, observed_styles)
+            mem_store.save_characters(merged_chars)
 
         # 4. Consolidação de Glossário
         incoming_terms = []

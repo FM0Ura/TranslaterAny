@@ -330,3 +330,44 @@ def test_consolidate_memory_sanitizes_glossary_aliases_and_is_idempotent(tmp_pat
 
     mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
     assert mem.glossary_path.read_text(encoding="utf-8") == first
+
+
+def test_consolidate_memory_merges_character_styles_across_episodes(tmp_path: Path) -> None:
+    from translaterany.memory.artifacts import CharacterStyle
+
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[
+            CharacterEntry(name="Rin Okada", gender=Gender.FEMALE),
+            CharacterEntry(name="Taro Sato", speech_style="estilo da metadata"),
+        ],
+    )
+    ep1 = ExtractTermsArtifact(
+        episode_key="S01E01",
+        character_styles=[
+            CharacterStyle(name="Rin Okada", speech_style="fala rápido, gírias"),
+            CharacterStyle(name="Taro Sato", speech_style="estilo novo"),
+            CharacterStyle(name="Mika", speech_style="meiga"),
+        ],
+    )
+    ep2 = ExtractTermsArtifact(
+        episode_key="S01E02",
+        character_styles=[CharacterStyle(name="Rin", speech_style="fala rápido, gírias")],
+    )
+    old_ep = ExtractTermsArtifact.model_validate({"episode_key": "S01E03", "terms": [], "character_mentions": []})
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep1, "S01E02": ep2, "S01E03": old_ep})
+
+    chars = {c.name: c for c in mem.load_characters()}
+    assert chars["Rin Okada"].speech_style == "fala rápido, gírias"
+    assert chars["Rin Okada"].source == EntrySource.METADATA
+    assert chars["Taro Sato"].speech_style == "estilo da metadata"
+    assert chars["Mika"].speech_style == "meiga"
+    assert chars["Mika"].source == EntrySource.EXTRACTED
+
+    # reexecutar não altera nada e uma segunda rodada sem estilos não apaga os já salvos
+    first = mem.characters_path.read_text(encoding="utf-8")
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep1, "S01E02": ep2, "S01E03": old_ep})
+    assert mem.characters_path.read_text(encoding="utf-8") == first
+    mem = _run_consolidate(tmp_path, meta, {"S01E03": old_ep})
+    assert {c.name: c for c in mem.load_characters()}["Rin Okada"].speech_style == "fala rápido, gírias"
