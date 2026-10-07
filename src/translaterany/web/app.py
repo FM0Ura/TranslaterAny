@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
@@ -26,6 +28,14 @@ from translaterany.web.services.pipeline_service import PipelineService
 from translaterany.web.services.series_service import SeriesService
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    yield
+    job_manager: JobManager | None = getattr(app.state, "job_manager", None)
+    if job_manager:
+        await job_manager.shutdown()
+
+
 def create_app(
     data_dir: Path | None = None,
     config_path: Path | None = None,
@@ -35,6 +45,7 @@ def create_app(
         title="TranslaterAny Web",
         description="Interface Web moderna e API RESTful desacoplada para tradução de legendas de anime",
         version="1.3.0",
+        lifespan=lifespan,
     )
 
     # Middleware CORS

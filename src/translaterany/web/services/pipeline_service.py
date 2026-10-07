@@ -9,8 +9,10 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from translaterany.config.loader import default_config_path, default_data_dir
+from translaterany.config.model import PipelineConfig
 from translaterany.pipeline.registry import REGISTRY
 from translaterany.stages import DEFAULT_PIPELINE
+from translaterany.web.services.config_service import ConfigService
 
 STAGE_METADATA: dict[str, dict[str, str]] = {
     "inventory": {"label": "Inventário de Faixas", "desc": "Mapeia faixas de áudio e legendas nos arquivos MKV"},
@@ -123,6 +125,9 @@ class PipelineService:
         return PipelineGraph(stages=stages, is_customized=is_customized)
 
     def set_stage_enabled(self, stage_name: str, enabled: bool, series_key: str | None = None) -> None:
+        if stage_name not in DEFAULT_PIPELINE and stage_name not in REGISTRY:
+            raise ValueError(f"etapa desconhecida: '{stage_name}'")
+
         current_enabled, _ = self._get_enabled_stages(series_key)
         enabled_set = set(current_enabled)
 
@@ -134,13 +139,19 @@ class PipelineService:
         # Preserva a ordem canônica do DEFAULT_PIPELINE
         new_active = [s for s in DEFAULT_PIPELINE if s in enabled_set]
 
+        # Valida via Pydantic PipelineConfig
+        validated_pipeline = PipelineConfig(stages=tuple(new_active))
+
         if series_key:
             series_dir = self.data_dir / "series" / series_key
             series_dir.mkdir(parents=True, exist_ok=True)
             series_toml = series_dir / "series.toml"
-            self._write_pipeline_to_toml(series_toml, new_active)
+            self._write_pipeline_to_toml(series_toml, list(validated_pipeline.stages))
         else:
-            self._write_pipeline_to_toml(self.config_path, new_active)
+            cfg_svc = ConfigService(self.config_path)
+            cfg = cfg_svc.get_config()
+            cfg.pipeline = validated_pipeline
+            cfg_svc.save_config(cfg)
 
     def _write_pipeline_to_toml(self, path: Path, active_stages: list[str]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,12 +163,10 @@ class PipelineService:
         pipeline_block = f"[pipeline]\nstages = {stages_repr}\n"
 
         if "[pipeline]" in content:
-            # Substitui o bloco [pipeline] existente
             import re
             pattern = re.compile(r"\[pipeline\][^\[]*", re.MULTILINE | re.DOTALL)
             new_content = pattern.sub(pipeline_block, content)
             path.write_text(new_content, encoding="utf-8")
         else:
-            # Adiciona ao final
             sep = "\n\n" if content.strip() else ""
             path.write_text(content.rstrip() + sep + pipeline_block, encoding="utf-8")

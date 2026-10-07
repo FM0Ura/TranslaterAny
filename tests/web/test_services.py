@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from translaterany.config.model import AppConfig
 from translaterany.memory.models import (
     CharacterEntry,
@@ -133,3 +135,13 @@ def test_config_service_read_and_save(tmp_path: Path) -> None:
     # Recarrega
     saved_cfg = svc.get_config()
     assert saved_cfg.source_language == "ja"
+
+
+def test_pipeline_service_validation(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    svc = PipelineService(config_path=config_path)
+
+    # Tentar habilitar etapa inexistente deve falhar com ValueError
+    with pytest.raises(ValueError, match="etapa desconhecida"):
+        svc.set_stage_enabled("malicious_stage_injection", True)
+

@@ -69,3 +69,15 @@ async def test_job_manager_event_streaming() -> None:
     assert events[1]["data"]["message"] == "Iniciando etapa"
     assert events[2]["event"] == "progress"
     assert events[2]["data"]["percent"] == 50.0
+
+
+@pytest.mark.anyio
+async def test_job_manager_shutdown() -> None:
+    manager = JobManager(start_worker=True)
+    job = manager.enqueue(series_key="series-shutdown")
+    assert job.status in (JobStatus.PENDING, JobStatus.RUNNING)
+
+    await manager.shutdown()
+    assert manager._executor._shutdown is True
+    assert job.status in (JobStatus.CANCELLED, JobStatus.COMPLETED)
+

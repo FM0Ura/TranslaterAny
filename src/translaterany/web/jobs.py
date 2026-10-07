@@ -297,3 +297,19 @@ class JobManager:
         token.check_point()
         # Aqui o pipeline real pode ser chamado se desejado.
         token.check_point()
+
+    async def shutdown(self) -> None:
+        """Cancela jobs ativos de forma cooperativa, encerra o loop do worker e o executor."""
+        for job_id, job in list(self._jobs.items()):
+            if job.status in (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.PAUSED):
+                self.cancel(job_id)
+
+        if self._worker_task and not self._worker_task.done():
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
+            except asyncio.CancelledError:
+                pass
+
+        self._executor.shutdown(wait=False, cancel_futures=True)
+
