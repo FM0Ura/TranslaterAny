@@ -59,7 +59,7 @@ def pick_style(candidates: Iterable[str]) -> str:
     return original[best]
 
 
-def _find_character(chars: list[CharacterEntry], name: str) -> int | None:
+def find_character(chars: list[CharacterEntry], name: str) -> int | None:
     key = _norm(name).lower()
     for idx, c in enumerate(chars):
         if key == _norm(c.name).lower() or key in {_norm(a).lower() for a in c.aliases}:
@@ -83,7 +83,7 @@ def apply_character_styles(chars: Iterable[CharacterEntry], observed: Iterable[C
         name, style = _norm(item.name), _norm(item.speech_style)
         if not style or not character_tokens(name):
             continue
-        idx = _find_character(result, name)
+        idx = find_character(result, name)
         if idx is None:
             result.append(CharacterEntry(name=name, source=EntrySource.EXTRACTED))
             idx = len(result) - 1

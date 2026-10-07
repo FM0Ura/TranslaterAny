@@ -6,8 +6,9 @@ from typing import ClassVar
 from pydantic import BaseModel, Field
 
 from translaterany.llm.client import LLMClient, LLMRequest
-from translaterany.memory.artifacts import ExtractTermsArtifact, MetadataArtifact
+from translaterany.memory.artifacts import CharacterStyle, ExtractTermsArtifact, MetadataArtifact
 from translaterany.memory.models import EntrySource, GlossaryCategory, GlossaryEntry
+from translaterany.memory.styles import find_character
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.subtitles.normalize import NormalizedDoc
@@ -41,9 +42,15 @@ class ExtractedTermItem(BaseModel):
     notes: str | None = None
 
 
+class ExtractedCharacterStyle(BaseModel):
+    name: str
+    speech_style: str = ""
+
+
 class ExtractTermsResponse(BaseModel):
     terms: list[ExtractedTermItem] = Field(default_factory=list)
     character_mentions: list[str] = Field(default_factory=list)
+    character_styles: list[ExtractedCharacterStyle] = Field(default_factory=list)
 
 
 class ExtractTermsOptions(BaseModel):
@@ -52,12 +59,42 @@ class ExtractTermsOptions(BaseModel):
     max_sample_lines: int | None = 500
 
 
+def sample_evenly[T](items: list[T], limit: int | None) -> list[T]:
+    """Até `limit` itens espaçados uniformemente (mantém ordem, primeiro e último) para cobrir o episódio inteiro."""
+    if limit is None or limit >= len(items):
+        return items
+    if limit <= 1:
+        return items[:limit]
+    last = len(items) - 1
+    return [items[round(i * last / (limit - 1))] for i in range(limit)]
+
+
+def _clean_styles(items: list[ExtractedCharacterStyle], meta: MetadataArtifact | None) -> list[CharacterStyle]:
+    """Descarta estilos vazios/duplicados e troca o nome pelo do personagem dos metadados quando casa."""
+    known = meta.characters if meta else []
+    cleaned: list[CharacterStyle] = []
+    seen: set[str] = set()
+    for item in items:
+        name = " ".join(item.name.split())
+        style = " ".join(item.speech_style.split())
+        if not name or not style:
+            continue
+        idx = find_character(known, name)
+        if idx is not None:
+            name = known[idx].name
+        if name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        cleaned.append(CharacterStyle(name=name, speech_style=style))
+    return cleaned
+
+
 @register_stage
 class ExtractTermsStage(Stage):
     """Etapa de episódio que extrai termos candidatos e menções de personagens."""
 
     name: ClassVar[str] = "extract_terms"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"
     scope: ClassVar[StageScope] = StageScope.EPISODE
     inputs: ClassVar[tuple[str, ...]] = ("metadata", "normalize")
     translates: ClassVar[bool] = False
@@ -113,16 +150,14 @@ class ExtractTermsStage(Stage):
                 names = [c.name for c in meta.characters[:20]]
                 context_parts.append(f"Known characters from metadata: {', '.join(names)}")
 
-        if self.options.max_sample_lines is not None:
-            sampled_units = units[: self.options.max_sample_lines]
-        else:
-            sampled_units = units
+        sampled_units = sample_evenly(units, self.options.max_sample_lines)
 
         sample_lines = "\n".join(f"- {u.text}" for u in sampled_units)
         prompt = (
             f"{chr(10).join(context_parts)}\n\n"
             f"Episode dialogue lines:\n{sample_lines}\n\n"
-            "Identify key terminology, abilities, locations, organizations, and mentioned characters."
+            "Identify key terminology, abilities, locations, organizations, mentioned characters, "
+            "and the speech style of the characters who speak."
         )
 
         instructions = (
@@ -130,7 +165,12 @@ class ExtractTermsStage(Stage):
             "to extract recurring non-trivial proper nouns, abilities, locations, organizations, and jargon. "
             "For each term, provide a natural PT-BR translation and an appropriate category "
             "('name', 'place', 'technique', 'object', 'org', or 'general'). "
-            "Also list character names mentioned in the dialogue."
+            "Also list character names mentioned in the dialogue. "
+            "Finally, fill character_styles with one {name, speech_style} item per character whose way of "
+            "speaking you can actually characterize from the lines: speech_style is a short PT-BR description "
+            "of register, verbal tics and politeness (e.g. 'formal e educado, usa tom sarcástico'). "
+            "Use the exact names from the known characters list when the character is in it, "
+            "and omit characters you cannot characterize."
         )
 
         req = LLMRequest(
@@ -202,6 +242,7 @@ class ExtractTermsStage(Stage):
             episode_key=ep_key,
             terms=entries,
             character_mentions=unique_mentions,
+            character_styles=_clean_styles(llm_output.character_styles, meta),
         )
         ctx.output.json(artifact)
 

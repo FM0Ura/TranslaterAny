@@ -6,7 +6,7 @@ import pytest
 from translaterany.llm.client import LLMTransientError
 from translaterany.llm.fake import FakeLLM
 from translaterany.memory.artifacts import ExtractTermsArtifact, MetadataArtifact
-from translaterany.memory.models import EntrySource, GlossaryCategory
+from translaterany.memory.models import CharacterEntry, EntrySource, GlossaryCategory
 from translaterany.pipeline.stage import StageScope
 from translaterany.pipeline.units import Episode
 from translaterany.stages.extract_terms import ExtractTermsOptions, ExtractTermsResponse, ExtractTermsStage
@@ -257,6 +257,75 @@ def test_extract_terms_max_sample_lines(tmp_path: Path) -> None:
     stage_50.run(ctx)
     assert len(fake_llm_50.calls) == 1
     prompt_50 = fake_llm_50.calls[0].prompt
-    assert "- Line 0" in prompt_50
-    assert "- Line 49" in prompt_50
-    assert "- Line 50" not in prompt_50
+    assert prompt_50.count("\n- Line ") == 50
+    assert "- Line 0\n" in prompt_50
+    assert "- Line 349" in prompt_50  # amostragem uniforme cobre o episódio inteiro
+
+
+def _run_stage(tmp_path: Path, units: list[Unit], response: ExtractTermsResponse, meta: MetadataArtifact | None = None):
+    doc = NormalizedDoc(encoding=Encoding(bom=False, newline="\n"), format=[], events=[], units=units)
+    captured: list[ExtractTermsArtifact] = []
+    fake_llm = FakeLLM([response])
+    ctx = SimpleNamespace(
+        episode=Episode(key="S01E01", source=tmp_path / "S01E01.mkv", number=1, season=1),
+        inputs=SimpleNamespace(
+            json=lambda name, model: doc if name == "normalize" else (meta or MetadataArtifact(matched=False))
+        ),
+        output=SimpleNamespace(json=captured.append),
+        llm=fake_llm,
+    )
+    ExtractTermsStage(client=fake_llm, options=ExtractTermsOptions(max_sample_lines=50)).run(ctx)
+    return captured[0], fake_llm
+
+
+def test_extract_terms_version_bumped() -> None:
+    assert ExtractTermsStage.version == "2"
+
+
+def test_extract_terms_samples_lines_evenly_across_episode(tmp_path: Path) -> None:
+    units = [Unit(id=str(i), style="Default", text=f"Line {i}", markers=0, events=[i]) for i in range(1000)]
+    _, llm = _run_stage(tmp_path, units, ExtractTermsResponse())
+    prompt = llm.calls[0].prompt
+    sampled = [int(line.removeprefix("- Line ")) for line in prompt.splitlines() if line.startswith("- Line ")]
+    assert len(sampled) == 50
+    assert sampled == sorted(sampled)
+    assert sampled[0] == 0
+    assert sampled[-1] == 999
+    gaps = [b - a for a, b in zip(sampled, sampled[1:], strict=False)]
+    assert max(gaps) - min(gaps) <= 1
+
+
+def test_extract_terms_asks_for_character_styles(tmp_path: Path) -> None:
+    units = [Unit(id="0", style="Default", text="Hello there.", markers=0, events=[0])]
+    _, llm = _run_stage(tmp_path, units, ExtractTermsResponse())
+    assert "speech_style" in llm.calls[0].instructions
+    assert "character_styles" in llm.calls[0].instructions
+
+
+def test_extract_terms_outputs_cleaned_character_styles(tmp_path: Path) -> None:
+    units = [Unit(id="0", style="Default", text="Hello there.", markers=0, events=[0])]
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[CharacterEntry(name="Rin Okada", aliases=["Rinrin"]), CharacterEntry(name="Taro Sato")],
+    )
+    response = ExtractTermsResponse(
+        character_styles=[
+            {"name": "Rinrin", "speech_style": " Fala rápido, usa gírias "},
+            {"name": "Rin Okada", "speech_style": "duplicado, será ignorado"},
+            {"name": "Taro", "speech_style": "polido e hesitante"},
+            {"name": "Mika", "speech_style": "meiga"},
+            {"name": "Nobody", "speech_style": "  "},
+            {"name": " ", "speech_style": "vazio"},
+        ]
+    )
+    art, _ = _run_stage(tmp_path, units, response, meta)
+    assert [(c.name, c.speech_style) for c in art.character_styles] == [
+        ("Rin Okada", "Fala rápido, usa gírias"),
+        ("Taro Sato", "polido e hesitante"),
+        ("Mika", "meiga"),
+    ]
+
+
+def test_extract_terms_response_without_styles_is_valid() -> None:
+    assert ExtractTermsResponse.model_validate({"terms": [], "character_mentions": []}).character_styles == []
