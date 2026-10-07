@@ -40,7 +40,7 @@ class RedistributeSentencesOptions(BaseModel):
 @register_stage
 class RedistributeSentencesStage(Stage):
     name: ClassVar[str] = "redistribute_sentences"
-    version: ClassVar[str] = "3"  # 3: diálogo da última etapa com produces_dialogue
+    version: ClassVar[str] = "4"  # 4: corte por cláusula/palavra (sem sobras no meio da frase); 3: produces_dialogue
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
@@ -50,19 +50,23 @@ class RedistributeSentencesStage(Stage):
     def __init__(self, options: BaseModel | None = None) -> None:
         super().__init__(options)
         self.max_cpl = 42  # padrão Netflix; o loader aplica o [checks] via bind_pipeline
+        self.max_cps = 17.0
+        self.max_lines = 2
         self.dialogue_input = "translate_dialogue"
         self.inputs = (*_FIXED, self.dialogue_input, *_OTHER_TEXTS)
 
     def bind_pipeline(self, previous: Sequence[Stage], app: AppConfig | None) -> None:
         if app is not None:
             self.max_cpl = app.checks.max_cpl
+            self.max_cps = app.checks.max_cps
+            self.max_lines = app.checks.max_lines
         dialogue = [s.name for s in previous if s.produces_dialogue]
         if dialogue:
             self.dialogue_input = dialogue[-1]
         self.inputs = (*_FIXED, self.dialogue_input, *_OTHER_TEXTS)
 
     def cache_payload(self, series: Series | None, episode: Episode | None) -> Any:
-        return {"max_cpl": self.max_cpl, "dialogue_input": self.dialogue_input}
+        return {"max_cpl": self.max_cpl, "max_cps": self.max_cps, "max_lines": self.max_lines, "dialogue_input": self.dialogue_input}
 
     def run(self, ctx: StageContext) -> None:
         doc = ctx.inputs.json("normalize", NormalizedDoc)
@@ -107,7 +111,9 @@ class RedistributeSentencesStage(Stage):
             for comp in merged_doc.units:
                 if comp.composite_id in dialogue_texts:
                     translated = dialogue_texts[comp.composite_id]
-                    split = redistribute_composite_unit(comp, translated)
+                    split = redistribute_composite_unit(
+                        comp, translated, max_cpl=self.max_cpl, max_cps=self.max_cps, max_lines=self.max_lines
+                    )
 
                     # Garante que cada unidade desmembrada contenha exatamente os marcadores esperados
                     for uid in comp.unit_ids:

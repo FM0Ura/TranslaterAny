@@ -5,85 +5,180 @@ from __future__ import annotations
 import re
 
 from translaterany.subtitles.merge import CompositeUnit
+from translaterany.subtitles.segments import MARKER_RE
+
+# Separador de palavras: espaços e quebras ASS literais (\N / \n)
+_SEP = re.compile(r"(?:\s|\\[Nn])+")
+_HARD_BREAK = re.compile(r"\n|\\[Nn]")
+
+_STRONG_END = ("...", "…", ".", "!", "?", "—", "”", "\"")
+_CLAUSE_END = (",", ";", ":", "-", "–")
+
+# Palavras funcionais (pt/es/en/fr/it): um evento não deve terminar nelas, pois a frase fica pendurada
+_FUNCTION_WORDS = frozenset(
+    """a o as os um uma uns umas de do da dos das em no na nos nas por pelo pela pelos pelas para pra
+    com sem sob sobre ao aos à às e ou mas que se como quando porque pois nem até e/ou seu sua meu minha
+    the an of to in on at by for with and or but that if as from into
+    el la los las un una unos unas del al y o pero porque cuando con sin
+    le les des du et ou mais que
+    il lo gli i di da e ma che""".split()
+)
+# Conectores que não devem abrir um evento quando o corte caiu no meio da oração
+_CONNECTORS = frozenset(
+    "e ou mas que se como porque pois nem quando and or but that if y pero porque et ou mais che ma".split()
+)
+
+_COST_PER_PERCENT = 1.0  # desvio da proporção de duração, por ponto percentual
+_COST_NO_PUNCT = 25.0  # corte no meio da oração
+_COST_CLAUSE = 6.0  # corte depois de vírgula, ponto e vírgula, dois-pontos
+_BONUS_LINE_BREAK = 8.0  # o modelo já separou a frase em linhas
+_COST_DANGLING_END = 30.0
+_COST_CONNECTOR_START = 8.0
+_COST_OPEN_PAREN = 100.0
+_COST_PER_CHAR_OVER_CPL = 2.0
+_COST_PER_CHAR_OVER_CPS = 0.5
 
 
-def _find_split_points(text: str, durations: list[int]) -> list[int]:
-    n = len(durations)
-    if n <= 1:
-        return []
+def _visible_len(text: str) -> int:
+    return len(MARKER_RE.sub("", text))
+
+
+def _bare(word: str) -> str:
+    return re.sub(r"^[^\w]+|[^\w]+$", "", word.lower())
+
+
+def _split_words(text: str) -> tuple[list[tuple[int, int]], list[bool]]:
+    """Posições (início, fim) de cada palavra e, para cada separador entre elas, se é quebra de linha."""
+    spans: list[tuple[int, int]] = []
+    hard: list[bool] = []
+    pos = 0
+    for m in _SEP.finditer(text):
+        if m.start() > pos:
+            spans.append((pos, m.start()))
+            hard.append(bool(_HARD_BREAK.search(m.group(0))))
+        pos = m.end()
+    if pos < len(text):
+        spans.append((pos, len(text)))
+        hard.append(False)
+    return spans, hard[: max(len(spans) - 1, 0)]
+
+
+def _boundary_cost(words: list[str], hard: list[bool], j: int) -> float:
+    """Custo de terminar um evento na palavra j (e começar o próximo em j+1)."""
+    last, nxt = words[j], words[j + 1]
+    if last.endswith(_STRONG_END):
+        cost = 0.0
+    elif last.endswith(_CLAUSE_END):
+        cost = _COST_CLAUSE
+    else:
+        cost = _COST_NO_PUNCT
+        if _bare(last) in _FUNCTION_WORDS:
+            cost += _COST_DANGLING_END
+        if _bare(nxt) in _CONNECTORS:
+            cost += _COST_CONNECTOR_START
+    if hard[j]:
+        cost -= _BONUS_LINE_BREAK
+    return cost
+
+
+def _split_indices(
+    words: list[str],
+    hard: list[bool],
+    durations: list[int],
+    max_cpl: int,
+    max_cps: float,
+    max_lines: int,
+) -> list[int]:
+    """Índices (da última palavra de cada evento, exceto o último) que minimizam o custo total."""
+    n, w = len(durations), len(words)
     total_dur = sum(durations) or n
-    length = len(text)
+    lens = [_visible_len(x) for x in words]
+    prefix = [0]
+    for ln in lens:
+        prefix.append(prefix[-1] + ln + 1)
+    total_len = prefix[-1] - 1 or 1
+    parens = [0]
+    for x in words:
+        parens.append(parens[-1] + x.count("(") - x.count(")"))
 
-    # Identifica spans de marcadores inline ⟦n⟧
-    marker_spans = [m.span() for m in re.finditer(r"⟦\d+⟧", text)]
+    def part_cost(a: int, b: int, k: int) -> float:
+        """Palavras a..b-1 no evento k: orçamento de caracteres por linha e por segundo."""
+        chars = prefix[b] - prefix[a] - 1
+        cost = max(0, chars - max_cpl * max_lines) * _COST_PER_CHAR_OVER_CPL
+        budget = max_cps * (durations[k] / 1000)
+        return cost + max(0.0, chars - budget) * _COST_PER_CHAR_OVER_CPS
 
-    def inside_marker(pos: int) -> bool:
-        return any(s < pos < e for s, e in marker_spans)
+    targets, cum = [], 0
+    for d in durations[:-1]:
+        cum += d
+        targets.append(cum / total_dur)
 
-    # Identifica posições de início de whitespace (cortes limpos entre palavras)
-    spaces: list[int] = []
-    for m in re.finditer(r"\s+", text):
-        pos = m.start()
-        if not inside_marker(pos) and 0 < pos < length:
-            spaces.append(pos)
-
-    cuts: list[int] = []
-    cum_dur = 0
-    prev_cut = 0
+    inf = float("inf")
+    # best[k][j]: custo mínimo com o corte k terminando na palavra j; prev guarda o corte anterior
+    best = [[inf] * w for _ in range(n)]
+    prev = [[-1] * w for _ in range(n)]
     for k in range(n - 1):
-        cum_dur += durations[k]
-        target = round((cum_dur / total_dur) * length)
-
-        valid_spaces = [s for s in spaces if s > prev_cut]
-        if valid_spaces:
-
-            def score(s: int) -> float:
-                dist = abs(s - target)
-                prefix = text[:s].rstrip()
-                # Pontuação de cláusula ou forte ganha prioridade
-                if prefix.endswith(("...", "…", ".", "!", "?", "—")):
-                    penalty = 0.8
-                elif prefix.endswith((",", ";", ":", "-")):
-                    penalty = 1.0
-                else:
-                    penalty = 2.5
-                if prefix.count("(") > prefix.count(")"):
-                    penalty *= 5.0
-                return dist * penalty
-
-            best_s = min(valid_spaces, key=score)
-            cuts.append(best_s)
-            prev_cut = best_s
-        else:
-            # Fallback se não houver espaços suficientes
-            best_pos = min(
-                (p for p in range(prev_cut + 1, length) if not inside_marker(p)),
-                key=lambda p: abs(p - target),
-                default=prev_cut + 1,
-            )
-            cuts.append(best_pos)
-            prev_cut = best_pos
-
-    return cuts
+        lo = k  # cada evento anterior precisa de ao menos uma palavra
+        for j in range(lo, w - (n - 1 - k)):
+            cut_ratio = (prefix[j + 1] - 1) / total_len
+            cost = abs(cut_ratio - targets[k]) * 100 * _COST_PER_PERCENT
+            cost += _boundary_cost(words, hard, j)
+            if parens[j + 1] > 0:
+                cost += _COST_OPEN_PAREN
+            if k == 0:
+                best[0][j] = cost + part_cost(0, j + 1, 0)
+                continue
+            for i in range(k - 1, j):
+                if best[k - 1][i] == inf:
+                    continue
+                total = best[k - 1][i] + cost + part_cost(i + 1, j + 1, k)
+                if total < best[k][j]:
+                    best[k][j], prev[k][j] = total, i
+    last = min(
+        range(n - 2, w - 1),
+        key=lambda j: best[n - 2][j] + part_cost(j + 1, w, n - 1),
+    )
+    cuts = [last]
+    for k in range(n - 2, 0, -1):
+        cuts.append(prev[k][cuts[-1]])
+    return cuts[::-1]
 
 
-def redistribute_composite_unit(comp: CompositeUnit, translated_text: str) -> dict[str, str]:
-    """Divide a tradução de uma unidade composta proporcionalmente à duração dos eventos originais."""
+def redistribute_composite_unit(
+    comp: CompositeUnit,
+    translated_text: str,
+    *,
+    max_cpl: int = 42,
+    max_cps: float = 17.0,
+    max_lines: int = 2,
+) -> dict[str, str]:
+    """Divide a tradução de uma unidade composta entre os eventos originais.
+
+    Corta preferencialmente em pontuação (ponto, reticências, vírgula), perto do ponto proporcional à
+    duração dos eventos; nunca no meio de uma palavra ou marcador e evitando terminar um evento numa
+    palavra funcional. Se o modelo já separou a frase em uma linha por evento, usa as linhas.
+    """
     unit_ids = comp.unit_ids
     if len(unit_ids) <= 1:
         return {unit_ids[0]: translated_text}
+    n = len(unit_ids)
+    durations = [*comp.durations_ms, *([1000] * n)][:n]
 
-    cuts = _find_split_points(translated_text, comp.durations_ms)
-    parts: list[str] = []
-    curr = 0
-    for cut in cuts:
-        parts.append(translated_text[curr:cut].strip())
-        m = re.match(r"\s+", translated_text[cut:])
-        space_len = len(m.group(0)) if m else 0
-        curr = cut + space_len
-    parts.append(translated_text[curr:].strip())
-
-    result: dict[str, str] = {}
-    for i, uid in enumerate(unit_ids):
-        result[uid] = parts[i] if i < len(parts) else ""
-    return result
+    spans, hard = _split_words(translated_text)
+    parts: list[str] = [""] * n
+    if len(spans) < n:
+        # menos palavras que eventos: uma palavra por evento, na ordem
+        for i, (s, e) in enumerate(spans):
+            parts[i] = translated_text[s:e]
+    else:
+        lines = [ln.strip() for ln in re.split(r"\s*(?:\n|\\[Nn])\s*", translated_text) if ln.strip()]
+        if len(lines) == n:
+            parts = lines
+        else:
+            words = [translated_text[s:e] for s, e in spans]
+            cuts = _split_indices(words, hard, durations, max_cpl, max_cps, max_lines)
+            start = 0
+            for k, cut in enumerate([*cuts, len(spans) - 1]):
+                parts[k] = translated_text[spans[start][0] : spans[cut][1]]
+                start = cut + 1
+    return {uid: parts[i].strip() for i, uid in enumerate(unit_ids)}
