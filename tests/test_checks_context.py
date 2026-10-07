@@ -52,6 +52,35 @@ def test_glossary_expected_form() -> None:
     assert not only(run_line_checks([line("Hoshinoumi Academy", "Academia Hoshinoumi")], env), "glossary")
 
 
+def test_glossary_ignores_alias_that_is_a_character_name() -> None:
+    env = CheckEnv(
+        glossary=[
+            GlossaryEntry(
+                term="Phantom Rin", translation="Rin Fantasma", aliases=["Rinrin", "The Phantom"], source="extracted"
+            )
+        ],
+        names=[["Rin Okada", "Rinrin"]],
+    )
+    # só o alias (que é apelido de personagem) casou: a forma esperada do termo não é exigida
+    assert not only(run_line_checks([line("Rinrin!", "Rinrin!")], env), "glossary")
+    # alias que não é de personagem continua exigindo a forma esperada
+    assert only(run_line_checks([line("The Phantom strikes.", "O vilão ataca.")], env), "glossary")
+    # o termo em si casou: exige a forma esperada mesmo com o alias de personagem presente
+    assert only(run_line_checks([line("Phantom Rin, Rinrin!", "Rinrin!")], env), "glossary")
+
+
+def test_glossary_ignores_alias_that_is_another_entry_term() -> None:
+    env = CheckEnv(
+        glossary=[
+            GlossaryEntry(term="Northtown", translation="Cidade Norte", aliases=["Northville"]),
+            GlossaryEntry(term="Northville", translation="Vila Norte"),
+        ]
+    )
+    findings = only(run_line_checks([line("Welcome to Northville.", "Bem-vindo à Vila Norte.")], env), "glossary")
+    assert not findings
+    assert only(run_line_checks([line("Welcome to Northtown.", "Bem-vindo à vila.")], env), "glossary")
+
+
 def test_foreign_markers() -> None:
     env = CheckEnv()
     assert only(run_line_checks([line("I'm on the bus.", "Estou no autocarro.")], env), "foreign_markers")
