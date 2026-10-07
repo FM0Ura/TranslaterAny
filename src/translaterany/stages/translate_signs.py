@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 from translaterany.languages.registry import LanguageRegistry
 from translaterany.llm.client import LLMClient
+from translaterany.memory.matching import load_memory_for_text
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
 from translaterany.pipeline.stage_metrics import StageMetrics
@@ -31,7 +32,7 @@ class TranslateSignsOptions(BaseModel):
 @register_stage
 class TranslateSignsStage(Stage):
     name: ClassVar[str] = "translate_signs"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: termos do glossário protegidos por marcador ⟦Gn⟧
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
@@ -70,6 +71,11 @@ class TranslateSignsStage(Stage):
         except Exception:
             pass
 
+        sign_ids = {uid for uid, c in classification.units.items() if c.type in ("sign", "title")}
+        sign_text = "\n".join(u.text for u in doc.units if u.id in sign_ids and u.id not in tm_resolved)
+        series = getattr(ctx, "series", None)
+        glossary, _ = load_memory_for_text(getattr(ctx, "store", None), series.key, sign_text) if series else ([], [])
+
         result = translate_signs(
             doc=doc,
             classes=classification,
@@ -80,6 +86,7 @@ class TranslateSignsStage(Stage):
             max_tokens_per_batch=self.options.max_tokens_per_batch,
             max_lines_per_batch=self.options.max_lines_per_batch,
             metrics=ctx.metrics if isinstance(getattr(ctx, "metrics", None), StageMetrics) else None,
+            glossary=glossary,
             system_instructions=render_signs_system_instructions(
                 getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en"),
                 getattr(ctx, "target_language", None) or LanguageRegistry.resolve("pt-BR"),

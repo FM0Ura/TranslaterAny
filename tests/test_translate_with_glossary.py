@@ -83,7 +83,8 @@ def test_translate_dialogue_filters_terms_and_populates_used_terms(tmp_path: Pat
                 return cons_art
             raise ValueError(name)
 
-    fake_llm = FakeLLM(responses={"Welcome to Hoshinoumi Academy, Yuu!": "Bem-vindo à Academia Hoshinoumi, Yuu!"})
+    # o termo do glossário chega ao modelo protegido por marcador
+    fake_llm = FakeLLM(responses={"Welcome to ⟦G1⟧, Yuu!": "Bem-vindo à ⟦G1⟧, Yuu!"})
     stage = StageTranslateDialogue(client=fake_llm)
     ep = Episode(key="S01E01", source=tmp_path / "S01E01.mkv", number=1, season=1)
     ctx = SimpleNamespace(

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 
 from translaterany.languages.models import LanguageInfo
 from translaterany.llm.client import LLMClient
+from translaterany.memory.models import GlossaryEntry
 from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.subtitles.chunking import DialogueLine
 from translaterany.subtitles.classify import Classification, UnitClass
@@ -59,6 +61,7 @@ def translate_signs(
     max_lines_per_batch: int | None = 1,
     metrics: StageMetrics | None = None,
     system_instructions: str | None = None,
+    glossary: Sequence[GlossaryEntry] = (),
 ) -> UnitTexts:
     """Traduz placas e elementos gráficos visuais, respeitando concisão e marcadores."""
     class_map = classes.units if isinstance(classes, Classification) else classes
@@ -89,6 +92,7 @@ def translate_signs(
         max_lines_per_batch=max_lines_per_batch,
         max_context_lines=2,
         metrics=metrics,
+        glossary=glossary,
         system_instructions=system_instructions or SIGNS_SYSTEM_INSTRUCTIONS,
     )
     raw_translations = translator.translate_lines(pending_units)

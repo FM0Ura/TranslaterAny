@@ -10,12 +10,23 @@ if TYPE_CHECKING:
     from translaterany.pipeline.artifacts import ArtifactStore
 
 
+def _term_pattern(term: str) -> re.Pattern[str]:
+    prefix = r"\b" if re.match(r"^\w", term) else ""
+    suffix = r"\b" if re.search(r"\w$", term) else ""
+    return re.compile(rf"{prefix}{re.escape(term)}{suffix}", re.IGNORECASE)
+
+
 def matches_term(term: str, text: str) -> bool:
     if not term:
         return False
-    prefix = r"\b" if re.match(r"^\w", term) else ""
-    suffix = r"\b" if re.search(r"\w$", term) else ""
-    return bool(re.search(rf"{prefix}{re.escape(term)}{suffix}", text, re.IGNORECASE))
+    return bool(_term_pattern(term).search(text))
+
+
+def term_spans(term: str, text: str) -> list[tuple[int, int]]:
+    """Intervalos (início, fim) de cada ocorrência do termo no texto, com a mesma semântica de matches_term."""
+    if not term:
+        return []
+    return [m.span() for m in _term_pattern(term).finditer(text)]
 
 
 def select_for_text(
@@ -61,4 +72,3 @@ def load_all_characters(store: ArtifactStore | None, series_key: str) -> list[Ch
 
     mem = MemoryStore(mem_dir)
     return mem.load_characters()
-

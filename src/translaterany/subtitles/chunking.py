@@ -87,6 +87,7 @@ def format_batch_prompt(
     characters: Sequence[CharacterEntry] = (),
     line_contexts: Mapping[str, Any] | None = None,
     char_budgets: Mapping[str, int] | None = None,
+    term_markers: Mapping[str, Sequence[str]] | None = None,
 ) -> str:
     sections: list[str] = []
     if glossary:
@@ -94,6 +95,18 @@ def format_batch_prompt(
         for g in glossary:
             note = f" ({g.notes})" if g.notes else ""
             sections.append(f"- {g.term} -> {g.translation}{note}")
+        sections.append("")
+
+    if term_markers:
+        sections.append("[MARCADORES DE TERMOS]:")
+        sections.append(
+            "Os marcadores ⟦G1⟧, ⟦G2⟧... representam termos do glossário já traduzidos. Copie cada marcador "
+            "exatamente como está, uma única vez, sem traduzi-lo, alterá-lo ou removê-lo; ele será substituído "
+            "depois. Apenas concorde gênero e número com o termo indicado."
+        )
+        for line in lines:
+            for n, canonical in enumerate(term_markers.get(line.id, ()), 1):
+                sections.append(f"- [{line.id}] ⟦G{n}⟧ = {canonical}")
         sections.append("")
 
     if characters:

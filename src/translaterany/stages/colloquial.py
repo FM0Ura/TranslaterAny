@@ -40,7 +40,7 @@ speech_style = ajustar ao jeito de falar do personagem. Falas com
 @register_stage
 class ColloquialStage(DialogueRefineStage):
     name: ClassVar[str] = "colloquial"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: rejeita edição que remove forma canônica do glossário
     default_dialogue_input: ClassVar[str] = "review_meaning"
 
     def __init__(self, options=None) -> None:

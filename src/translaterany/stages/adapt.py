@@ -28,7 +28,7 @@ def identify_cps_exceeded(text: str, duration_ms: int, max_cps: float = 17.0) ->
 @register_stage
 class AdaptStage(DialogueRefineStage):
     name: ClassVar[str] = "adapt"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: rejeita edição que remove forma canônica do glossário
     default_dialogue_input: ClassVar[str] = "treatment_consistency"
     Options: ClassVar[type] = AdaptOptions
 
