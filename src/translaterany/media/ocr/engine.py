@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
+from translaterany.media.ocr.cleanup import fix_pipe_as_capital_i
 from translaterany.media.ocr.models import SubtitleDisplaySet
 
 TESSERACT_LANG_MAP: dict[str, str] = {
@@ -114,6 +115,7 @@ class _HOCRParser(HTMLParser):
 
 
 def _clean_common_ocr_errors(text: str) -> str:
+    text = fix_pipe_as_capital_i(text)
     # 1. Standalone | or / followed by space and lowercase, or apostrophe (e.g. '| don\'t', '/ stayed', '|\'m')
     text = re.sub(r"(^|[\s\(\[\{])[/|](?=\s+[a-z]|[\'’][a-z]|[\s.,!?]|$)", r"\g<1>I", text)
     # 2. Leading / or | attached to lowercase word (e.g. '/ate' -> 'late', '|ike' -> 'like')
@@ -121,7 +123,7 @@ def _clean_common_ocr_errors(text: str) -> str:
     return text
 
 
-def _parse_hocr(hocr: str) -> str:
+def _parse_hocr(hocr: str, lang: str = "eng") -> str:
     parser = _HOCRParser()
     parser.feed(hocr)
     if parser.in_italic:
@@ -130,7 +132,8 @@ def _parse_hocr(hocr: str) -> str:
     raw_text = raw_text.replace("{\\i0}{\\i1}", "").replace("{\\i1}{\\i0}", "")
     raw_text = re.sub(r" +", " ", raw_text)
     raw_text = re.sub(r"\s*\\N\s*", lambda m: r"\N", raw_text)
-    return _clean_common_ocr_errors(raw_text)
+    # as confusões '|'/'/' por 'I' valem para o pronome inglês; em outros idiomas o texto fica como veio
+    return _clean_common_ocr_errors(raw_text) if lang == "eng" else raw_text
 
 
 def _call_tesseract_hocr(image: Image.Image, lang: str) -> str:
@@ -238,7 +241,7 @@ def run_ocr(
                 )
 
         hocr = _call_tesseract_hocr(ds.image, lang)
-        text = _parse_hocr(hocr)
+        text = _parse_hocr(hocr, lang)
         with lock:
             cache[h] = text
 

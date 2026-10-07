@@ -39,7 +39,7 @@ def _build_ass_event(line: OCRResultLine) -> pysubs2.SSAEvent:
 @register_stage
 class OCRStage(Stage):
     name = "ocr"
-    version = "1"
+    version = "2"  # 2: troca "|" isolado por "I" também após \N e tags de itálico
     scope = StageScope.EPISODE
     inputs = ("extract",)
 
