@@ -269,3 +269,64 @@ def test_consolidate_memory_ignores_short_tokens_and_honorifics(tmp_path: Path) 
     assert "san" not in senku.aliases
     assert "yo" not in senku.aliases
     assert "kun" not in senku.aliases
+
+
+def _run_consolidate(tmp_path: Path, meta: MetadataArtifact, episodes: dict[str, ExtractTermsArtifact]):
+    from translaterany.memory.store import MemoryStore
+
+    series = Series(name="Synthetic Series (2020)", path=tmp_path)
+    store = ArtifactStore(tmp_path / "data")
+
+    class MockOutput:
+        def json(self, obj: ConsolidatedMemoryArtifact) -> None:
+            pass
+
+    class MockInputs:
+        def json(self, name: str, model: type) -> object:
+            if name == "metadata":
+                return meta
+            raise ValueError(name)
+
+        def json_all(self, name: str, model: type) -> dict[str, ExtractTermsArtifact]:
+            if name == "extract_terms":
+                return episodes
+            raise ValueError(name)
+
+    ctx = SimpleNamespace(series=series, episode=None, inputs=MockInputs(), output=MockOutput(), store=store, llm=None)
+    ConsolidateMemoryStage().run(ctx)
+    return MemoryStore(store.series_dir(series.key) / "memory")
+
+
+def test_consolidate_memory_sanitizes_glossary_aliases_and_is_idempotent(tmp_path: Path) -> None:
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[CharacterEntry(name="Rin Okada", aliases=["Rinrin"], gender=Gender.FEMALE)],
+    )
+    cat = GlossaryCategory.NAME
+    ep = ExtractTermsArtifact(
+        episode_key="S01E01",
+        terms=[
+            GlossaryEntry(
+                term="Phantom Rin",
+                translation="Phantom Rin",
+                category=cat,
+                keep_original=True,
+                aliases=["Phantom Rin", "Rinrin", "Phantom"],
+            ),
+            GlossaryEntry(term="Rinrin", translation="Rinrin", category=cat, keep_original=True),
+            GlossaryEntry(term="Gadget", translation="Gadget", category=GlossaryCategory.OBJECT),
+            GlossaryEntry(
+                term="Gadget (draft name)", translation="Gadget (rascunho)", category=GlossaryCategory.OBJECT
+            ),
+        ],
+    )
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
+    glossary = mem.load_glossary()
+    assert glossary["Phantom Rin"].aliases == ["Phantom"]
+    assert "Gadget (draft name)" not in glossary
+    assert glossary["Gadget"].aliases == ["Gadget (draft name)"]
+    first = mem.glossary_path.read_text(encoding="utf-8")
+
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
+    assert mem.glossary_path.read_text(encoding="utf-8") == first

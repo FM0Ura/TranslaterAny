@@ -6,6 +6,7 @@ from typing import ClassVar
 
 from translaterany.memory.artifacts import ConsolidatedMemoryArtifact, ExtractTermsArtifact, MetadataArtifact
 from translaterany.memory.models import CharacterEntry, EntrySource, StoryMemory
+from translaterany.memory.sanitize import sanitize_glossary
 from translaterany.memory.store import MemoryStore
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
@@ -53,7 +54,7 @@ class ConsolidateMemoryStage(Stage):
     """Etapa de série que consolida termos e personagens em arquivos YAML e gera consolidate_memory.json."""
 
     name: ClassVar[str] = "consolidate_memory"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"
     scope: ClassVar[StageScope] = StageScope.SERIES
     inputs: ClassVar[tuple[str, ...]] = ("metadata", "extract_terms")
     translates: ClassVar[bool] = False
@@ -149,7 +150,8 @@ class ConsolidateMemoryStage(Stage):
             if ep_art and ep_art.terms:
                 incoming_terms.extend(ep_art.terms)
 
-        merged_glossary = mem_store.merge_glossary(incoming_terms)
+        merged_glossary = sanitize_glossary(mem_store.merge_glossary(incoming_terms), merged_chars)
+        mem_store.save_glossary(merged_glossary)
 
         # 5. Consolidação de História (story.yaml)
         if meta and meta.story:
