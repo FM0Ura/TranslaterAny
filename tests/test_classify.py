@@ -93,3 +93,24 @@ def test_scenes_split_on_gaps() -> None:
     )
     assert [s.events for s in c.scenes] == [[0, 1], [2]]
     assert (c.scenes[0].start_ms, c.scenes[0].end_ms) == (1000, 5000)
+
+
+def test_bilingual_romaji_english_lyrics_are_routed_as_songs() -> None:
+    nd, c = _classify(
+        _ev("01.00", "Default", "Fala normal aqui", end="02.00"),
+        _ev("10.00", "Default", "Kimi to taiyo ga shinda hi\\NThe day you and the sun died", end="12.00"),
+        _ev("12.50", "Default", "Mimamotte ite\\NAnd watch over me for a long time", end="14.00"),
+        _ev("15.00", "Default", "Hello?\\NDad?!", end="16.00"),
+    )
+    by_text = {u.text: c.units[u.id] for u in nd.units}
+    assert by_text["Fala normal aqui"].type == "dialogue"
+    assert by_text["Hello?\\NDad?!"].type == "dialogue"
+    strong = by_text["Kimi to taiyo ga shinda hi\\NThe day you and the sun died"]
+    assert strong.type == "song" and not strong.uncertain and strong.rule == "letra bilíngue romaji/inglês"
+    # romaji curto (2 palavras) vale por estar a 2,5 s de uma linha forte
+    assert by_text["Mimamotte ite\\NAnd watch over me for a long time"].type == "song"
+
+
+def test_isolated_weak_bilingual_candidate_stays_dialogue() -> None:
+    _, c = _classify(_ev("01.00", "Default", "Mimamotte ite\\NAnd watch over me for a long time", end="02.00"))
+    assert c.units["u1"].type == "dialogue"
