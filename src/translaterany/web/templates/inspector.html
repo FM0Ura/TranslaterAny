@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Inspetor de Legendas - {{ episode_key }} - TranslaterAny{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-800 pb-6">
+        <div>
+            <div class="flex items-center space-x-2 text-sm text-gray-400 mb-1">
+                <a href="/series/{{ series_key }}" class="hover:text-white">&larr; Voltar para a série</a>
+            </div>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight">Inspetor: <span class="text-indigo-400 font-mono">{{ series_key }} &bull; {{ episode_key }}</span></h1>
+            <p class="text-sm text-gray-400 mt-1">Valide as legendas traduzidas e confira o relatório de qualidade (QA).</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            {% if subtitles_text %}
+            <button onclick="downloadSubtitles()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold transition">
+                ⬇️ Baixar .ass
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Visualizador de Legendas -->
+    <div class="glass-card rounded-2xl overflow-hidden p-6 space-y-4">
+        <h2 class="text-lg font-bold text-white flex items-center justify-between">
+            <span>Arquivo de Legenda Gerado</span>
+            <span class="text-xs font-mono text-gray-400">Formato Advanced SubStation Alpha (.ass)</span>
+        </h2>
+        {% if subtitles_text %}
+        <div class="bg-gray-950 rounded-xl p-4 font-mono text-xs text-gray-300 max-h-96 overflow-y-auto whitespace-pre-wrap border border-gray-800" id="subtitles-box">{{ subtitles_text }}</div>
+        {% else %}
+        <div class="py-12 text-center text-gray-500">
+            Nenhuma legenda foi gerada ainda para este episódio. Execute o pipeline para gerar o arquivo `.pt-BR.ass`.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Métricas de QA se disponíveis -->
+    {% if qa_report %}
+    <div class="glass-card rounded-2xl p-6 space-y-4">
+        <h2 class="text-lg font-bold text-white">Relatório de Qualidade (QA)</h2>
+        <pre class="bg-gray-950 p-4 rounded-xl text-xs font-mono text-gray-300 overflow-x-auto border border-gray-800">{{ qa_report | tojson(indent=2) }}</pre>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    function downloadSubtitles() {
+        const text = document.getElementById('subtitles-box').innerText;
+        const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = '{{ series_key }}-{{ episode_key }}.pt-BR.ass';
+        link.click();
+    }
+</script>
+{% endblock %}

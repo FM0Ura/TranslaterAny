@@ -16,6 +16,9 @@ from translaterany.web.api.memory import router as memory_router
 from translaterany.web.api.pipeline import router as pipeline_router
 from translaterany.web.api.series import router as series_router
 from translaterany.web.jobs import JobManager
+from translaterany.web.pages.dashboard import router as dashboard_router
+from translaterany.web.pages.series import router as series_page_router
+from translaterany.web.pages.settings import router as settings_page_router
 from translaterany.web.services.config_service import ConfigService
 from translaterany.web.services.memory_service import MemoryService
 from translaterany.web.services.pipeline_service import PipelineService
@@ -68,6 +71,11 @@ def create_app(
     api_v1.include_router(doctor_router)
     api_v1.include_router(jobs_router)
     app.include_router(api_v1)
+
+    # Rotas de páginas HTML
+    app.include_router(dashboard_router)
+    app.include_router(series_page_router)
+    app.include_router(settings_page_router)
 
     # Servir arquivos estáticos locais se o diretório existir
     static_dir = Path(__file__).parent / "static"
