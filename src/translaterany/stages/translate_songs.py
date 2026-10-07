@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -27,13 +27,16 @@ class TranslateSongsOptions(BaseModel):
     fallback_model: str | None = "translategemma"
     max_tokens_per_batch: int = 800
     translate: bool = False  # músicas ficam no original; ligue para traduzi-las
+    # linhas de tradução de letra ('op trans') e a glosa inglesa de letras 'romaji\Ninglês' são sempre tratadas;
+    # o romaji/karaokê nunca é tocado. 'drop' remove a glosa, 'keep' a deixa em inglês.
+    bilingual_gloss: Literal["translate", "drop", "keep"] = "translate"
     max_lines_per_batch: int | None = 1  # uma fala por chamada: evita desalinhamento de IDs
 
 
 @register_stage
 class TranslateSongsStage(Stage):
     name: ClassVar[str] = "translate_songs"
-    version: ClassVar[str] = "2"  # 2: músicas puladas por padrão
+    version: ClassVar[str] = "3"  # 3: traduz linhas de tradução de letra e glosa bilíngue; 2: puladas por padrão
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
@@ -61,9 +64,6 @@ class TranslateSongsStage(Stage):
             self.inputs = inputs
 
     def run(self, ctx: StageContext) -> None:
-        if not self.options.translate:
-            ctx.output.json(UnitTexts())  # letra original preservada
-            return
         client = self.client or ctx.llm
         doc = ctx.inputs.json("normalize", NormalizedDoc)
         classification = ctx.inputs.json("classify", Classification)
@@ -84,6 +84,8 @@ class TranslateSongsStage(Stage):
             fallback_model=self.options.fallback_model,
             max_tokens_per_batch=self.options.max_tokens_per_batch,
             max_lines_per_batch=self.options.max_lines_per_batch,
+            translate_all=self.options.translate,  # sem isto só as linhas de tradução/glosa são tratadas
+            bilingual_gloss=self.options.bilingual_gloss,
             metrics=ctx.metrics if isinstance(getattr(ctx, "metrics", None), StageMetrics) else None,
             system_instructions=render_songs_system_instructions(
                 getattr(ctx, "source_language", None) or LanguageRegistry.resolve("en"),
