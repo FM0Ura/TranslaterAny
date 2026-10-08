@@ -140,3 +140,11 @@ def test_translate_signs_protects_glossary_terms() -> None:
     res = translate_signs(doc, classes, client=fake, glossary=[WIDGET])
     assert res.texts["s1"] == "Laboratório de fabricante de engenhocas"
     assert "Widget Maker" not in fake.calls[0].prompt
+
+
+def test_short_term_inside_longer_canonical_entry_is_not_protected() -> None:
+    longer = GlossaryEntry(term="Zorb Gate", translation="Zorb Gate", keep_original=True, aliases=["Zorb;Gate"])
+    short = GlossaryEntry(term="Gate", translation="Portal")
+    protected = GlossaryProtector([short, longer]).protect("Is it the choice of Zorb Gate?")
+    assert protected.text == "Is it the choice of Zorb Gate?"
+    assert protected.canonicals == []

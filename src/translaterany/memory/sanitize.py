@@ -4,10 +4,14 @@ O glossário extraído por LLM acumula aliases que apontam para outra entrada ou
 (ex.: o alias de uma entrada ser o termo de outra). Como a checagem `glossary` bloqueia o gate de
 tradução, essas colisões geram falsos positivos. Aqui as colisões são resolvidas de forma
 determinística e idempotente; entradas `user` nunca são alteradas ou removidas.
+Traduções extraídas com alternativas ("Portal / Gate") também são normalizadas aqui, pois os termos do glossário
+são impostos literalmente na legenda e a alternativa vazaria no texto final.
 """
 
+import re
 from collections.abc import Iterable
 
+from translaterany.memory.matching import matches_term
 from translaterany.memory.models import CharacterEntry, EntrySource, GlossaryEntry
 from translaterany.memory.store import PRECEDENCE_RANK
 
@@ -18,6 +22,82 @@ def _key(text: str) -> str:
 
 def _rank(entry: GlossaryEntry) -> int:
     return PRECEDENCE_RANK.get(entry.source, 1)
+
+
+# separadores de alternativa: "A / B", "A/B" entre letras (não "24/7"), "A ou B", "A or B", "A | B", "A; B"
+_ALTERNATIVE_SEPARATORS = (
+    re.compile(r"\s+/\s+|(?<=[^\W\d_])/(?=[^\W\d_])"),
+    re.compile(r"\s+(?:ou|or)\s+", re.IGNORECASE),
+    re.compile(r"\s*[|;]\s*"),
+)
+_PARENTHETICAL = re.compile(r"\s*\([^()]*\)")
+
+
+def _split_alternatives(translation: str, term: str) -> tuple[list[str], bool]:
+    """Opções da tradução e se vieram de separador explícito (False: só dos parênteses).
+
+    Separadores que o próprio termo contém ("AC/DC", "Heads or Tails") não indicam alternativa.
+    """
+    pieces = [translation]
+    explicit = False
+    for sep in _ALTERNATIVE_SEPARATORS:
+        if sep.search(term):
+            continue
+        split = [part for piece in pieces for part in sep.split(piece)]
+        explicit = explicit or len(split) > len(pieces)
+        pieces = split
+    kept: list[str] = []
+    for piece in pieces:
+        if _PARENTHETICAL.search(piece):
+            outside = _PARENTHETICAL.sub("", piece)
+            if outside.strip():  # "Portão (Gate)": a parte entre parênteses é só glosa
+                piece = outside
+        kept.append(piece.strip(" \t-–—,"))
+    return [p for p in kept if p], explicit
+
+
+def _normalize_translation(entry: GlossaryEntry) -> GlossaryEntry | None:
+    """Mantém só a primeira opção da tradução extraída; se uma opção repete o termo, mantém o original.
+
+    Devolve None quando a tradução fica vazia depois da limpeza.
+    """
+    pieces, explicit = _split_alternatives(entry.translation, entry.term)
+    if not pieces:
+        return None
+    if explicit and any(_key(p) == _key(entry.term) for p in pieces):
+        return entry.model_copy(update={"translation": entry.term, "keep_original": True})
+    if pieces[0] == entry.translation:
+        return entry
+    return entry.model_copy(update={"translation": pieces[0]})
+
+
+def _normalize_extracted_translations(entries: list[GlossaryEntry]) -> list[GlossaryEntry]:
+    result: list[GlossaryEntry] = []
+    for e in entries:
+        if e.source != EntrySource.EXTRACTED:
+            result.append(e)
+            continue
+        fixed = _normalize_translation(e)
+        if fixed is not None:
+            result.append(fixed)
+    return result
+
+
+def _drop_terms_inside_longer_entries(entries: list[GlossaryEntry]) -> list[GlossaryEntry]:
+    """Remove extraídas keep_original sem aliases quando outra entrada o contém como palavra inteira.
+
+    "Gate" é inútil e perigoso dentro de "Steins Gate": a checagem de glossário o exigiria na forma curta.
+    """
+    forms = [form for e in entries for form in (e.term, *e.aliases)]
+
+    def inside_longer(term: str) -> bool:
+        return any(len(_key(f)) > len(_key(term)) and matches_term(term, f) for f in forms)
+
+    return [
+        e
+        for e in entries
+        if not (e.source == EntrySource.EXTRACTED and not e.aliases and e.keep_original and inside_longer(e.term))
+    ]
 
 
 def _is_variant(longer: str, shorter: str) -> bool:
@@ -88,9 +168,14 @@ def sanitize_glossary(entries: Iterable[GlossaryEntry], characters: Iterable[Cha
     - alias que é termo de outra entrada, ou nome/alias de personagem: removido;
     - alias compartilhado entre entradas: fica só com a de maior precedência (empate: a primeira);
     - termos extraídos que são variante entre parênteses/vírgula de outro (mesma categoria): fundidos no mais curto;
+    - traduções extraídas com alternativas ("A / B", "A ou B", "A (B)") ficam só com a primeira opção; se uma opção
+      repete o termo, vira keep_original; traduções vazias descartam a entrada;
+    - extraídas keep_original sem aliases contidas (palavra inteira) em outro termo/alias são descartadas;
     - entradas `user` nunca são alteradas; extraídas duplicadas de termo/alias protegido são descartadas.
     """
     items = [e.model_copy() for e in entries]
+    items = _normalize_extracted_translations(items)
+    items = _drop_terms_inside_longer_entries(items)
     items = _drop_duplicates_of_protected(items)
     items = _merge_variants(items)
 
