@@ -2,7 +2,7 @@
 
 from translaterany.memory.artifacts import CharacterStyle, ExtractTermsArtifact
 from translaterany.memory.models import CharacterEntry, EntrySource
-from translaterany.memory.styles import apply_character_styles, pick_style
+from translaterany.memory.styles import apply_character_styles, find_character, pick_style
 
 
 def styles(*pairs: tuple[str, str]) -> list[CharacterStyle]:
@@ -85,3 +85,64 @@ def test_input_characters_not_mutated() -> None:
     chars = [CharacterEntry(name="Rin Okada")]
     apply_character_styles(chars, styles(("Rin Okada", "alegre")))
     assert chars[0].speech_style is None
+
+
+def test_find_character_ignores_case_and_diacritics() -> None:
+    chars = [CharacterEntry(name="Zoë Lund", aliases=["Zozo"])]
+    assert find_character(chars, "ZOE LUND") == 0
+    assert find_character(chars, "zoë") == 0
+    assert find_character(chars, "ZOZO") == 0
+
+
+def test_find_character_strips_honorifics_from_the_style_name() -> None:
+    chars = [CharacterEntry(name="Taro Sato", aliases=["Tarou"])]
+    assert find_character(chars, "Taro-kun") == 0
+    assert find_character(chars, "Dr. Sato") == 0
+    assert find_character(chars, "tarou-chan") == 0
+
+
+def test_find_character_resolves_nickname_by_containment() -> None:
+    chars = [
+        CharacterEntry(name="Luka Urushibara"),
+        CharacterEntry(name="Mika Sato"),
+        CharacterEntry(name="Yukitaka Aoi"),
+    ]
+    assert find_character(chars, "Lukako") == 0  # "luka" + sufixo de apelido
+    assert find_character(chars, "Rukako") == 0  # troca L/R da romanização
+    assert find_character(chars, "Urushiba") == 0  # prefixo do sobrenome
+    assert find_character(chars, "Yuki") is None  # curto demais perto de "yukitaka"
+    assert find_character(chars, "Mik") is None  # menos de 4 letras
+
+
+def test_containment_with_two_candidates_is_ambiguous() -> None:
+    chars = [CharacterEntry(name="Lukas Berg"), CharacterEntry(name="Lukan Moor")]
+    assert find_character(chars, "Luka") is None
+
+
+def test_nickname_with_parenthetical_name_resolves_to_the_inner_character() -> None:
+    chars = [CharacterEntry(name="Luka Urushibara")]
+    assert find_character(chars, "Zumbi (Luka Urushibara)") == 0
+    assert find_character(chars, "Lukako (Urushibara)") == 0
+
+
+def test_nickname_style_resolves_to_existing_character_and_becomes_alias() -> None:
+    chars = [CharacterEntry(name="Luka Urushibara", source=EntrySource.METADATA)]
+    out = apply_character_styles(chars, styles(("Lukako", "doce e tímido")))
+    assert len(out) == 1
+    assert out[0].speech_style == "doce e tímido"
+    assert out[0].source == EntrySource.METADATA
+    assert out[0].aliases == ["Lukako"]
+
+
+def test_exact_alias_resolution_does_not_duplicate_the_alias() -> None:
+    chars = [CharacterEntry(name="Luka Urushibara", aliases=["Lukako"], source=EntrySource.METADATA)]
+    out = apply_character_styles(chars, styles(("lukako", "doce")))
+    assert out[0].aliases == ["Lukako"]
+
+
+def test_unresolvable_nickname_still_creates_extracted_character() -> None:
+    chars = [CharacterEntry(name="Luka Urushibara", source=EntrySource.METADATA)]
+    out = apply_character_styles(chars, styles(("Zanzibar", "rouco")))
+    assert [c.name for c in out] == ["Luka Urushibara", "Zanzibar"]
+    assert out[1].source == EntrySource.EXTRACTED
+    assert out[0].aliases == []
