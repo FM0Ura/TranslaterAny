@@ -145,12 +145,17 @@ def find_character(chars: list[CharacterEntry], name: str) -> int | None:
     return found[0] if found else None
 
 
-def add_alias(chars: list[CharacterEntry], idx: int, nickname: str) -> bool:
-    """Registra o apelido como alias de chars[idx], salvo se repetir o nome/alias de qualquer personagem."""
+def can_add_alias(chars: list[CharacterEntry], nickname: str) -> bool:
+    """O apelido é utilizável como alias: tem token válido e não repete o nome/alias de nenhum personagem."""
     key = fold(nickname)
     if not key or not character_tokens(nickname):
         return False
-    if any(key == fold(f) for c in chars for f in (c.name, *c.aliases)):
+    return not any(key == fold(f) for c in chars for f in (c.name, *c.aliases))
+
+
+def add_alias(chars: list[CharacterEntry], idx: int, nickname: str) -> bool:
+    """Registra o apelido como alias de chars[idx] (sem alterar o objeto original), se não houver colisão."""
+    if not can_add_alias(chars, nickname):
         return False
     target = chars[idx]
     chars[idx] = target.model_copy(update={"aliases": [*target.aliases, _norm(nickname)]})

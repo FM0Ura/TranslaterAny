@@ -6,9 +6,16 @@ from typing import ClassVar
 
 from translaterany.memory.artifacts import ConsolidatedMemoryArtifact, ExtractTermsArtifact, MetadataArtifact
 from translaterany.memory.models import CharacterEntry, EntrySource, StoryMemory
+from translaterany.memory.nicknames import merge_nickname_characters
 from translaterany.memory.sanitize import sanitize_glossary
 from translaterany.memory.store import MemoryStore
-from translaterany.memory.styles import apply_character_styles, character_tokens, is_valid_character_token
+from translaterany.memory.styles import (
+    apply_character_styles,
+    can_add_alias,
+    character_tokens,
+    is_valid_character_token,
+    resolve_character,
+)
 from translaterany.pipeline.artifacts import ArtifactStore
 from translaterany.pipeline.registry import register_stage
 from translaterany.pipeline.stage import Stage, StageContext, StageScope
@@ -21,7 +28,7 @@ class ConsolidateMemoryStage(Stage):
     """Etapa de série que consolida termos e personagens em arquivos YAML e gera consolidate_memory.json."""
 
     name: ClassVar[str] = "consolidate_memory"
-    version: ClassVar[str] = "2"
+    version: ClassVar[str] = "3"
     scope: ClassVar[StageScope] = StageScope.SERIES
     inputs: ClassVar[tuple[str, ...]] = ("metadata", "extract_terms")
     translates: ClassVar[bool] = False
@@ -106,6 +113,18 @@ class ConsolidateMemoryStage(Stage):
                         break
 
             if not matched and is_valid_mention_token:
+                # Apelido de um personagem conhecido (heurística de apelido/honorífico/"Apelido (Nome)")
+                known = [c for c in [*incoming_chars, *existing_chars] if c.source != EntrySource.EXTRACTED]
+                found = resolve_character(known, m_clean)
+                if found is not None:
+                    target = known[found[0]]
+                    if can_add_alias([*incoming_chars, *existing_chars], found[1]):
+                        target.aliases.append(found[1])
+                    if not any(target is c for c in incoming_chars):
+                        incoming_chars.append(target)
+                    matched = True
+
+            if not matched and is_valid_mention_token:
                 # Novo personagem detectado apenas nas falas (ignora tokens curtos ou honoríficos isolados)
                 incoming_chars.append(CharacterEntry(name=m_clean, source=EntrySource.EXTRACTED))
 
@@ -115,7 +134,10 @@ class ConsolidateMemoryStage(Stage):
         observed_styles = [s for ep_art in episodes_extracts.values() if ep_art for s in ep_art.character_styles]
         if observed_styles:
             merged_chars = apply_character_styles(merged_chars, observed_styles)
-            mem_store.save_characters(merged_chars)
+
+        # Personagens extraídos em rodadas anteriores que são apelidos de outro viram aliases dele
+        merged_chars = merge_nickname_characters(merged_chars)
+        mem_store.save_characters(merged_chars)
 
         # 4. Consolidação de Glossário
         incoming_terms = []

@@ -371,3 +371,62 @@ def test_consolidate_memory_merges_character_styles_across_episodes(tmp_path: Pa
     assert mem.characters_path.read_text(encoding="utf-8") == first
     mem = _run_consolidate(tmp_path, meta, {"S01E03": old_ep})
     assert {c.name: c for c in mem.load_characters()}["Rin Okada"].speech_style == "fala rápido, gírias"
+
+
+def test_consolidate_memory_resolves_nicknames_instead_of_creating_characters(tmp_path: Path) -> None:
+    from translaterany.memory.artifacts import CharacterStyle
+
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[
+            CharacterEntry(name="Luka Urushibara", aliases=["Luka"]),
+            CharacterEntry(name="Ren Aoki", aliases=["Super Ren"]),
+        ],
+    )
+    ep = ExtractTermsArtifact(
+        episode_key="S01E01",
+        character_mentions=["Luka Urushibara", "Ren Aoki", "Lukako", "Super Ren", "Zanzibar"],
+        character_styles=[
+            CharacterStyle(name="Rukako", speech_style="doce"),
+            CharacterStyle(name="Ren-kun", speech_style="seco"),
+        ],
+    )
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
+    chars = {c.name: c for c in mem.load_characters()}
+    assert set(chars) == {"Luka Urushibara", "Ren Aoki", "Zanzibar"}
+    assert chars["Luka Urushibara"].aliases == ["Luka", "Lukako", "Rukako"]
+    assert chars["Luka Urushibara"].speech_style == "doce"
+    assert chars["Ren Aoki"].speech_style == "seco"
+    assert chars["Zanzibar"].source == EntrySource.EXTRACTED
+
+    first = mem.characters_path.read_text(encoding="utf-8")
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
+    assert mem.characters_path.read_text(encoding="utf-8") == first
+
+
+def test_consolidate_memory_heals_stale_extracted_nickname_characters(tmp_path: Path) -> None:
+    from translaterany.memory.store import MemoryStore
+
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[CharacterEntry(name="Luka Urushibara"), CharacterEntry(name="Ren Aoki")],
+    )
+    series = Series(name="Synthetic Series (2020)", path=tmp_path)
+    mem_dir = ArtifactStore(tmp_path / "data").series_dir(series.key) / "memory"
+    MemoryStore(mem_dir).save_characters(
+        [
+            CharacterEntry(name="Rukako", source=EntrySource.EXTRACTED),
+            CharacterEntry(name="Zanzibar", source=EntrySource.EXTRACTED),
+            CharacterEntry(name="Ren Aoki, Luka Urushibara", source=EntrySource.EXTRACTED),
+        ]
+    )
+    mem = _run_consolidate(tmp_path, meta, {})
+    chars = {c.name: c for c in mem.load_characters()}
+    assert set(chars) == {"Luka Urushibara", "Ren Aoki", "Zanzibar"}
+    assert chars["Luka Urushibara"].aliases == ["Rukako"]
+
+    first = mem.characters_path.read_text(encoding="utf-8")
+    mem = _run_consolidate(tmp_path, meta, {})
+    assert mem.characters_path.read_text(encoding="utf-8") == first
