@@ -18,8 +18,10 @@ Responda com a lista "edits"; cada item tem "id" (o id da fala), "new"
 (a fala COMPLETA reescrita em português do Brasil, nunca um trecho ou fragmento, mantendo os
 marcadores ⟦n⟧) e "reason" (justificativa curta). "sinais" diz por que a fala foi escolhida: formal_connective,
 enclisis, redundant_subject e archaic_pronoun = texto duro ou literal demais; too_long = encurtar;
-speech_style = ajustar ao jeito de falar do personagem. Falas com
-"editavel": false são só contexto. Responda apenas com as falas que mudar; se nenhuma, lista vazia."""
+speech_style = ajustar ao jeito de falar do personagem (descrito em "estilo"), mas só junto de outro sinal.
+Se a fala já soa natural, deixe como está: não troque sinônimos nem pontuação por troca, e não deixe o
+registro mais formal. Falas com "editavel": false são só contexto.
+Responda apenas com as falas que mudar; se nenhuma, lista vazia."""
 
 
 def render_colloquial_instructions(source: LanguageInfo, target: LanguageInfo) -> str:
@@ -33,15 +35,20 @@ Responda com a lista "edits"; cada item tem "id" (o id da fala), "new"
 (a fala COMPLETA reescrita em {target_display}, nunca um trecho ou fragmento, mantendo os
 marcadores ⟦n⟧) e "reason" (justificativa curta). "sinais" diz por que a fala foi escolhida: formal_connective,
 enclisis, redundant_subject e archaic_pronoun = texto duro ou literal demais; too_long = encurtar;
-speech_style = ajustar ao jeito de falar do personagem. Falas com
-"editavel": false são só contexto. Responda apenas com as falas que mudar; se nenhuma, lista vazia."""
+speech_style = ajustar ao jeito de falar do personagem (descrito em "estilo"), mas só junto de outro sinal.
+Se a fala já soa natural, deixe como está: não troque sinônimos nem pontuação por troca, e não deixe o
+registro mais formal. Falas com "editavel": false são só contexto.
+Responda apenas com as falas que mudar; se nenhuma, lista vazia."""
 
 
 @register_stage
 class ColloquialStage(DialogueRefineStage):
     name: ClassVar[str] = "colloquial"
-    version: ClassVar[str] = "2"  # 2: rejeita edição que remove forma canônica do glossário
+    # 3: speech_style não seleciona sozinho e o prompt traz o "estilo" do falante;
+    # 2: rejeita edição que remove forma canônica do glossário
+    version: ClassVar[str] = "3"
     default_dialogue_input: ClassVar[str] = "review_meaning"
+    include_speaker_style: ClassVar[bool] = True
 
     def __init__(self, options=None) -> None:
         self.pre_review_input: str | None = "translate_dialogue"

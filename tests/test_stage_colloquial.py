@@ -1,14 +1,18 @@
 """Etapa colloquial (M6)."""
 
+import json
 from types import SimpleNamespace
 
 import test_stage_review_meaning as base  # reaproveita DOC, CLASSES, MERGED, SCENE
 
 from translaterany.llm.fake import FakeLLM
+from translaterany.memory.models import CharacterEntry
 from translaterany.pipeline.registry import REGISTRY
 from translaterany.pipeline.stage_metrics import StageMetrics
 from translaterany.refine.edits import EditsResponse, LineEdit
+from translaterany.stages import refine_base
 from translaterany.stages.colloquial import ColloquialStage
+from translaterany.subtitles.scene_analysis import LineContext, SceneAnalysisDoc
 from translaterany.subtitles.texts import UnitTexts
 
 PRE = UnitTexts(texts={"u1": "No entanto, para onde o gato foi?", "u2": "Você mentiu sobre tudo, seu merda.",
@@ -71,3 +75,32 @@ def test_bind_pipeline_finds_pre_review_stage() -> None:
     alone = ColloquialStage()
     alone.bind_pipeline([REGISTRY.get(n)() for n in ("normalize", "classify", "translate_dialogue")], None)
     assert alone.dialogue_input == "translate_dialogue" and alone.pre_review_input is None
+
+
+def test_style_alone_does_not_target_but_reinforces_and_reaches_the_prompt(monkeypatch) -> None:
+    yumi = CharacterEntry(name="Yumi", speech_style="fala solta e brincalhona")
+    monkeypatch.setattr(refine_base, "load_all_characters", lambda store, key: [yumi])
+    inputs = Inputs()
+    # a Yumi também fala u2 (sem sinal de texto duro): estilo sozinho não pode escolhê-la
+    teasing = LineContext(speaker="Yumi", tone="teasing")
+    inputs.data["scene_analysis"] = SceneAnalysisDoc(lines={"u1": teasing, "u2": teasing})
+    prompts = []
+
+    def script(req):
+        prompts.append(json.loads(req.prompt))
+        return EditsResponse()
+
+    stage = ColloquialStage()
+    metrics = StageMetrics()
+    ctx = SimpleNamespace(inputs=inputs, output=base.Output(), llm=FakeLLM(script), metrics=metrics, store=None,
+                          series=SimpleNamespace(key="s"), episode=SimpleNamespace(key="S01E01"))  # fmt: skip
+    stage.run(ctx)
+    assert metrics.counters["lines_targeted"] == 1
+    by_id = {item["id"]: item for item in prompts[0]}
+    assert "formal_connective" in by_id["u1"]["sinais"] and by_id["u1"]["sinais"][-1] == "speech_style"
+    assert by_id["u1"]["estilo"] == "fala solta e brincalhona" and by_id["u1"]["editavel"] is True
+    assert "estilo" not in by_id["u2"] and by_id["u2"]["editavel"] is False  # contexto não leva o estilo
+
+
+def test_stage_version_was_bumped_to_invalidate_cache() -> None:
+    assert ColloquialStage.version == "3"
