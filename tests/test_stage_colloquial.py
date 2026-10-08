@@ -103,4 +103,4 @@ def test_style_alone_does_not_target_but_reinforces_and_reaches_the_prompt(monke
 
 
 def test_stage_version_was_bumped_to_invalidate_cache() -> None:
-    assert ColloquialStage.version == "3"
+    assert ColloquialStage.version == "4"

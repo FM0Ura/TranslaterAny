@@ -136,3 +136,19 @@ def test_edit_keeping_glossary_forms_and_fixing_others_is_applied() -> None:
     out = apply_edits(texts, [edit], {"g1"}, sources, env)
     assert out.applied == {"g1": "O Fabricante de Engenhocas encontrou Zorblax e a geringonça."}
     assert out.rejected["glossary"] == 0
+
+
+def test_edit_repairing_short_term_inside_longer_term_is_not_rejected_as_glossary() -> None:
+    from translaterany.memory.models import GlossaryEntry
+
+    sources = {"g1": LineSource("What is Steins Gate?", "dialogue", "Default", 2000)}
+    texts = {"g1": "O que é Steins Portal / Gate?"}
+    env = CheckEnv(
+        glossary=[
+            GlossaryEntry(term="Gate", translation="Portal / Gate"),
+            GlossaryEntry(term="Steins Gate", translation="Steins Gate", keep_original=True),
+        ]
+    )
+    out = apply_edits(texts, [LineEdit(id="g1", new="O que é Steins Gate?")], {"g1"}, sources, env)
+    assert out.rejected["glossary"] == 0
+    assert out.applied == {"g1": "O que é Steins Gate?"}

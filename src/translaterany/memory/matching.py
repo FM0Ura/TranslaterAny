@@ -29,6 +29,31 @@ def term_spans(term: str, text: str) -> list[tuple[int, int]]:
     return [m.span() for m in _term_pattern(term).finditer(text)]
 
 
+def glossary_matches(glossary: Iterable[GlossaryEntry], text: str) -> list[tuple[GlossaryEntry, list[str]]]:
+    """Entradas do glossário presentes no texto, com as formas (termo/aliases) que casaram em algum trecho que vale.
+
+    Resolução do mais longo para o mais curto, sem sobreposição (igual à do GlossaryProtector): uma forma que só
+    casa dentro de uma entrada mais longa ("Gate" em "Steins Gate") não conta como menção da entrada curta.
+    Trechos idênticos de entradas diferentes coexistem: nenhum engole o outro.
+    """
+    entries = list(glossary)
+    candidates = [
+        (start, end, i, form)
+        for i, entry in enumerate(entries)
+        for form in dict.fromkeys((entry.term, *entry.aliases))
+        for start, end in term_spans(form, text)
+    ]
+    candidates.sort(key=lambda c: (-(c[1] - c[0]), c[0]))
+    taken: list[tuple[int, int]] = []
+    forms: dict[int, list[str]] = {}
+    for start, end, i, form in candidates:
+        if (start, end) in taken or not any(start < t_end and t_start < end for t_start, t_end in taken):
+            taken.append((start, end))
+            if form not in forms.setdefault(i, []):
+                forms[i].append(form)
+    return [(entries[i], forms[i]) for i in sorted(forms)]
+
+
 def select_for_text(
     glossary: Iterable[GlossaryEntry], characters: Iterable[CharacterEntry], text: str
 ) -> tuple[list[GlossaryEntry], list[CharacterEntry]]:

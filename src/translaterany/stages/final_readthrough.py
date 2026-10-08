@@ -63,7 +63,7 @@ def render_readthrough_prompt(lines: Sequence[ReviewLine | dict[str, Any]], scen
 @register_stage
 class FinalReadthroughStage(DialogueRefineStage):
     name: ClassVar[str] = "final_readthrough"
-    version: ClassVar[str] = "2"  # 2: rejeita edição que remove forma canônica do glossário
+    version: ClassVar[str] = "3"  # 3: glossário casa pelo termo mais longo; 2: rejeita edição que remove forma canônica
     default_dialogue_input: ClassVar[str] = "orthography"
     Options: ClassVar[type] = FinalReadthroughOptions
 

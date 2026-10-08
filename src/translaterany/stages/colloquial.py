@@ -46,7 +46,7 @@ class ColloquialStage(DialogueRefineStage):
     name: ClassVar[str] = "colloquial"
     # 3: speech_style não seleciona sozinho e o prompt traz o "estilo" do falante;
     # 2: rejeita edição que remove forma canônica do glossário
-    version: ClassVar[str] = "3"
+    version: ClassVar[str] = "4"  # 4: glossário casa pelo termo mais longo na rejeição de edições
     default_dialogue_input: ClassVar[str] = "review_meaning"
     include_speaker_style: ClassVar[bool] = True
 

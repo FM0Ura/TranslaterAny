@@ -10,7 +10,7 @@ from pydantic import AliasChoices, BaseModel, Field
 from translaterany.checks import CheckEnv, LineInput, run_line_checks
 from translaterany.checks.snapshots import LineSource
 from translaterany.checks.text import plain
-from translaterany.memory.matching import matches_term
+from translaterany.memory.matching import glossary_matches, matches_term
 from translaterany.subtitles.segments import marker_ids
 
 type RejectReason = Literal["unknown_id", "empty", "unchanged", "markers", "reversal", "worse", "glossary"]
@@ -72,9 +72,7 @@ def _meaning_findings(item: str, text: str, src: LineSource, env: CheckEnv) -> s
 def _drops_glossary_form(current: str, new: str, source: str, env: CheckEnv) -> bool:
     """A edição remove a forma canônica de um termo do glossário (presente na fonte) que o texto atual tinha."""
     src, before, after = plain(source), plain(current), plain(new)
-    for entry in env.glossary:
-        if not any(matches_term(t, src) for t in (entry.term, *entry.aliases)):
-            continue
+    for entry, _ in glossary_matches(env.glossary, src):
         expected = entry.term if entry.keep_original else entry.translation
         if expected and matches_term(expected, before) and not matches_term(expected, after):
             return True

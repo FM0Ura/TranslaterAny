@@ -56,7 +56,7 @@ class OrthographyStage(Stage):
     """Revisão ortográfica determinística com LanguageTool sem IA."""
 
     name: ClassVar[str] = "orthography"
-    version: ClassVar[str] = "2"
+    version: ClassVar[str] = "3"  # 3: glossário casa pelo termo mais longo na rejeição de edições
     scope: ClassVar[StageScope] = StageScope.EPISODE
     produces_texts: ClassVar[bool] = True
     produces_dialogue: ClassVar[bool] = True
