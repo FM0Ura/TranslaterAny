@@ -65,6 +65,21 @@ def create_dialogue_batches(
     return batches
 
 
+_GENDER_PT = {"male": "masculino", "female": "feminino"}
+
+
+def _speaker_gender(lctx: Any, characters: Sequence[CharacterEntry]) -> str:
+    """Gênero do falante: campo da análise de cena; artefatos antigos (sem o campo) usam a lista de personagens."""
+    gender = getattr(lctx, "speaker_gender", "unknown")
+    if gender in _GENDER_PT:
+        return gender
+    for c in characters:
+        if c.name == getattr(lctx, "speaker", None):
+            value = c.gender.value if hasattr(c.gender, "value") else str(c.gender)
+            return value if value in _GENDER_PT else "unknown"
+    return "unknown"
+
+
 def format_batch_prompt(
     lines: list[DialogueLine],
     context: list[ContextLine],
@@ -72,6 +87,7 @@ def format_batch_prompt(
     characters: Sequence[CharacterEntry] = (),
     line_contexts: Mapping[str, Any] | None = None,
     char_budgets: Mapping[str, int] | None = None,
+    term_markers: Mapping[str, Sequence[str]] | None = None,
 ) -> str:
     sections: list[str] = []
     if glossary:
@@ -79,6 +95,18 @@ def format_batch_prompt(
         for g in glossary:
             note = f" ({g.notes})" if g.notes else ""
             sections.append(f"- {g.term} -> {g.translation}{note}")
+        sections.append("")
+
+    if term_markers:
+        sections.append("[MARCADORES DE TERMOS]:")
+        sections.append(
+            "Os marcadores ⟦G1⟧, ⟦G2⟧... representam termos do glossário já traduzidos. Copie cada marcador "
+            "exatamente como está, uma única vez, sem traduzi-lo, alterá-lo ou removê-lo; ele será substituído "
+            "depois. Apenas concorde gênero e número com o termo indicado."
+        )
+        for line in lines:
+            for n, canonical in enumerate(term_markers.get(line.id, ()), 1):
+                sections.append(f"- [{line.id}] ⟦G{n}⟧ = {canonical}")
         sections.append("")
 
     if characters:
@@ -105,8 +133,11 @@ def format_batch_prompt(
                 if lctx:
                     notes = []
                     speaker = getattr(lctx, "speaker", None)
-                    if speaker and speaker != "Unknown":
-                        notes.append(f"falante: {speaker}")
+                    known_speaker = bool(speaker) and speaker != "Unknown"
+                    gender = _speaker_gender(lctx, characters) if known_speaker else "unknown"
+                    if known_speaker:
+                        label = _GENDER_PT.get(gender)
+                        notes.append(f"falante: {speaker} ({label})" if label else f"falante: {speaker}")
                     listener = getattr(lctx, "listener", None)
                     if listener and listener != "Unknown":
                         notes.append(f"ouvinte: {listener}")
@@ -116,8 +147,12 @@ def format_batch_prompt(
                     conf = getattr(lctx, "confidence", None)
                     if conf:
                         notes.append(f"confiança: {conf}")
-                    if conf == "low":
-                        notes.append("adote formulação neutra / neutral gender")
+                    if conf == "low" or gender == "unknown":
+                        # falante desconhecido (qualquer confiança) ou de gênero ignorado: não presumir masculino
+                        notes.append(
+                            "gênero do falante indeterminado: adote formulação neutra / neutral gender "
+                            "(evite adjetivos e particípios de gênero na 1ª pessoa)"
+                        )
                     if notes:
                         sections.append(f"- [{line.id}] {', '.join(notes)}")
             sections.append("")

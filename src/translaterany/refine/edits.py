@@ -10,10 +10,19 @@ from pydantic import AliasChoices, BaseModel, Field
 from translaterany.checks import CheckEnv, LineInput, run_line_checks
 from translaterany.checks.snapshots import LineSource
 from translaterany.checks.text import plain
+from translaterany.memory.matching import glossary_matches, matches_term
 from translaterany.subtitles.segments import marker_ids
 
-type RejectReason = Literal["unknown_id", "empty", "unchanged", "markers", "reversal", "worse"]
-REJECT_REASONS: tuple[RejectReason, ...] = ("unknown_id", "empty", "unchanged", "markers", "reversal", "worse")
+type RejectReason = Literal["unknown_id", "empty", "unchanged", "markers", "reversal", "worse", "glossary"]
+REJECT_REASONS: tuple[RejectReason, ...] = (
+    "unknown_id",
+    "empty",
+    "unchanged",
+    "markers",
+    "reversal",
+    "worse",
+    "glossary",
+)
 WORSE_CHECKS = frozenset({"markers", "numbers", "negation", "names", "glossary", "profanity_added"})
 _SPACES = re.compile(r"\s+")
 MIN_LENGTH_RATIO = 0.5  # uma edição com menos da metade do texto visível é tratada como fragmento
@@ -60,6 +69,16 @@ def _meaning_findings(item: str, text: str, src: LineSource, env: CheckEnv) -> s
     return {f.check for f in run_line_checks([line], env) if f.check in WORSE_CHECKS}
 
 
+def _drops_glossary_form(current: str, new: str, source: str, env: CheckEnv) -> bool:
+    """A edição remove a forma canônica de um termo do glossário (presente na fonte) que o texto atual tinha."""
+    src, before, after = plain(source), plain(current), plain(new)
+    for entry, _ in glossary_matches(env.glossary, src):
+        expected = entry.term if entry.keep_original else entry.translation
+        if expected and matches_term(expected, before) and not matches_term(expected, after):
+            return True
+    return False
+
+
 def apply_edits(
     texts: Mapping[str, str],
     edits: Iterable[LineEdit],
@@ -95,6 +114,8 @@ def apply_edits(
             reason = "markers"
         elif forbidden and item in forbidden and _norm(new) == _norm(forbidden[item]):
             reason = "reversal"
+        elif _drops_glossary_form(current, new, src.source, env):
+            reason = "glossary"
         elif (
             _is_fragment(current, new)
             or _norm(plain(new)).casefold() == _norm(plain(src.source)).casefold()

@@ -31,7 +31,9 @@ def test_rejection_reasons() -> None:
         LineEdit(id="u2", new="Para a ⟦1⟧velha⟦2⟧ estação."),  # unchanged
         LineEdit(id="u2", new="Para a velha estação."),  # markers (a última edição de u2 vale)
     )
-    assert out.rejected == {"unknown_id": 1, "empty": 1, "unchanged": 0, "markers": 1, "reversal": 0, "worse": 0}
+    assert out.rejected == {
+        "unknown_id": 1, "empty": 1, "unchanged": 0, "markers": 1, "reversal": 0, "worse": 0, "glossary": 0,
+    }  # fmt: skip
     assert out.applied == {}
 
 
@@ -96,3 +98,57 @@ def test_synthetic_or_malformed_markers_are_rejected() -> None:
     assert out2.rejected["markers"] == 1
     assert out2.applied == {}
 
+
+
+def _glossary_case():
+    from translaterany.memory.models import GlossaryEntry
+
+    sources = {"g1": LineSource("The widget maker met Zorblax and the gizmo.", "dialogue", "Default", 3000)}
+    texts = {"g1": "O fabricante de engenhocas encontrou Zorblax e o gizmo."}
+    env = CheckEnv(
+        glossary=[
+            GlossaryEntry(term="widget maker", translation="fabricante de engenhocas"),
+            GlossaryEntry(term="Zorblax", translation="Zorblax", keep_original=True),
+            GlossaryEntry(term="gizmo", translation="geringonça"),  # já violado no texto atual
+        ]
+    )
+    return texts, sources, env
+
+
+def test_edit_removing_canonical_glossary_form_is_rejected() -> None:
+    texts, sources, env = _glossary_case()
+    edit = LineEdit(id="g1", new="O criador de engenhocas encontrou Zorblax e o gizmo.")
+    out = apply_edits(texts, [edit], {"g1"}, sources, env)
+    assert out.rejected["glossary"] == 1 and out.applied == {} and out.texts == texts
+
+
+def test_glossary_rejection_holds_even_when_another_term_is_already_violated() -> None:
+    texts, sources, env = _glossary_case()
+    edit = LineEdit(id="g1", new="O fabricante de engenhocas encontrou o Zorblax e o gizmo.")  # mantém tudo: ok
+    assert apply_edits(texts, [edit], {"g1"}, sources, env).applied
+    edit = LineEdit(id="g1", new="O fabricante de engenhocas encontrou Zorbla e o gizmo.")  # perde o nome mantido
+    assert apply_edits(texts, [edit], {"g1"}, sources, env).rejected["glossary"] == 1
+
+
+def test_edit_keeping_glossary_forms_and_fixing_others_is_applied() -> None:
+    texts, sources, env = _glossary_case()
+    edit = LineEdit(id="g1", new="O Fabricante de Engenhocas encontrou Zorblax e a geringonça.")
+    out = apply_edits(texts, [edit], {"g1"}, sources, env)
+    assert out.applied == {"g1": "O Fabricante de Engenhocas encontrou Zorblax e a geringonça."}
+    assert out.rejected["glossary"] == 0
+
+
+def test_edit_repairing_short_term_inside_longer_term_is_not_rejected_as_glossary() -> None:
+    from translaterany.memory.models import GlossaryEntry
+
+    sources = {"g1": LineSource("What is Steins Gate?", "dialogue", "Default", 2000)}
+    texts = {"g1": "O que é Steins Portal / Gate?"}
+    env = CheckEnv(
+        glossary=[
+            GlossaryEntry(term="Gate", translation="Portal / Gate"),
+            GlossaryEntry(term="Steins Gate", translation="Steins Gate", keep_original=True),
+        ]
+    )
+    out = apply_edits(texts, [LineEdit(id="g1", new="O que é Steins Gate?")], {"g1"}, sources, env)
+    assert out.rejected["glossary"] == 0
+    assert out.applied == {"g1": "O que é Steins Gate?"}

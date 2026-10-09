@@ -14,10 +14,18 @@ class MetadataArtifact(BaseModel):
     story: StoryMemory | None = None
 
 
+class CharacterStyle(BaseModel):
+    """Estilo de fala de um personagem observado em um episódio (descrição curta em PT-BR)."""
+
+    name: str
+    speech_style: str
+
+
 class ExtractTermsArtifact(BaseModel):
     episode_key: str
     terms: list[GlossaryEntry] = Field(default_factory=list)
     character_mentions: list[str] = Field(default_factory=list)
+    character_styles: list[CharacterStyle] = Field(default_factory=list)  # ausente em artefatos antigos
 
 
 class ConsolidatedMemoryArtifact(BaseModel):

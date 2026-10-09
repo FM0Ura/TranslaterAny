@@ -32,5 +32,21 @@ def test_colloquial_signals() -> None:
         "u3": ["redundant_subject"],
         "u4": ["archaic_pronoun"],
         "u5": ["too_long"],
-        "u7": ["speech_style"],
     }
+
+
+def test_speech_style_alone_does_not_target_a_line() -> None:
+    lines = [line("u1", "Let's go.", "Vamos."), line("u2", "Hello there.", "Olá.")]
+    speaker_of = {"u1": "Yu", "u2": "Yu"}
+    assert colloquial_signals(lines, speaker_of, {"Yu"}) == {}
+
+
+def test_speech_style_reinforces_lines_already_selected() -> None:
+    lines = [
+        line("u1", "However, I lost it.", "No entanto, eu perdi."),
+        line("u2", "I'll do it.", "Vou fazê-lo."),
+        line("u3", "Let's go.", "Vamos."),
+    ]
+    speaker_of = {"u1": "Yu", "u3": "Yu"}  # u2 sem falante estilizado
+    got = colloquial_signals(lines, speaker_of, {"Yu"})
+    assert got == {"u1": ["formal_connective", "speech_style"], "u2": ["enclisis"]}

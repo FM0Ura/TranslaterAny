@@ -22,7 +22,7 @@ class ClassifyOptions(BaseModel):
 @register_stage
 class ClassifyStage(Stage):
     name = "classify"
-    version = "1"
+    version = "2"  # 2: letras bilíngues romaji/inglês viram song
     scope = StageScope.EPISODE
     inputs = ("normalize",)
     Options = ClassifyOptions

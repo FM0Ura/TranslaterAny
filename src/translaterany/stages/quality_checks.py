@@ -104,7 +104,7 @@ def assemble_metrics(
 @register_stage
 class QualityChecksStage(Stage):
     name: ClassVar[str] = "quality_checks"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: glossário casa pelo termo mais longo (sem exigir termo curto dentro de outro)
     scope: ClassVar[StageScope] = StageScope.EPISODE
     reads_source: ClassVar[bool] = True  # extrai as fontes anexadas
     Options: ClassVar[type[BaseModel]] = QualityChecksOptions

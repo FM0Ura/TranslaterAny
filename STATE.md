@@ -3,7 +3,7 @@
 > Fotografia atual do desenvolvimento. O plano completo está em [`ROADMAP.md`](ROADMAP.md).
 > Atualize este arquivo ao concluir cada etapa de um marco (spec, plano, implementação) e sempre que uma decisão for tomada.
 
-**Última atualização:** 2026-10-06
+**Última atualização:** 2026-10-09
 
 ---
 
@@ -94,6 +94,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-10-05 | **Lançamento v1.1.0:** Conclusão dos marcos M9 e M10 com 715 testes passando, validação real no Blu-ray de High School of the Dead e release v1.1.0 publicada | marco v1.1 finalizado |
 | 2026-10-06 | **M11 — Diarização de Áudio e Multimodalidade (v1.2):** Pipeline multimodal de áudio com Map-Reduce em nível de série: etapas `extract_voice` (por episódio) e `consolidate_voice_bank` (escopo SERIES). Motores de diarização desacoplados (ONNX local padrão e PyAnnote opcional com HF token). Banco de vozes da série (`voice_bank.json`) consolida centróides e associa a `characters.yaml`. Análise multimodal em `scene_analysis` (`analyze_scenes_multimodal`) com similaridade cosseno, confiança `high`, precedência de gênero canônico do AniList sobre pitch acústico, salvaguarda estrita de vocativo (identifica listener, nunca speaker) e gênero acústico para Unknown; binding dinâmico via `bind_pipeline` garantindo compatibilidade com pipelines parciais | 746 testes passando (+31 novos testes do M11); zero regressões; v1.2 concluída |
 | 2026-10-06 | **M12 — UI Web e API RESTful Desacoplada (v1.3):** Arquitetura desacoplada em 3 camadas com API RESTful JSON pura (`/api/v1/`) no FastAPI; gerenciador assíncrono de jobs (`JobManager`) com suporte a pausa segura entre etapas (`PAUSED`), retomada e cancelamento com streaming SSE em tempo real; camada de serviços (`SeriesService`, `MemoryService`, `PipelineService`, `ConfigService`); SSR em Jinja2 com HTMX 2.x e Tailwind CSS embutidos localmente (100% offline, zero dependências Node/npm); construtor visual de pipeline em grafo DAG com toggles de bypass e suporte a customização por série (`series.toml`); editor visual interativo de memórias (`characters.yaml`, `glossary.yaml`, `story.yaml`); comando CLI Typer `translaterany web` | 767 testes passando (+21 novos testes do M12); zero regressões; v1.3 concluída |
+| 2026-10-09 | **Consistência de tradução (Steins;Gate, 26 episódios):** glossário determinístico com marcadores `⟦Gn⟧` e guarda nas edições do refino; casamento de glossário pelo termo mais longo; sanitização do glossário e fusão de apelidos em personagens na consolidação; `speech_style` deixa de selecionar sozinho as falas da `colloquial` (de ~74% para ~10% das falas); análise de cena marca gênero indeterminado; redistribuição por cláusulas; limpeza de OCR `\|`→`I`; letras de abertura/encerramento com tradução bilíngue; ortografia só aceita correção de acento | 976 testes; 8 episódios reprocessados (glossário violado 97→53, vazamento "Portal / Gate" 4→0). Teste A/B de fundir `review_meaning`+`treatment_consistency`+`final_readthrough` numa passada de 12B piorou (branch `exp/review-combined`, não integrada). Em aberto: placas `Blackboard` em inglês (S01E11); 18 episódios sem reprocesso; conferência com o original roda antes de `colloquial`/`adapt`; custo da `orthography`; verificação final com modelo de nuvem a avaliar |
 
 ---
 

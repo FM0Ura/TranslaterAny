@@ -20,6 +20,7 @@ from translaterany.pipeline.units import Episode, Series
 from translaterany.stages.translation_memory import TranslationMemoryArtifact
 from translaterany.subtitles.chunking import DialogueLine, format_batch_prompt
 from translaterany.subtitles.classify import Classification, ClassifiedUnit, ClassifiedUnitCollection
+from translaterany.subtitles.glossary_protect import GlossaryProtector
 from translaterany.subtitles.linebreak import char_budget, flatten_breaks
 from translaterany.subtitles.merge import MergedUnitsDoc
 from translaterany.subtitles.normalize import NormalizedDoc
@@ -53,7 +54,8 @@ class TranslateDialogueOptions(BaseModel):
 @register_stage
 class StageTranslateDialogue(Stage):
     name: ClassVar[str] = "translate_dialogue"
-    version: ClassVar[str] = "3"  # 3: orçamento de compostos proporcional ao nº de eventos (2: sem \N + orçamento)
+    # 4: termos do glossário protegidos por marcador ⟦Gn⟧; 3: orçamento de compostos por evento
+    version: ClassVar[str] = "4"
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
@@ -288,6 +290,7 @@ class StageTranslateDialogue(Stage):
                 limits=ChecksConfig(max_cps=self.max_cps, max_cpl=self.max_cpl),
             )
 
+            protector = GlossaryProtector(matched_glossary)
             for line_id, orig_text in units_to_verify.items():
                 tr = translated_texts.get(line_id, orig_text)
                 if gate.enabled:
@@ -308,13 +311,15 @@ class StageTranslateDialogue(Stage):
                             count(ctx, "gate_retries")
                             count(ctx, "extra_calls")
                             feedback = decision.feedback or gate.generate_feedback(decision.blocking)
+                            protected = protector.protect(orig_text)
                             single_prompt = format_batch_prompt(
-                                [DialogueLine(id=line_id, text=orig_text)],
+                                [DialogueLine(id=line_id, text=protected.text)],
                                 context=[],
-                                glossary=matched_glossary,
+                                glossary=() if protector else matched_glossary,
                                 characters=matched_characters,
                                 line_contexts=line_contexts,
                                 char_budgets={line_id: budgets[line_id]} if line_id in budgets else None,
+                                term_markers={line_id: protected.canonicals} if protected.canonicals else None,
                             )
                             full_prompt = f"{single_prompt}\n\nATENÇÃO - CORREÇÃO OBRIGATÓRIA:\n{feedback}"
                             req = LLMRequest(
@@ -352,6 +357,10 @@ class StageTranslateDialogue(Stage):
 
                             if not new_text.strip():
                                 break
+
+                            new_text, restored = protector.restore(new_text, protected.canonicals)
+                            if not restored:
+                                count(ctx, "glossary_markers_lost")
 
                             if gate.is_oscillating(line_id, new_text):
                                 logger.info(

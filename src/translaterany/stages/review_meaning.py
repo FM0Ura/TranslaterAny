@@ -34,7 +34,7 @@ só contexto. Responda apenas com as falas que precisam mudar; se nenhuma precis
 @register_stage
 class ReviewMeaningStage(DialogueRefineStage):
     name: ClassVar[str] = "review_meaning"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "3"  # 3: glossário casa pelo termo mais longo; 2: rejeita edição que remove forma canônica
 
     def instructions(self, ctx: StageContext | None = None) -> str:
         if ctx is not None:

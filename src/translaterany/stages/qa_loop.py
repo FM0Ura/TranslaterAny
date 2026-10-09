@@ -86,7 +86,7 @@ class QALoopStage(Stage):
     """Etapa do Laço de QA final com auditoria, blame e cascata de reprocessamento."""
 
     name: ClassVar[str] = "qa_loop"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "2"  # 2: glossário casa pelo termo mais longo (sem exigir termo curto dentro de outro)
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True

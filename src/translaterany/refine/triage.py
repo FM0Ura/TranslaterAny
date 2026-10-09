@@ -22,6 +22,15 @@ def meaning_signals(lines: Sequence[LineInput], env: CheckEnv) -> dict[str, list
 def colloquial_signals(
     lines: Sequence[LineInput], speaker_of: Mapping[str, str], speakers_with_style: set[str]
 ) -> dict[str, list[str]]:
+    """Escolhe as falas que a etapa colloquial pode reescrever, com os sinais que as motivaram.
+
+    Só entra a fala com algum sinal de texto duro ou literal (conectivo formal, ênclise, sujeito
+    redundante, pronome arcaico, tradução longa demais). O estilo de fala do personagem NÃO seleciona
+    sozinho: quando todo personagem tem estilo, o sinal marcaria quase toda fala e a etapa viraria
+    reescrita geral, com muita troca lateral de sinônimos e risco de mudar o sentido. Ele só é
+    anexado, como sinal de reforço, às falas já escolhidas, e o prompt da etapa o recebe junto
+    com o "tom" e o "falante" para orientar a reescrita.
+    """
     result: dict[str, list[str]] = {}
     for line in lines:
         pt, en = plain(line.target), plain(line.source)
@@ -36,7 +45,7 @@ def colloquial_signals(
             signals.append("archaic_pronoun")
         if len(en) >= lexicon.TOO_LONG_MIN_CHARS and len(pt) > lexicon.TOO_LONG_RATIO * len(en):
             signals.append("too_long")
-        if speaker_of.get(line.id) in speakers_with_style:
+        if signals and speaker_of.get(line.id) in speakers_with_style:
             signals.append("speech_style")
         if signals:
             result[line.id] = signals

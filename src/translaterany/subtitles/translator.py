@@ -22,6 +22,7 @@ from translaterany.subtitles.chunking import (
     create_dialogue_batches,
     format_batch_prompt,
 )
+from translaterany.subtitles.glossary_protect import GlossaryProtector, ProtectedText
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,14 @@ class DialogueBatchTranslator:
         if self.metrics is not None:
             self.metrics.count(name, n)
 
+    def _finish(self, line: DialogueLine, text: str, protector: GlossaryProtector, protected: ProtectedText) -> str:
+        """Repõe os termos protegidos; marcador perdido ou duplicado só é contado (o portão do glossário reage)."""
+        text, restored = protector.restore(text, protected.canonicals)
+        if not restored:
+            logger.warning("Fala id=%s: marcadores de glossário perdidos ou duplicados pelo modelo.", line.id)
+            self._count("glossary_markers_lost")
+        return _clean_alternative_slash(text, line.text)
+
     @retry(
         retry=retry_if_exception_type(LLMTransientError),
         stop=stop_after_attempt(3),
@@ -184,13 +193,18 @@ class DialogueBatchTranslator:
         if not lines:
             return {}
 
+        # Termos do glossário viram ⟦Gn⟧ antes do modelo e voltam na forma canônica depois (determinístico)
+        protector = GlossaryProtector(glossary)
+        protected = {line.id: protector.protect(line.text) for line in lines}
+        term_markers = {line_id: p.canonicals for line_id, p in protected.items() if p.canonicals}
         prompt = format_batch_prompt(
-            lines,
+            [DialogueLine(id=line.id, text=protected[line.id].text) for line in lines],
             context,
-            glossary=glossary,
+            glossary=() if protector else glossary,  # com a proteção, o glossário vai nos marcadores
             characters=characters,
             line_contexts=self.line_contexts,
             char_budgets=self.char_budgets,
+            term_markers=term_markers,
         )
         expected_ids = {line.id for line in lines}
         target_model = self.model_name
@@ -222,10 +236,12 @@ class DialogueBatchTranslator:
             for item in output.items:
                 item_id = _normalize_id(item.id)
                 if item_id in expected_ids:
-                    src_text = by_id[item_id].text if item_id in by_id else ""
-                    translations[item_id] = _clean_alternative_slash(item.text, src_text)
+                    translations[item_id] = self._finish(by_id[item_id], item.text, protector, protected[item_id])
             if not translations and len(lines) == 1 and len(output.items) == 1:
-                translations[lines[0].id] = _clean_alternative_slash(output.items[0].text, lines[0].text)  # chamada de uma fala: o ID não importa
+                # chamada de uma fala: o ID não importa
+                translations[lines[0].id] = self._finish(
+                    lines[0], output.items[0].text, protector, protected[lines[0].id]
+                )
 
         # Nível 2: Reconciliação de IDs ausentes
         missing_ids = expected_ids - set(translations.keys())

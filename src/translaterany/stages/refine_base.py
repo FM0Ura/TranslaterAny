@@ -144,6 +144,7 @@ class DialogueRefineStage(Stage):
     produces_dialogue: ClassVar[bool] = True
     Options: ClassVar[type[BaseModel]] = RefineOptions
     default_dialogue_input: ClassVar[str] = "translate_dialogue"
+    include_speaker_style: ClassVar[bool] = False  # manda o "estilo" do falante nas falas editáveis
 
     def __init__(self, options: BaseModel | None = None) -> None:
         super().__init__(options)
@@ -247,6 +248,7 @@ class DialogueRefineStage(Stage):
             profile=getattr(ctx, "target_profile", None),
         )
         targets = self.select_targets(ids, data)
+        style_of = {c.name: c.speech_style for c in characters if c.speech_style} if self.include_speaker_style else {}
         if "translation_memory" in self.inputs:  # falas resolvidas pela memória de tradução não são revisadas
             tm = ctx.inputs.json("translation_memory", TranslationMemoryArtifact)
             targets = {i: s for i, s in targets.items() if i not in tm.matched_units}
@@ -282,6 +284,7 @@ class DialogueRefineStage(Stage):
                         signals=targets.get(i, []),
                         editable=i in targets,
                         listener=listener_of.get(i, "Unknown"),
+                        style=style_of.get(speaker_of.get(i, "")) if i in targets else None,
                     )
                 )
             try:

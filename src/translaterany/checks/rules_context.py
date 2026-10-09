@@ -6,7 +6,7 @@ from translaterany.checks import lexicon
 from translaterany.checks.models import CheckEnv, Finding, LineInput
 from translaterany.checks.registry import line_check
 from translaterany.checks.text import plain, visible_lines
-from translaterany.memory.matching import matches_term
+from translaterany.memory.matching import glossary_matches, matches_term
 
 
 @dataclass(frozen=True)
@@ -38,13 +38,20 @@ def names(line: LineInput, env: CheckEnv) -> list[Finding]:
     return findings
 
 
+def _norm(text: str) -> str:
+    return " ".join(text.split()).lower()
+
+
 @line_check("glossary", {"dialogue", "sign"})
 def glossary(line: LineInput, env: CheckEnv) -> list[Finding]:
     src, tgt = plain(line.source), plain(line.target)
     findings: list[Finding] = []
-    for entry in env.glossary:
-        if not any(matches_term(t, src) for t in (entry.term, *entry.aliases)):
-            continue
+    # formas que pertencem a outro dono (personagem ou outra entrada): um alias ambíguo não prova o termo
+    foreign = {_norm(n) for group in env.names for n in group} | {_norm(e.term) for e in env.glossary}
+    for entry, matched in glossary_matches(env.glossary, src):
+        if _norm(entry.term) not in {_norm(t) for t in matched}:
+            if all(_norm(t) in foreign for t in matched):
+                continue
         expected = entry.term if entry.keep_original else entry.translation
         if expected and not matches_term(expected, tgt):
             findings.append(

@@ -269,3 +269,164 @@ def test_consolidate_memory_ignores_short_tokens_and_honorifics(tmp_path: Path) 
     assert "san" not in senku.aliases
     assert "yo" not in senku.aliases
     assert "kun" not in senku.aliases
+
+
+def _run_consolidate(tmp_path: Path, meta: MetadataArtifact, episodes: dict[str, ExtractTermsArtifact]):
+    from translaterany.memory.store import MemoryStore
+
+    series = Series(name="Synthetic Series (2020)", path=tmp_path)
+    store = ArtifactStore(tmp_path / "data")
+
+    class MockOutput:
+        def json(self, obj: ConsolidatedMemoryArtifact) -> None:
+            pass
+
+    class MockInputs:
+        def json(self, name: str, model: type) -> object:
+            if name == "metadata":
+                return meta
+            raise ValueError(name)
+
+        def json_all(self, name: str, model: type) -> dict[str, ExtractTermsArtifact]:
+            if name == "extract_terms":
+                return episodes
+            raise ValueError(name)
+
+    ctx = SimpleNamespace(series=series, episode=None, inputs=MockInputs(), output=MockOutput(), store=store, llm=None)
+    ConsolidateMemoryStage().run(ctx)
+    return MemoryStore(store.series_dir(series.key) / "memory")
+
+
+def test_consolidate_memory_sanitizes_glossary_aliases_and_is_idempotent(tmp_path: Path) -> None:
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[CharacterEntry(name="Rin Okada", aliases=["Rinrin"], gender=Gender.FEMALE)],
+    )
+    cat = GlossaryCategory.NAME
+    ep = ExtractTermsArtifact(
+        episode_key="S01E01",
+        terms=[
+            GlossaryEntry(
+                term="Phantom Rin",
+                translation="Phantom Rin",
+                category=cat,
+                keep_original=True,
+                aliases=["Phantom Rin", "Rinrin", "Phantom"],
+            ),
+            GlossaryEntry(term="Rinrin", translation="Rinrin", category=cat, keep_original=True),
+            GlossaryEntry(term="Gadget", translation="Gadget", category=GlossaryCategory.OBJECT),
+            GlossaryEntry(
+                term="Gadget (draft name)", translation="Gadget (rascunho)", category=GlossaryCategory.OBJECT
+            ),
+        ],
+    )
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
+    glossary = mem.load_glossary()
+    assert glossary["Phantom Rin"].aliases == ["Phantom"]
+    assert "Gadget (draft name)" not in glossary
+    assert glossary["Gadget"].aliases == ["Gadget (draft name)"]
+    first = mem.glossary_path.read_text(encoding="utf-8")
+
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
+    assert mem.glossary_path.read_text(encoding="utf-8") == first
+
+
+def test_consolidate_memory_merges_character_styles_across_episodes(tmp_path: Path) -> None:
+    from translaterany.memory.artifacts import CharacterStyle
+
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[
+            CharacterEntry(name="Rin Okada", gender=Gender.FEMALE),
+            CharacterEntry(name="Taro Sato", speech_style="estilo da metadata"),
+        ],
+    )
+    ep1 = ExtractTermsArtifact(
+        episode_key="S01E01",
+        character_styles=[
+            CharacterStyle(name="Rin Okada", speech_style="fala rápido, gírias"),
+            CharacterStyle(name="Taro Sato", speech_style="estilo novo"),
+            CharacterStyle(name="Mika", speech_style="meiga"),
+        ],
+    )
+    ep2 = ExtractTermsArtifact(
+        episode_key="S01E02",
+        character_styles=[CharacterStyle(name="Rin", speech_style="fala rápido, gírias")],
+    )
+    old_ep = ExtractTermsArtifact.model_validate({"episode_key": "S01E03", "terms": [], "character_mentions": []})
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep1, "S01E02": ep2, "S01E03": old_ep})
+
+    chars = {c.name: c for c in mem.load_characters()}
+    assert chars["Rin Okada"].speech_style == "fala rápido, gírias"
+    assert chars["Rin Okada"].source == EntrySource.METADATA
+    assert chars["Taro Sato"].speech_style == "estilo da metadata"
+    assert chars["Mika"].speech_style == "meiga"
+    assert chars["Mika"].source == EntrySource.EXTRACTED
+
+    # reexecutar não altera nada e uma segunda rodada sem estilos não apaga os já salvos
+    first = mem.characters_path.read_text(encoding="utf-8")
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep1, "S01E02": ep2, "S01E03": old_ep})
+    assert mem.characters_path.read_text(encoding="utf-8") == first
+    mem = _run_consolidate(tmp_path, meta, {"S01E03": old_ep})
+    assert {c.name: c for c in mem.load_characters()}["Rin Okada"].speech_style == "fala rápido, gírias"
+
+
+def test_consolidate_memory_resolves_nicknames_instead_of_creating_characters(tmp_path: Path) -> None:
+    from translaterany.memory.artifacts import CharacterStyle
+
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[
+            CharacterEntry(name="Luka Urushibara", aliases=["Luka"]),
+            CharacterEntry(name="Ren Aoki", aliases=["Super Ren"]),
+        ],
+    )
+    ep = ExtractTermsArtifact(
+        episode_key="S01E01",
+        character_mentions=["Luka Urushibara", "Ren Aoki", "Lukako", "Super Ren", "Zanzibar"],
+        character_styles=[
+            CharacterStyle(name="Rukako", speech_style="doce"),
+            CharacterStyle(name="Ren-kun", speech_style="seco"),
+        ],
+    )
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
+    chars = {c.name: c for c in mem.load_characters()}
+    assert set(chars) == {"Luka Urushibara", "Ren Aoki", "Zanzibar"}
+    assert chars["Luka Urushibara"].aliases == ["Luka", "Lukako", "Rukako"]
+    assert chars["Luka Urushibara"].speech_style == "doce"
+    assert chars["Ren Aoki"].speech_style == "seco"
+    assert chars["Zanzibar"].source == EntrySource.EXTRACTED
+
+    first = mem.characters_path.read_text(encoding="utf-8")
+    mem = _run_consolidate(tmp_path, meta, {"S01E01": ep})
+    assert mem.characters_path.read_text(encoding="utf-8") == first
+
+
+def test_consolidate_memory_heals_stale_extracted_nickname_characters(tmp_path: Path) -> None:
+    from translaterany.memory.store import MemoryStore
+
+    meta = MetadataArtifact(
+        matched=True,
+        title="Synthetic",
+        characters=[CharacterEntry(name="Luka Urushibara"), CharacterEntry(name="Ren Aoki")],
+    )
+    series = Series(name="Synthetic Series (2020)", path=tmp_path)
+    mem_dir = ArtifactStore(tmp_path / "data").series_dir(series.key) / "memory"
+    MemoryStore(mem_dir).save_characters(
+        [
+            CharacterEntry(name="Rukako", source=EntrySource.EXTRACTED),
+            CharacterEntry(name="Zanzibar", source=EntrySource.EXTRACTED),
+            CharacterEntry(name="Ren Aoki, Luka Urushibara", source=EntrySource.EXTRACTED),
+        ]
+    )
+    mem = _run_consolidate(tmp_path, meta, {})
+    chars = {c.name: c for c in mem.load_characters()}
+    assert set(chars) == {"Luka Urushibara", "Ren Aoki", "Zanzibar"}
+    assert chars["Luka Urushibara"].aliases == ["Rukako"]
+
+    first = mem.characters_path.read_text(encoding="utf-8")
+    mem = _run_consolidate(tmp_path, meta, {})
+    assert mem.characters_path.read_text(encoding="utf-8") == first

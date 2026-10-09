@@ -19,6 +19,7 @@ class ReviewLine:
     signals: list[str]
     editable: bool
     listener: str | None = None
+    style: str | None = None  # jeito de falar do falante (memória da série), só quando a etapa o pede
 
 
 def _windowed(scene: Sequence[str], group: Sequence[str], targets: set[str], window: int) -> list[str]:
@@ -78,6 +79,8 @@ def render_block_prompt(lines: Sequence[ReviewLine]) -> str:
         }
         if ln.listener and ln.listener != "Unknown":
             item["ouvinte"] = ln.listener
+        if ln.style:
+            item["estilo"] = ln.style
         item.update(
             {
                 "tom": ln.tone,

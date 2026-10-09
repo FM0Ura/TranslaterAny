@@ -66,7 +66,7 @@ Se nenhuma fala precisar de alteração, retorne a lista "edits" vazia."""
 @register_stage
 class TreatmentConsistencyStage(DialogueRefineStage):
     name: ClassVar[str] = "treatment_consistency"
-    version: ClassVar[str] = "1"
+    version: ClassVar[str] = "3"  # 3: glossário casa pelo termo mais longo; 2: rejeita edição que remove forma canônica
     default_dialogue_input: ClassVar[str] = "colloquial"
     Options: ClassVar[type] = TreatmentConsistencyOptions
 
