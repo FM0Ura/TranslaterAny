@@ -311,14 +311,37 @@ extrair → normalizar → classificar → memória de tradução → unir frase
 
 ---
 
-## Depois da v1.2 (backlog)
+### Marco M12 — UI Web e API RESTful Desacoplada (v1.3)
+
+**Objetivo:** Interface Web moderna, interativa e desacoplada em 3 camadas, com visualização da biblioteca de animes, fila de processamento em segundo plano com suporte a status PAUSED, retomada e cancelamento, streaming SSE em tempo real, grafo visual de pipeline com nós em bypass e edição das memórias da série.
+
+**Design e Implementação:**
+- Servidor ASGI FastAPI desacoplado executável via CLI: `translaterany web [--host 0.0.0.0] [--port 8080]`.
+- Camada de API RESTful pura (`/api/v1/`) com endpoints para séries, episódios, memórias, pipeline, jobs e diagnóstico (`doctor`).
+- Gerenciador de tarefas (`JobManager`) assíncrono com thread worker dedicada (`max_workers=1` para evitar sobrecarga de GPU), tokens atômicos de pausa/cancelamento cooperativos e broadcaster de eventos SSE (`/api/v1/jobs/{id}/stream`).
+- Interface gráfica SSR renderizada com Jinja2, HTMX 2.x e Tailwind CSS embutidos localmente (100% offline, zero dependências Node/npm).
+- Grafo visual e interativo de pipeline (DAG com nós e conexões) permitindo ligar e desligar etapas ("Bypass"), tanto globalmente quanto por série (`series.toml`).
+- Editor visual de memórias com gerenciamento de personagens (`characters.yaml`), termos de glossário (`glossary.yaml`) e sinopse narrativa (`story.yaml`).
+- Inspetor de episódios com comparador de falas e download de arquivos `.pt-BR.ass`.
+
+**Pronto quando:**
+1. Servidor ASGI FastAPI inicializado via comando CLI `translaterany web` (✅);
+2. API RESTful `/api/v1/` cobre todas as operações de biblioteca, pipeline, configurações e memórias de forma desacoplada (✅);
+3. `JobManager` gerencia enfileiramento, pausa atômica entre etapas, cancelamento e streaming de progresso/logs via SSE (✅);
+4. Interface gráfica Jinja2 + HTMX funcional e sem dependências externas de rede (✅);
+5. Grafo de pipeline interativo reflete nós ativos e bypass por série e globalmente (✅);
+6. Suíte completa com 767 testes passando com 100% de sucesso e zero regressões (✅ M12 concluído — 767 testes no total).
+
+---
+
+## Depois da v1.3 (backlog)
 
 - `eval` com conjunto de ouro + **métricas camada 3** (COMETKiwi, IA como juiz).
 - **Guia de estilo por série** (`style.yaml`) — adiado ("por enquanto não").
 - Política configurável para notas de tradução (T/N) do fansub.
 - Troca automática para fonte de fallback quando a fonte do fansub não tiver acentos.
 - Portões de etapa anterior (retraduzir o episódio quando a taxa de edição da revisão for alta).
-- UI web e/ou serviço automático (observar pasta, webhook Sonarr/Jellyfin).
+- Observador de diretório em segundo plano / webhook Sonarr/Jellyfin.
 
 ## Descartado
 

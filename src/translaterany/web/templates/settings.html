@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações - TranslaterAny{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-4xl mx-auto">
+    <div class="border-b border-gray-800 pb-6">
+        <h1 class="text-3xl font-extrabold text-white tracking-tight">Configurações do Sistema</h1>
+        <p class="text-sm text-gray-400 mt-1">Gerencie idiomas, provedores de inteligência artificial e limites de qualidade.</p>
+    </div>
+
+    <form id="settings-form" onsubmit="saveConfig(event)" class="space-y-8">
+        <!-- Seção 1: Idiomas -->
+        <div class="glass-card rounded-2xl p-6 space-y-6">
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                <span>🌐</span>
+                <span>Idiomas de Tradução</span>
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Idioma de Origem</label>
+                    <input type="text" id="cfg-source-lang" value="{{ config.source_language }}" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Idioma de Destino</label>
+                    <input type="text" id="cfg-target-lang" value="{{ config.target_language }}" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 2: LLM & Modelos -->
+        <div class="glass-card rounded-2xl p-6 space-y-6">
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                <span>🤖</span>
+                <span>Provedores e Modelos de IA</span>
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Perfil Ativo</label>
+                    <select id="cfg-llm-profile" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        <option value="local" {% if config.llm.profile == 'local' %}selected{% endif %}>Local (Ollama 100% Offline)</option>
+                        <option value="hibrido" {% if config.llm.profile == 'hibrido' %}selected{% endif %}>Híbrido (Local + Nuvem)</option>
+                        <option value="nuvem" {% if config.llm.profile == 'nuvem' %}selected{% endif %}>Nuvem</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Custo Máximo Permitido (USD)</label>
+                    <input type="number" step="0.5" id="cfg-llm-max-cost" value="{{ config.llm.max_cost_usd }}" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 3: Diagnóstico de Ambiente (Doctor) -->
+        <div class="glass-card rounded-2xl p-6 space-y-4">
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                <span>🩺</span>
+                <span>Diagnóstico do Sistema</span>
+            </h2>
+            <div id="doctor-checks-container" class="space-y-2 text-xs font-mono">
+                Carregando verificações de ambiente...
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold shadow-lg transition">
+                Salvar Configurações
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Carrega diagnósticos automaticamente
+    fetch('/api/v1/doctor')
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('doctor-checks-container');
+            container.innerHTML = data.checks.map(c => {
+                const color = c.status === 'ok' ? 'text-emerald-400' : (c.status === 'warn' ? 'text-amber-400' : 'text-red-400');
+                const badge = c.status === 'ok' ? '✓ OK' : (c.status === 'warn' ? '⚠ WARN' : '✗ FAIL');
+                return `<div class="flex items-center justify-between p-2 rounded bg-gray-950 border border-gray-800">
+                    <span class="font-bold text-gray-300">${c.name}</span>
+                    <span class="${color}">${badge}: ${c.message}</span>
+                </div>`;
+            }).join('');
+        });
+
+    async function saveConfig(e) {
+        e.preventDefault();
+        const baseRes = await fetch('/api/v1/config');
+        const cfg = await baseRes.json();
+
+        cfg.source_language = document.getElementById('cfg-source-lang').value;
+        cfg.target_language = document.getElementById('cfg-target-lang').value;
+        cfg.llm.profile = document.getElementById('cfg-llm-profile').value;
+        cfg.llm.max_cost_usd = parseFloat(document.getElementById('cfg-llm-max-cost').value);
+
+        const putRes = await fetch('/api/v1/config', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(cfg)
+        });
+
+        if (putRes.ok) {
+            alert('Configurações salvas com sucesso!');
+        } else {
+            alert('Erro ao salvar configurações.');
+        }
+    }
+</script>
+{% endblock %}

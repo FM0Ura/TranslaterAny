@@ -9,9 +9,9 @@
 
 ## Onde estamos
 
-- **Fase:** v1.2 concluída e lançada — **Release v1.2.0** (746 testes passando, zero regressões).
-- **Marco atual:** **v1.2.0 pronta** (M11: Diarização de Áudio e Multimodalidade).
-- **Próxima ação:** Planejamento do backlog pós-v1.2.
+- **Fase:** v1.3 concluída e lançada — **Release v1.3.0** (767 testes passando, zero regressões).
+- **Marco atual:** **v1.3.0 pronta** (M12: UI Web e API RESTful Desacoplada).
+- **Próxima ação:** Validação interativa e novas extensões do ecossistema.
 
 ## Progresso dos marcos
 
@@ -31,7 +31,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | M9 — Suporte Universal a Idiomas (v1.1) | ✅ | [spec](docs/superpowers/specs/2026-10-04-m9-suporte-universal-idiomas-design.md) | [plano](docs/superpowers/plans/2026-10-04-m9-suporte-universal-idiomas.md) | concluído (686 testes); pares arbitrários de idiomas, LanguageRegistry, perfis linguísticos e prompts parametrizados |
 | M10 — OCR de Legendas Gráficas (v1.1) | ✅ | [spec](docs/superpowers/specs/2026-10-05-m10-ocr-legendas-graficas-design.md) | [plano](docs/superpowers/plans/2026-10-05-m10-ocr-legendas-graficas.md) | concluído (715 testes); suporte nativo a PGS/VobSub via Tesseract OCR em paralelo, hOCR com itálico, deduplicação SHA-256 e estilos de posição |
 | M11 — Diarização de Áudio e Multimodalidade (v1.2) | ✅ | [spec](docs/superpowers/specs/2026-10-06-m11-diarizacao-audio-design.md) | [plano](docs/superpowers/plans/2026-10-06-m11-diarizacao-audio.md) | concluído (746 testes); extração de áudio, Map-Reduce de perfis de voz por série, fusão multimodal no scene_analysis, precedência de gênero do AniList e salvaguarda de vocativo |
-| M12 — UI Web e API RESTful (v1.3) | 📝 | [spec](docs/superpowers/specs/2026-10-06-m12-ui-web-design.md) | ⬜ | spec criada; servidor FastAPI com API RESTful desacoplada, fila com suporte a pausa, grafo de pipeline e editor de memórias |
+| M12 — UI Web e API RESTful (v1.3) | ✅ | [spec](docs/superpowers/specs/2026-10-06-m12-ui-web-design.md) | [plano](docs/superpowers/plans/2026-10-06-m12-ui-web.md) | concluído (767 testes); servidor FastAPI, API RESTful v1 desacoplada, fila de jobs com suporte a pausa e SSE streaming, grafo de pipeline interativo com bypass, editor de memórias da série e CLI 'translaterany web' |
 
 ---
 
@@ -93,6 +93,7 @@ Legenda: ⬜ não iniciado · 📝 spec · 📋 plano · 🔨 implementação ·
 | 2026-10-05 | **M10 — OCR de Legendas Gráficas (v1.1):** Suporte nativo a legendas em imagem PGS (`.sup`) e VobSub DVD (`.sub`/`.idx`) via pure-Python + Pillow (zero OpenCV/PyTorch); seletor de faixas prioriza diálogo completo gráfico sobre placas/músicas em texto; extração via `mkvextract`; motor de OCR paralelo via Tesseract com hOCR para preservação de itálicos (`{\i1}...{\i0}`), deduplicação SHA-256 de frames e `ThreadPoolExecutor`; nova etapa `OCRStage` no pipeline gerando `.ocr.ass` com estilos de posicionamento vertical (`Top`/`\an8`, `Sign`/`\an5`, `Default`) e bypass transparente para faixas de texto; binding dinâmico de `NormalizeStage` e `WriteStage` ao `ocr`; checagem `doctor` para Tesseract e pacotes de idioma do `source_language` | 715 testes passando (+27 novos testes de OCR e E2E); zero regressões; v1.1 concluída |
 | 2026-10-05 | **Lançamento v1.1.0:** Conclusão dos marcos M9 e M10 com 715 testes passando, validação real no Blu-ray de High School of the Dead e release v1.1.0 publicada | marco v1.1 finalizado |
 | 2026-10-06 | **M11 — Diarização de Áudio e Multimodalidade (v1.2):** Pipeline multimodal de áudio com Map-Reduce em nível de série: etapas `extract_voice` (por episódio) e `consolidate_voice_bank` (escopo SERIES). Motores de diarização desacoplados (ONNX local padrão e PyAnnote opcional com HF token). Banco de vozes da série (`voice_bank.json`) consolida centróides e associa a `characters.yaml`. Análise multimodal em `scene_analysis` (`analyze_scenes_multimodal`) com similaridade cosseno, confiança `high`, precedência de gênero canônico do AniList sobre pitch acústico, salvaguarda estrita de vocativo (identifica listener, nunca speaker) e gênero acústico para Unknown; binding dinâmico via `bind_pipeline` garantindo compatibilidade com pipelines parciais | 746 testes passando (+31 novos testes do M11); zero regressões; v1.2 concluída |
+| 2026-10-06 | **M12 — UI Web e API RESTful Desacoplada (v1.3):** Arquitetura desacoplada em 3 camadas com API RESTful JSON pura (`/api/v1/`) no FastAPI; gerenciador assíncrono de jobs (`JobManager`) com suporte a pausa segura entre etapas (`PAUSED`), retomada e cancelamento com streaming SSE em tempo real; camada de serviços (`SeriesService`, `MemoryService`, `PipelineService`, `ConfigService`); SSR em Jinja2 com HTMX 2.x e Tailwind CSS embutidos localmente (100% offline, zero dependências Node/npm); construtor visual de pipeline em grafo DAG com toggles de bypass e suporte a customização por série (`series.toml`); editor visual interativo de memórias (`characters.yaml`, `glossary.yaml`, `story.yaml`); comando CLI Typer `translaterany web` | 767 testes passando (+21 novos testes do M12); zero regressões; v1.3 concluída |
 
 ---
 

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Biblioteca de Séries - TranslaterAny{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header com Ações e Resumo -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-800 pb-6">
+        <div>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight">Biblioteca de Séries</h1>
+            <p class="text-sm text-gray-400 mt-1">Gerencie animes e acompanhe o pipeline de tradução em tempo real.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <a href="/pipeline" class="inline-flex items-center px-4 py-2 border border-gray-700 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-800 transition">
+                ⚙️ Configurar Pipeline
+            </a>
+        </div>
+    </div>
+
+    <!-- Grid de Séries -->
+    {% if series_list %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {% for s in series_list %}
+        <div class="glass-card rounded-xl overflow-hidden hover:border-indigo-500 transition duration-200 flex flex-col group">
+            <div class="relative h-64 bg-gray-800 overflow-hidden">
+                {% if s.poster_url %}
+                <img src="{{ s.poster_url }}" alt="{{ s.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                {% else %}
+                <div class="w-full h-full flex flex-col items-center justify-center text-gray-600 bg-gray-900">
+                    <span class="text-4xl mb-2">🎬</span>
+                    <span class="text-xs text-gray-500">Sem Pôster</span>
+                </div>
+                {% endif %}
+                <span class="absolute top-3 right-3 px-2 py-1 text-xs font-semibold rounded-md backdrop-filter backdrop-blur-md {% if s.status == 'completed' %}bg-emerald-900 text-emerald-200 border border-emerald-700{% elif s.status == 'in_progress' %}bg-amber-900 text-amber-200 border border-amber-700{% else %}bg-gray-800 text-gray-300 border border-gray-700{% endif %}">
+                    {{ s.completed_episodes }}/{{ s.total_episodes }} prontos
+                </span>
+            </div>
+            <div class="p-5 flex-grow flex flex-col justify-between">
+                <div>
+                    <h3 class="font-bold text-white text-lg tracking-tight truncate" title="{{ s.title }}">{{ s.title }}</h3>
+                    <p class="text-xs text-gray-400 mt-1 font-mono">{{ s.key }}</p>
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between">
+                    <a href="/series/{{ s.key }}" class="text-indigo-400 hover:text-indigo-300 text-sm font-semibold flex items-center">
+                        Ver Detalhes &rarr;
+                    </a>
+                    <button hx-post="/api/v1/jobs/run" hx-ext="json-enc" hx-vals='{"series_key": "{{ s.key }}"}' hx-swap="none" onclick="toggleJobDrawer()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-medium transition">
+                        ▶ Processar
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16 glass-card rounded-2xl border border-dashed border-gray-800">
+        <span class="text-5xl">📂</span>
+        <h3 class="mt-4 text-lg font-bold text-white">Nenhuma série detectada</h3>
+        <p class="mt-2 text-sm text-gray-400 max-w-md mx-auto">
+            Coloque pastas de anime no diretório configurado da biblioteca ou execute um primeiro lote via CLI para indexar os episódios.
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
