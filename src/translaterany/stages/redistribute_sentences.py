@@ -66,7 +66,12 @@ class RedistributeSentencesStage(Stage):
         self.inputs = (*_FIXED, self.dialogue_input, *_OTHER_TEXTS)
 
     def cache_payload(self, series: Series | None, episode: Episode | None) -> Any:
-        return {"max_cpl": self.max_cpl, "max_cps": self.max_cps, "max_lines": self.max_lines, "dialogue_input": self.dialogue_input}
+        return {
+            "max_cpl": self.max_cpl,
+            "max_cps": self.max_cps,
+            "max_lines": self.max_lines,
+            "dialogue_input": self.dialogue_input,
+        }
 
     def run(self, ctx: StageContext) -> None:
         doc = ctx.inputs.json("normalize", NormalizedDoc)

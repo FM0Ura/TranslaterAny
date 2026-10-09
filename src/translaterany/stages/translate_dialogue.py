@@ -54,7 +54,8 @@ class TranslateDialogueOptions(BaseModel):
 @register_stage
 class StageTranslateDialogue(Stage):
     name: ClassVar[str] = "translate_dialogue"
-    version: ClassVar[str] = "4"  # 4: termos do glossário protegidos por marcador ⟦Gn⟧ (3: orçamento de compostos por evento)
+    # 4: termos do glossário protegidos por marcador ⟦Gn⟧; 3: orçamento de compostos por evento
+    version: ClassVar[str] = "4"
     scope: ClassVar[StageScope] = StageScope.EPISODE
     translates: ClassVar[bool] = True
     produces_texts: ClassVar[bool] = True
